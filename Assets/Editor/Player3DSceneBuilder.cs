@@ -30,8 +30,6 @@ public static class Player3DSceneBuilder
 
         if (!File.Exists(ThreeDScenePath))
             BuildScene(false);
-        else
-            EnsureTwoDSceneSwitcher();
     }
 
     private static void BuildScene(bool force)
@@ -46,7 +44,6 @@ public static class Player3DSceneBuilder
             CreateGround();
             CreatePlayer();
             CreateLighting();
-            CreateSceneSwitcher(scene);
             EditorSceneManager.SaveScene(scene, ThreeDScenePath);
             EnsureBuildSettings();
         }
@@ -56,7 +53,7 @@ public static class Player3DSceneBuilder
                 EditorSceneManager.RestoreSceneManagerSetup(previousSetup);
         }
 
-        EnsureTwoDSceneSwitcher();
+        UnifiedGameplaySceneUpgrade.ApplyNow();
         AssetDatabase.SaveAssets();
     }
 
@@ -107,49 +104,13 @@ public static class Player3DSceneBuilder
         light.intensity = 1f;
     }
 
-    private static void CreateSceneSwitcher(Scene scene)
-    {
-        GameObject switcher = new GameObject("View Scene Switcher");
-        SceneManager.MoveGameObjectToScene(switcher, scene);
-        switcher.AddComponent<ViewSceneSwitcher>();
-    }
-
-    private static void EnsureTwoDSceneSwitcher()
-    {
-        if (!File.Exists(TwoDScenePath))
-            return;
-
-        Scene scene = SceneManager.GetSceneByPath(TwoDScenePath);
-        bool openedForUpdate = !scene.IsValid() || !scene.isLoaded;
-        if (openedForUpdate)
-            scene = EditorSceneManager.OpenScene(TwoDScenePath, OpenSceneMode.Additive);
-
-        try
-        {
-            if (scene.GetRootGameObjects().Any(root => root.GetComponent<ViewSceneSwitcher>() != null))
-                return;
-
-            CreateSceneSwitcher(scene);
-            EditorSceneManager.MarkSceneDirty(scene);
-            EditorSceneManager.SaveScene(scene);
-        }
-        finally
-        {
-            if (openedForUpdate && scene.IsValid() && scene.isLoaded)
-                EditorSceneManager.CloseScene(scene, true);
-        }
-    }
-
     private static void EnsureBuildSettings()
     {
-        string[] requiredPaths = { TwoDScenePath, ThreeDScenePath };
-        EditorBuildSettingsScene[] scenes = EditorBuildSettings.scenes;
-        foreach (string path in requiredPaths)
+        EditorBuildSettings.scenes = new[]
         {
-            if (!scenes.Any(scene => scene.path == path))
-                scenes = scenes.Concat(new[] { new EditorBuildSettingsScene(path, true) }).ToArray();
-        }
-        EditorBuildSettings.scenes = scenes;
+            new EditorBuildSettingsScene(ThreeDScenePath, true),
+            new EditorBuildSettingsScene(TwoDScenePath, false)
+        };
     }
 }
 #endif
