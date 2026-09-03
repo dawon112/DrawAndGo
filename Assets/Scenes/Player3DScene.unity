@@ -247,7 +247,8 @@ GameObject:
   - component: {fileID: 664375297}
   - component: {fileID: 664375296}
   - component: {fileID: 664375295}
-  m_Layer: 0
+  - component: {fileID: 3000000001}
+  m_Layer: 10
   m_Name: DuduSurface
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -266,7 +267,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b4a12b8718cf689458421d396ea6cd3c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DuduSurface
-  width: 10
+  width: 20
   height: 6
   surfaceOffset: 0.03
 --- !u!23 &664375296
@@ -357,8 +358,8 @@ Transform:
   m_GameObject: {fileID: 664375294}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 3, z: 8}
-  m_LocalScale: {x: 10, y: 6, z: 1}
+  m_LocalPosition: {x: 5, y: 3, z: 8}
+  m_LocalScale: {x: 20, y: 6, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -469,8 +470,8 @@ Transform:
   m_GameObject: {fileID: 723503506}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.5999999, z: 7.97}
-  m_LocalScale: {x: 10, y: 0.14, z: 0.06}
+  m_LocalPosition: {x: 5, y: 0.5999999, z: 7.97}
+  m_LocalScale: {x: 20, y: 0.14, z: 0.06}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -486,7 +487,7 @@ GameObject:
   - component: {fileID: 820480128}
   - component: {fileID: 820480127}
   - component: {fileID: 820480126}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Player3D
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -560,6 +561,7 @@ GameObject:
   m_Component:
   - component: {fileID: 911315875}
   - component: {fileID: 911315874}
+  - component: {fileID: 3000000002}
   m_Layer: 0
   m_Name: GameViewManager
   m_TagString: Untagged
@@ -585,6 +587,8 @@ MonoBehaviour:
   haruLook: {fileID: 1100589744}
   duduCamera: {fileID: 2112354181}
   duduMovement: {fileID: 1973135219}
+  haruDrawing: {fileID: 3000000003}
+  crosshair: {fileID: 3000000002}
 --- !u!4 &911315875
 Transform:
   m_ObjectHideFlags: 0
@@ -611,6 +615,7 @@ GameObject:
   - component: {fileID: 1100589743}
   - component: {fileID: 1100589745}
   - component: {fileID: 1100589744}
+  - component: {fileID: 3000000003}
   m_Layer: 0
   m_Name: First Person Camera
   m_TagString: MainCamera
@@ -687,7 +692,7 @@ Camera:
   m_Depth: 0
   m_CullingMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 4294966783
   m_RenderingPath: -1
   m_TargetTexture: {fileID: 0}
   m_TargetDisplay: 0
@@ -950,7 +955,8 @@ GameObject:
   - component: {fileID: 1973135221}
   - component: {fileID: 1973135220}
   - component: {fileID: 1973135219}
-  m_Layer: 0
+  - component: {fileID: 3000000006}
+  m_Layer: 7
   m_Name: Dudu
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -964,7 +970,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1973135218}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9f7aeb6a844e9cc4a91af85f2ff2ea49, type: 3}
   m_Name: 
@@ -973,9 +979,9 @@ MonoBehaviour:
   moveSpeed: 4
   gravity: 18
   jumpHeight: 1.4
-  groundSurfaceY: -2.4
+  maximumFallSpeed: 20
   characterHalfSize: {x: 0.4, y: 0.75}
-  surfacePosition: {x: 0, y: -1.6500001}
+  surfacePosition: {x: -5, y: -1.65}
   animator: {fileID: 493869931}
   spriteRenderer: {fileID: 493869932}
 --- !u!65 &1973135220
@@ -997,8 +1003,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.8, y: 1.5, z: 0.08}
-  m_Center: {x: 0, y: 0, z: 0}
+  m_Size: {x: 0.8, y: 1.2901623, z: 0.08}
+  m_Center: {x: 0, y: -0.10491884, z: 0}
 --- !u!4 &1973135221
 Transform:
   m_ObjectHideFlags: 0
@@ -1008,7 +1014,7 @@ Transform:
   m_GameObject: {fileID: 1973135218}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1.3499999, z: 7.97}
+  m_LocalPosition: {x: 0, y: 1.35, z: 7.97}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -1097,8 +1103,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DuduCameraController
   targetSurface: {fileID: 664375295}
+  targetDudu: {fileID: 1973135221}
   cameraDistance: 10
   orthographicSize: 3.5
+  followSmoothTime: 0.15
+  horizontalOffset: 1
 --- !u!4 &2112354183
 Transform:
   m_ObjectHideFlags: 0
@@ -1204,6 +1213,145 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2123405256}
   m_Mesh: {fileID: 10208, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &3000000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 664375294}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 26537f59e55e43bf86364b3b2c411599, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DrawingSurface
+  strokeRoot: {fileID: 3000000005}
+--- !u!114 &3000000002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 911315873}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d7a1cc28d9d4bc493c6f00d0547d102, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CrosshairController
+  color: {r: 0, g: 0, b: 0, a: 1}
+  armLength: 12
+  thickness: 2
+--- !u!114 &3000000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1100589742}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7e1de668ec8d460d9f1dc4475d65bb88, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HaruDrawingController
+  maxDrawDistance: 3
+  aimRayDistance: 100
+  minPointDistance: 0.02
+  lineWidth: 0.06
+  surfaceOffset: 0.01
+  eraserRadius: 0.1
+  colliderThickness: 0.08
+  colliderDepth: 0.12
+  penColor: {r: 0.08627451, g: 0.49803922, b: 0.7647059, a: 1}
+  drawingSurfaceMask:
+    serializedVersion: 2
+    m_Bits: 1024
+  drawingBlockerMask:
+    serializedVersion: 2
+    m_Bits: 128
+  crosshair: {fileID: 3000000002}
+  surfaceAimMarker: {fileID: 3000000007}
+  haruMovement: {fileID: 820480126}
+  haruLook: {fileID: 1100589744}
+  haruLayerName: Haru
+  duduLayerName: Dudu
+  strokeLayerName: DrawnStroke
+--- !u!1 &3000000004
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 3000000005}
+  - component: {fileID: 3000000007}
+  m_Layer: 0
+  m_Name: DrawingRoot
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &3000000005
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3000000004}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!54 &3000000006
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1973135218}
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 0
+  m_IsKinematic: 0
+  m_Interpolate: 1
+  m_Constraints: 112
+  m_CollisionDetection: 1
+--- !u!114 &3000000007
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3000000004}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 904b687d357a4755987a476e22dc8356, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HaruSurfaceAimMarker
+  markerSurfaceOffset: 0.05
+  markerSize: 0.24
+  markerLineWidth: 0.035
+  penMarkerColor: {r: 1, g: 0.25, b: 0.05, a: 1}
+  eraserMarkerColor: {r: 1, g: 0.1, b: 0.65, a: 1}
+  markerLayerName: RemoteAim
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -1216,3 +1364,4 @@ SceneRoots:
   - {fileID: 2112354183}
   - {fileID: 911315875}
   - {fileID: 723503510}
+  - {fileID: 3000000005}

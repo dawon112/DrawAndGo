@@ -1,20 +1,27 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+[DisallowMultipleComponent]
+[RequireComponent(typeof(Rigidbody), typeof(Collider))]
 public sealed class DuduSurfaceMovement : MonoBehaviour
 {
     [SerializeField] private DuduSurface currentSurface;
     [SerializeField, Min(0f)] private float moveSpeed = 4f;
     [SerializeField, Min(0f)] private float gravity = 18f;
     [SerializeField, Min(0f)] private float jumpHeight = 1.4f;
-    [SerializeField] private float groundSurfaceY = -2.4f;
+    [SerializeField, Min(0f)] private float maximumFallSpeed = 20f;
     [SerializeField] private Vector2 characterHalfSize = new Vector2(0.4f, 0.75f);
-    [SerializeField] private Vector2 surfacePosition = new Vector2(0f, -1.65f);
+    [SerializeField] private Vector2 surfacePosition = new Vector2(-5f, -1.65f);
     [SerializeField] private Animator animator;
     [SerializeField] private SpriteRenderer spriteRenderer;
 
-    private float verticalVelocity;
-    private bool grounded;
+    private Rigidbody body;
+    private Collider duduCollider;
+    private float horizontalInput;
+    private float surfaceDepth;
+    private bool inputEnabled;
+    private bool jumpRequested;
+    private float lastGroundedTime = float.NegativeInfinity;
 
     private static readonly int SpeedId = Animator.StringToHash("Speed");
     private static readonly int GroundedId = Animator.StringToHash("Grounded");
@@ -22,7 +29,10 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
     public void SetSurface(DuduSurface surface)
     {
         currentSurface = surface;
-        ApplySurfaceTransform();
+        if (Application.isPlaying && body != null)
+            InitializeSurfacePhysics();
+        else
+            ApplySurfaceTransform();
     }
 
     public void Configure(DuduSurface surface, Animator newAnimator, SpriteRenderer newSpriteRenderer)
@@ -30,55 +40,46 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         currentSurface = surface;
         animator = newAnimator;
         spriteRenderer = newSpriteRenderer;
-        SnapToGround();
+        surfacePosition.y = -1.65f;
         ApplySurfaceTransform();
     }
 
-    private void Start()
+    public void SetInputEnabled(bool enabled)
     {
-        ApplySurfaceTransform();
+        inputEnabled = enabled;
+        if (!enabled)
+        {
+            horizontalInput = 0f;
+            jumpRequested = false;
+        }
+    }
+
+    private void Awake()
+    {
+        body = GetComponent<Rigidbody>();
+        if (body == null)
+            body = gameObject.AddComponent<Rigidbody>();
+        duduCollider = GetComponent<Collider>();
+
+        body.useGravity = false;
+        body.isKinematic = false;
+        body.interpolation = RigidbodyInterpolation.Interpolate;
+        body.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+        body.constraints = RigidbodyConstraints.FreezeRotation;
+        InitializeSurfacePhysics();
     }
 
     private void Update()
     {
-        if (currentSurface == null)
-            return;
-
+        horizontalInput = 0f;
         Keyboard keyboard = Keyboard.current;
-        float horizontalInput = 0f;
-        if (keyboard != null)
+        if (inputEnabled && keyboard != null)
         {
             bool right = keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed;
             bool left = keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed;
             horizontalInput = (right ? 1f : 0f) - (left ? 1f : 0f);
-        }
-
-        surfacePosition.x += horizontalInput * moveSpeed * Time.deltaTime;
-        float horizontalLimit = Mathf.Max(0f, currentSurface.Width * 0.5f - characterHalfSize.x);
-        surfacePosition.x = Mathf.Clamp(surfacePosition.x, -horizontalLimit, horizontalLimit);
-
-        if (grounded && keyboard != null && keyboard.spaceKey.wasPressedThisFrame)
-        {
-            verticalVelocity = Mathf.Sqrt(jumpHeight * 2f * gravity);
-            grounded = false;
-        }
-
-        verticalVelocity -= gravity * Time.deltaTime;
-        surfacePosition.y += verticalVelocity * Time.deltaTime;
-
-        float standingY = groundSurfaceY + characterHalfSize.y;
-        if (surfacePosition.y <= standingY)
-        {
-            surfacePosition.y = standingY;
-            verticalVelocity = 0f;
-            grounded = true;
-        }
-
-        float topLimit = currentSurface.Height * 0.5f - characterHalfSize.y;
-        if (surfacePosition.y > topLimit)
-        {
-            surfacePosition.y = topLimit;
-            verticalVelocity = Mathf.Min(verticalVelocity, 0f);
+            if (keyboard.spaceKey.wasPressedThisFrame && Time.time - lastGroundedTime < 0.15f)
+                jumpRequested = true;
         }
 
         if (spriteRenderer != null && horizontalInput != 0f)
@@ -86,17 +87,71 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         if (animator != null)
         {
             animator.SetFloat(SpeedId, Mathf.Abs(horizontalInput));
-            animator.SetBool(GroundedId, grounded);
+            animator.SetBool(GroundedId, Time.time - lastGroundedTime < 0.1f);
         }
-
-        ApplySurfaceTransform();
     }
 
-    private void SnapToGround()
+    private void FixedUpdate()
     {
-        surfacePosition.y = groundSurfaceY + characterHalfSize.y;
-        verticalVelocity = 0f;
-        grounded = true;
+        if (currentSurface == null || body == null)
+            return;
+
+        Vector3 right = currentSurface.Right.normalized;
+        Vector3 up = currentSurface.Up.normalized;
+        Vector3 normal = currentSurface.Normal.normalized;
+        Vector3 relativePosition = body.position - currentSurface.transform.position;
+
+        float horizontalPosition = Vector3.Dot(relativePosition, right);
+        float horizontalLimit = Mathf.Max(0f, currentSurface.Width * 0.5f - characterHalfSize.x);
+        float clampedHorizontal = Mathf.Clamp(horizontalPosition, -horizontalLimit, horizontalLimit);
+        float normalPosition = Vector3.Dot(relativePosition, normal);
+        body.position += right * (clampedHorizontal - horizontalPosition);
+        body.position += normal * (surfaceDepth - normalPosition);
+
+        float horizontalSpeed = horizontalInput * moveSpeed;
+        if ((clampedHorizontal <= -horizontalLimit && horizontalSpeed < 0f) ||
+            (clampedHorizontal >= horizontalLimit && horizontalSpeed > 0f))
+            horizontalSpeed = 0f;
+
+        float verticalSpeed = Mathf.Max(Vector3.Dot(body.linearVelocity, up), -maximumFallSpeed);
+        if (jumpRequested)
+        {
+            verticalSpeed = Mathf.Sqrt(2f * gravity * jumpHeight);
+            jumpRequested = false;
+            lastGroundedTime = float.NegativeInfinity;
+        }
+        body.linearVelocity = right * horizontalSpeed + up * verticalSpeed;
+        body.AddForce(-up * gravity, ForceMode.Acceleration);
+    }
+
+    private void OnCollisionStay(Collision collision)
+    {
+        if (currentSurface == null)
+            return;
+
+        Vector3 up = currentSurface.Up.normalized;
+        foreach (ContactPoint contact in collision.contacts)
+        {
+            if (Vector3.Dot(contact.normal, up) > 0.35f)
+            {
+                lastGroundedTime = Time.time;
+                break;
+            }
+        }
+    }
+
+    private void InitializeSurfacePhysics()
+    {
+        if (currentSurface == null || body == null)
+            return;
+
+        surfaceDepth = Vector3.Dot(
+            body.position - currentSurface.transform.position,
+            currentSurface.Normal.normalized);
+
+        Collider surfaceCollider = currentSurface.GetComponent<Collider>();
+        if (surfaceCollider != null && duduCollider != null)
+            Physics.IgnoreCollision(duduCollider, surfaceCollider, true);
     }
 
     private void ApplySurfaceTransform()

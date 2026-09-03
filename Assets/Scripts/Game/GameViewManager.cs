@@ -9,6 +9,8 @@ public sealed class GameViewManager : MonoBehaviour
     [SerializeField] private Player3DLook haruLook;
     [SerializeField] private Camera duduCamera;
     [SerializeField] private DuduSurfaceMovement duduMovement;
+    [SerializeField] private HaruDrawingController haruDrawing;
+    [SerializeField] private CrosshairController crosshair;
 
     private bool duduMode;
 
@@ -41,6 +43,8 @@ public sealed class GameViewManager : MonoBehaviour
     private void SetDuduMode(bool enabled)
     {
         duduMode = enabled;
+        if (enabled && haruDrawing != null)
+            haruDrawing.ForceDisableCameraLock();
         if (haruCamera != null)
             haruCamera.gameObject.SetActive(!enabled);
         if (haruMovement != null)
@@ -50,7 +54,11 @@ public sealed class GameViewManager : MonoBehaviour
         if (duduCamera != null)
             duduCamera.gameObject.SetActive(enabled);
         if (duduMovement != null)
-            duduMovement.enabled = enabled;
+            duduMovement.SetInputEnabled(enabled);
+        if (haruDrawing != null)
+            haruDrawing.enabled = !enabled;
+        if (crosshair != null)
+            crosshair.SetVisible(!enabled);
 
         if (enabled)
         {
