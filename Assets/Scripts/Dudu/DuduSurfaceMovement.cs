@@ -22,6 +22,8 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
     private bool inputEnabled;
     private bool jumpRequested;
     private float lastGroundedTime = float.NegativeInfinity;
+    private float bounceHorizontalSpeed;
+    private float bounceControlUntil = float.NegativeInfinity;
 
     private static readonly int SpeedId = Animator.StringToHash("Speed");
     private static readonly int GroundedId = Animator.StringToHash("Grounded");
@@ -52,6 +54,32 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
             horizontalInput = 0f;
             jumpRequested = false;
         }
+    }
+
+    public void BounceAwayFrom(
+        Vector3 sourcePosition,
+        float horizontalSpeed,
+        float upwardSpeed,
+        float controlDuration)
+    {
+        if (currentSurface == null || body == null)
+            return;
+
+        Vector3 right = currentSurface.Right.normalized;
+        Vector3 up = currentSurface.Up.normalized;
+        float side = Vector3.Dot(body.position - sourcePosition, right);
+        if (Mathf.Abs(side) < 0.01f)
+            side = horizontalInput == 0f ? 1f : -horizontalInput;
+
+        bounceHorizontalSpeed = Mathf.Sign(side) * Mathf.Abs(horizontalSpeed);
+        bounceControlUntil = Time.time + Mathf.Max(0f, controlDuration);
+        float verticalSpeed = Mathf.Max(
+            Vector3.Dot(body.linearVelocity, up),
+            Mathf.Abs(upwardSpeed));
+
+        body.linearVelocity = right * bounceHorizontalSpeed + up * verticalSpeed;
+        jumpRequested = false;
+        lastGroundedTime = float.NegativeInfinity;
     }
 
     private void Awake()
@@ -114,7 +142,9 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         body.position += right * (clampedHorizontal - horizontalPosition);
         body.position += normal * (surfaceDepth - normalPosition);
 
-        float horizontalSpeed = horizontalInput * moveSpeed;
+        float horizontalSpeed = Time.time < bounceControlUntil
+            ? bounceHorizontalSpeed
+            : horizontalInput * moveSpeed;
         if ((clampedHorizontal <= -horizontalLimit && horizontalSpeed < 0f) ||
             (clampedHorizontal >= horizontalLimit && horizontalSpeed > 0f))
             horizontalSpeed = 0f;
@@ -141,6 +171,8 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         body.angularVelocity = Vector3.zero;
         jumpRequested = false;
         lastGroundedTime = float.NegativeInfinity;
+        bounceHorizontalSpeed = 0f;
+        bounceControlUntil = float.NegativeInfinity;
     }
 
     private void OnCollisionStay(Collision collision)

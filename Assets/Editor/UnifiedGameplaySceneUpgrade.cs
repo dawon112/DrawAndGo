@@ -49,6 +49,7 @@ public static class UnifiedGameplaySceneUpgrade
                 existingSurface.GetComponent<Renderer>().sharedMaterial = EnsurePaperMaterial();
                 DuduSurface existingDuduSurface = existingSurface.GetComponent<DuduSurface>();
                 EnsureGroundLine(scene, existingDuduSurface);
+                EnsureVerticalObstacle(scene, existingDuduSurface);
                 GameObject existingDudu = scene.GetRootGameObjects().First(root => root.name == "Dudu");
                 Animator animator = existingDudu.GetComponentInChildren<Animator>(true);
                 SpriteRenderer spriteRenderer = existingDudu.GetComponentInChildren<SpriteRenderer>(true);
@@ -65,6 +66,7 @@ public static class UnifiedGameplaySceneUpgrade
 
             DuduSurface surface = CreateSurface(scene);
             EnsureGroundLine(scene, surface);
+            EnsureVerticalObstacle(scene, surface);
             DuduSurfaceMovement duduMovement = CreateDudu(scene, surface);
             Camera duduCamera = CreateDuduCamera(scene, surface);
 
@@ -140,6 +142,36 @@ public static class UnifiedGameplaySceneUpgrade
         groundLine.transform.rotation = surface.transform.rotation;
         groundLine.transform.localScale = new Vector3(surface.Width, 0.14f, 0.06f);
         groundLine.GetComponent<Renderer>().sharedMaterial = EnsureGroundLineMaterial();
+    }
+
+    private static void EnsureVerticalObstacle(Scene scene, DuduSurface surface)
+    {
+        const string obstacleName = "Vertical Obstacle";
+        GameObject obstacle = scene.GetRootGameObjects()
+            .FirstOrDefault(root => root.name == obstacleName);
+        if (obstacle != null)
+            return;
+
+        obstacle = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        obstacle.name = obstacleName;
+        SceneManager.MoveGameObjectToScene(obstacle, scene);
+        obstacle.transform.localScale = new Vector3(0.9f, 0.9f, 0.12f);
+        obstacle.GetComponent<Renderer>().sharedMaterial = EnsureGroundLineMaterial();
+
+        Rigidbody body = obstacle.AddComponent<Rigidbody>();
+        body.useGravity = false;
+        body.isKinematic = true;
+        body.interpolation = RigidbodyInterpolation.Interpolate;
+        body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+        body.constraints = RigidbodyConstraints.FreezeRotation;
+
+        DuduMovingObstacle movement = obstacle.AddComponent<DuduMovingObstacle>();
+        movement.Configure(
+            surface,
+            DuduMovingObstacle.MovementAxis.Vertical,
+            new Vector2(1.5f, -0.3f),
+            2.8f,
+            3f);
     }
 
     private static Camera CreateDuduCamera(Scene scene, DuduSurface surface)
