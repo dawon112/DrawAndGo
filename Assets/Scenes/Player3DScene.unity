@@ -632,8 +632,8 @@ Transform:
   m_GameObject: {fileID: 723503506}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 5, y: 0.5999999, z: 7.97}
-  m_LocalScale: {x: 20, y: 0.14, z: 0.06}
+  m_LocalPosition: {x: 3.8, y: 0.5999999, z: 7.97}
+  m_LocalScale: {x: 17.6, y: 0.14, z: 0.06}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -1539,6 +1539,8 @@ MonoBehaviour:
   gravity: 18
   jumpHeight: 1.4
   maximumFallSpeed: 20
+  maxWalkableSlopeAngle: 45
+  drawnLineStepHeight: 0.04
   animator: {fileID: 493869931}
   spriteRenderer: {fileID: 493869932}
   hitOpacity: 0.5

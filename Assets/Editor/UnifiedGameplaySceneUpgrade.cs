@@ -50,7 +50,6 @@ public static class UnifiedGameplaySceneUpgrade
             {
                 existingSurface.GetComponent<Renderer>().sharedMaterial = EnsurePaperMaterial();
                 DuduSurface existingDuduSurface = existingSurface.GetComponent<DuduSurface>();
-                EnsureGroundLine(scene, existingDuduSurface);
                 EnsureVerticalObstacle(scene, existingDuduSurface);
                 EnsureStainObstacles(scene, existingDuduSurface);
                 GameObject existingDudu = scene.GetRootGameObjects().First(root => root.name == "Dudu");
@@ -58,6 +57,7 @@ public static class UnifiedGameplaySceneUpgrade
                 SpriteRenderer spriteRenderer = existingDudu.GetComponentInChildren<SpriteRenderer>(true);
                 DuduSurfaceMovement existingDuduMovement = existingDudu.GetComponent<DuduSurfaceMovement>();
                 existingDuduMovement.Configure(existingDuduSurface, animator, spriteRenderer);
+                EnsureGroundLine(scene, existingDuduSurface, existingDuduMovement);
                 EnsureHomingEnemy(scene, existingDuduSurface, existingDuduMovement);
                 EditorSceneManager.MarkSceneDirty(scene);
                 EditorSceneManager.SaveScene(scene);
@@ -70,10 +70,10 @@ public static class UnifiedGameplaySceneUpgrade
             Camera haruCamera = haruLook.GetComponent<Camera>();
 
             DuduSurface surface = CreateSurface(scene);
-            EnsureGroundLine(scene, surface);
             EnsureVerticalObstacle(scene, surface);
             EnsureStainObstacles(scene, surface);
             DuduSurfaceMovement duduMovement = CreateDudu(scene, surface);
+            EnsureGroundLine(scene, surface, duduMovement);
             EnsureHomingEnemy(scene, surface, duduMovement);
             Camera duduCamera = CreateDuduCamera(scene, surface);
 
@@ -134,7 +134,7 @@ public static class UnifiedGameplaySceneUpgrade
         return movement;
     }
 
-    private static void EnsureGroundLine(Scene scene, DuduSurface surface)
+    private static void EnsureGroundLine(Scene scene, DuduSurface surface, DuduSurfaceMovement dudu)
     {
         GameObject groundLine = scene.GetRootGameObjects().FirstOrDefault(root => root.name == "Dudu Ground Line");
         if (groundLine == null)
@@ -145,9 +145,20 @@ public static class UnifiedGameplaySceneUpgrade
         }
 
         const float groundY = -2.4f;
-        groundLine.transform.position = surface.SurfaceToWorld(new Vector2(0f, groundY));
+        // Measure the character in world units along the paper's horizontal axis.
+        // Transform the box's axes so this also works for a rotated paper surface.
+        BoxCollider characterCollider = dudu.GetComponent<BoxCollider>();
+        Vector3 right = surface.Right.normalized;
+        Transform characterTransform = characterCollider.transform;
+        Vector3 size = characterCollider.size;
+        float characterWidth =
+            Mathf.Abs(Vector3.Dot(right, characterTransform.TransformVector(Vector3.right * size.x))) +
+            Mathf.Abs(Vector3.Dot(right, characterTransform.TransformVector(Vector3.up * size.y))) +
+            Mathf.Abs(Vector3.Dot(right, characterTransform.TransformVector(Vector3.forward * size.z)));
+        float gap = Mathf.Min(characterWidth * 3f, surface.Width - 0.01f);
+        groundLine.transform.position = surface.SurfaceToWorld(new Vector2(-gap * 0.5f, groundY));
         groundLine.transform.rotation = surface.transform.rotation;
-        groundLine.transform.localScale = new Vector3(surface.Width, 0.14f, 0.06f);
+        groundLine.transform.localScale = new Vector3(surface.Width - gap, 0.14f, 0.06f);
         groundLine.GetComponent<Renderer>().sharedMaterial = EnsureGroundLineMaterial();
     }
 

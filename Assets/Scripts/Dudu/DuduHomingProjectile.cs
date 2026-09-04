@@ -7,6 +7,7 @@ public sealed class DuduHomingProjectile : MonoBehaviour
     private DuduSurface surface;
     private DuduSurfaceMovement target;
     private Rigidbody body;
+    private SphereCollider projectileSphere;
     private Vector3 movementDirection;
     private float moveSpeed;
     private float turnSpeedRadians;
@@ -38,6 +39,7 @@ public sealed class DuduHomingProjectile : MonoBehaviour
 
         Collider projectileCollider = GetComponent<Collider>();
         projectileCollider.isTrigger = true;
+        projectileSphere = projectileCollider as SphereCollider;
     }
 
     private void FixedUpdate()
@@ -65,17 +67,63 @@ public sealed class DuduHomingProjectile : MonoBehaviour
                 0f).normalized;
         }
 
-        body.MovePosition(body.position + movementDirection * moveSpeed * Time.fixedDeltaTime);
+        Vector3 displacement = movementDirection * moveSpeed * Time.fixedDeltaTime;
+        if (TouchesDrawnLineAlongMove(displacement))
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        body.MovePosition(body.position + displacement);
     }
 
     private void OnTriggerEnter(Collider other)
     {
+        if (other.GetComponentInParent<DrawingStroke>() != null)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
         DuduSurfaceMovement dudu = other.GetComponentInParent<DuduSurfaceMovement>();
         if (dudu == null || dudu != target)
             return;
 
         dudu.ShowHitFeedback();
         Destroy(gameObject);
+    }
+
+    private bool TouchesDrawnLineAlongMove(Vector3 displacement)
+    {
+        if (projectileSphere == null)
+            return false;
+
+        // Match the actual sphere collider, including its non-uniform world scale.
+        Vector3 scale = transform.lossyScale;
+        float radius = projectileSphere.radius * Mathf.Max(
+            Mathf.Abs(scale.x), Mathf.Abs(scale.y), Mathf.Abs(scale.z));
+        Vector3 center = body.position + body.rotation * Vector3.Scale(projectileSphere.center, scale);
+
+        // Trigger CCD alone cannot guarantee a hit across a thin stroke in one step.
+        // Include initial overlaps (e.g. a line drawn over a stationary missile).
+        foreach (Collider other in Physics.OverlapSphere(center, radius, Physics.AllLayers, QueryTriggerInteraction.Collide))
+        {
+            if (other.GetComponentInParent<DrawingStroke>() != null)
+                return true;
+        }
+
+        float distance = displacement.magnitude;
+        if (distance <= Mathf.Epsilon)
+            return false;
+
+        foreach (RaycastHit hit in Physics.SphereCastAll(
+            center, radius, displacement / distance, distance, Physics.AllLayers, QueryTriggerInteraction.Collide))
+        {
+            if (hit.collider.GetComponentInParent<DrawingStroke>() != null)
+                return true;
+        }
+
+        return false;
     }
 
     private Vector3 GetDirectionToTarget()

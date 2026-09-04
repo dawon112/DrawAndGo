@@ -46,7 +46,8 @@ public sealed class DuduHomingShooter : MonoBehaviour
 
     private void Update()
     {
-        bool targetIsActive = target != null && target.InputEnabled;
+        // Temporary 3D testing gate: reuse the view manager's existing input state.
+        bool targetIsActive = surface != null && target != null && target.InputEnabled;
         if (!targetIsActive)
         {
             targetWasActive = false;
