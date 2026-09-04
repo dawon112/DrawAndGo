@@ -38,6 +38,11 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
     private float bounceControlUntil = float.NegativeInfinity;
     private Coroutine hitFeedbackRoutine;
     private Color normalSpriteColor = Color.white;
+    private bool slowEffectActive;
+    private float slowEffectUntil = float.NegativeInfinity;
+    private bool reverseEffectActive;
+    private float reverseEffectUntil = float.NegativeInfinity;
+    private float stainSpeedMultiplier = 1f;
 
     private static readonly int SpeedId = Animator.StringToHash("Speed");
     private static readonly int GroundedId = Animator.StringToHash("Grounded");
@@ -109,6 +114,31 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         hitFeedbackRoutine = StartCoroutine(HitFeedbackRoutine());
     }
 
+    public void ApplyStainEffect(
+        DuduStainObstacle.EffectType effectType,
+        float speedMultiplier,
+        float duration)
+    {
+        float effectEndTime = Time.time + Mathf.Max(0f, duration);
+        switch (effectType)
+        {
+            case DuduStainObstacle.EffectType.Slow:
+                if (slowEffectActive && Time.time < slowEffectUntil)
+                    return;
+                slowEffectActive = true;
+                slowEffectUntil = effectEndTime;
+                stainSpeedMultiplier = Mathf.Clamp(speedMultiplier, 0.1f, 1f);
+                break;
+
+            case DuduStainObstacle.EffectType.ReverseControls:
+                if (reverseEffectActive && Time.time < reverseEffectUntil)
+                    return;
+                reverseEffectActive = true;
+                reverseEffectUntil = effectEndTime;
+                break;
+        }
+    }
+
     private void Awake()
     {
         body = GetComponent<Rigidbody>();
@@ -128,10 +158,16 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
     private void OnDisable()
     {
         RestoreSpriteColor();
+        ResetStainEffects();
     }
 
     private void Update()
     {
+        if (slowEffectActive && Time.time >= slowEffectUntil)
+            ResetSlowEffect();
+        if (reverseEffectActive && Time.time >= reverseEffectUntil)
+            ResetReverseEffect();
+
         horizontalInput = 0f;
         Keyboard keyboard = Keyboard.current;
         if (inputEnabled && keyboard != null)
@@ -139,6 +175,8 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
             bool right = keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed;
             bool left = keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed;
             horizontalInput = (right ? 1f : 0f) - (left ? 1f : 0f);
+            if (reverseEffectActive)
+                horizontalInput = -horizontalInput;
             if (keyboard.spaceKey.wasPressedThisFrame && Time.time - lastGroundedTime < 0.15f)
                 jumpRequested = true;
         }
@@ -177,7 +215,7 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
 
         float horizontalSpeed = Time.time < bounceControlUntil
             ? bounceHorizontalSpeed
-            : horizontalInput * moveSpeed;
+            : horizontalInput * moveSpeed * stainSpeedMultiplier;
         if ((clampedHorizontal <= -horizontalLimit && horizontalSpeed < 0f) ||
             (clampedHorizontal >= horizontalLimit && horizontalSpeed > 0f))
             horizontalSpeed = 0f;
@@ -206,6 +244,7 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         lastGroundedTime = float.NegativeInfinity;
         bounceHorizontalSpeed = 0f;
         bounceControlUntil = float.NegativeInfinity;
+        ResetStainEffects();
     }
 
     private void OnCollisionStay(Collision collision)
@@ -269,5 +308,24 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         if (spriteRenderer != null)
             spriteRenderer.color = normalSpriteColor;
         hitFeedbackRoutine = null;
+    }
+
+    private void ResetStainEffects()
+    {
+        ResetSlowEffect();
+        ResetReverseEffect();
+    }
+
+    private void ResetSlowEffect()
+    {
+        slowEffectActive = false;
+        slowEffectUntil = float.NegativeInfinity;
+        stainSpeedMultiplier = 1f;
+    }
+
+    private void ResetReverseEffect()
+    {
+        reverseEffectActive = false;
+        reverseEffectUntil = float.NegativeInfinity;
     }
 }

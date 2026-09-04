@@ -15,6 +15,8 @@ public static class UnifiedGameplaySceneUpgrade
     private const string KnightControllerPath = "Assets/Animations/Player/Knight.controller";
     private const string PaperMaterialPath = "Assets/Materials/PaperBackground.mat";
     private const string GroundLineMaterialPath = "Assets/Materials/DuduGroundLine.mat";
+    private const string SlowStainMaterialPath = "Assets/Materials/DuduSlowStain.mat";
+    private const string ReverseStainMaterialPath = "Assets/Materials/DuduReverseStain.mat";
 
     static UnifiedGameplaySceneUpgrade()
     {
@@ -50,6 +52,7 @@ public static class UnifiedGameplaySceneUpgrade
                 DuduSurface existingDuduSurface = existingSurface.GetComponent<DuduSurface>();
                 EnsureGroundLine(scene, existingDuduSurface);
                 EnsureVerticalObstacle(scene, existingDuduSurface);
+                EnsureStainObstacles(scene, existingDuduSurface);
                 GameObject existingDudu = scene.GetRootGameObjects().First(root => root.name == "Dudu");
                 Animator animator = existingDudu.GetComponentInChildren<Animator>(true);
                 SpriteRenderer spriteRenderer = existingDudu.GetComponentInChildren<SpriteRenderer>(true);
@@ -69,6 +72,7 @@ public static class UnifiedGameplaySceneUpgrade
             DuduSurface surface = CreateSurface(scene);
             EnsureGroundLine(scene, surface);
             EnsureVerticalObstacle(scene, surface);
+            EnsureStainObstacles(scene, surface);
             DuduSurfaceMovement duduMovement = CreateDudu(scene, surface);
             EnsureHomingEnemy(scene, surface, duduMovement);
             Camera duduCamera = CreateDuduCamera(scene, surface);
@@ -203,6 +207,71 @@ public static class UnifiedGameplaySceneUpgrade
             EnsureGroundLineMaterial());
     }
 
+    private static void EnsureStainObstacles(Scene scene, DuduSurface surface)
+    {
+        const string slowStainName = "Slow Stain Obstacle";
+        GameObject slowStain = scene.GetRootGameObjects()
+            .FirstOrDefault(root => root.name == slowStainName);
+        if (slowStain == null)
+        {
+            slowStain = scene.GetRootGameObjects()
+                .FirstOrDefault(root => root.name == "Stain Obstacle");
+            if (slowStain == null)
+            {
+                slowStain = CreateStainObstacle(
+                    scene,
+                    surface,
+                    slowStainName,
+                    new Vector2(-3f, -2.2f),
+                    DuduStainObstacle.EffectType.Slow,
+                    EnsureSlowStainMaterial());
+            }
+            else
+            {
+                slowStain.name = slowStainName;
+                slowStain.GetComponent<Renderer>().sharedMaterial = EnsureSlowStainMaterial();
+                slowStain.GetComponent<DuduStainObstacle>().Configure(
+                    surface,
+                    new Vector2(-3f, -2.2f),
+                    DuduStainObstacle.EffectType.Slow);
+            }
+        }
+
+        const string reverseStainName = "Reverse Stain Obstacle";
+        GameObject reverseStain = scene.GetRootGameObjects()
+            .FirstOrDefault(root => root.name == reverseStainName);
+        if (reverseStain == null)
+        {
+            CreateStainObstacle(
+                scene,
+                surface,
+                reverseStainName,
+                new Vector2(0f, -2.2f),
+                DuduStainObstacle.EffectType.ReverseControls,
+                EnsureReverseStainMaterial());
+        }
+    }
+
+    private static GameObject CreateStainObstacle(
+        Scene scene,
+        DuduSurface surface,
+        string stainName,
+        Vector2 position,
+        DuduStainObstacle.EffectType effectType,
+        Material material)
+    {
+        GameObject stain = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        stain.name = stainName;
+        SceneManager.MoveGameObjectToScene(stain, scene);
+        stain.transform.localScale = new Vector3(0.7f, 0.7f, 0.08f);
+        stain.GetComponent<Renderer>().sharedMaterial = material;
+        stain.GetComponent<Collider>().isTrigger = true;
+
+        DuduStainObstacle stainObstacle = stain.AddComponent<DuduStainObstacle>();
+        stainObstacle.Configure(surface, position, effectType);
+        return stain;
+    }
+
     private static Camera CreateDuduCamera(Scene scene, DuduSurface surface)
     {
         GameObject cameraObject = new GameObject("DuduCamera");
@@ -290,6 +359,39 @@ public static class UnifiedGameplaySceneUpgrade
         if (material.HasProperty("_BaseColor"))
             material.SetColor("_BaseColor", Color.black);
         AssetDatabase.CreateAsset(material, GroundLineMaterialPath);
+        return material;
+    }
+
+    private static Material EnsureSlowStainMaterial()
+    {
+        return EnsureStainMaterial(
+            SlowStainMaterialPath,
+            "DuduSlowStain",
+            Color.red);
+    }
+
+    private static Material EnsureReverseStainMaterial()
+    {
+        return EnsureStainMaterial(
+            ReverseStainMaterialPath,
+            "DuduReverseStain",
+            Color.blue);
+    }
+
+    private static Material EnsureStainMaterial(string path, string materialName, Color color)
+    {
+        Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (material != null)
+            return material;
+
+        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+        if (shader == null)
+            shader = Shader.Find("Unlit/Color");
+        material = new Material(shader) { name = materialName };
+        material.color = color;
+        if (material.HasProperty("_BaseColor"))
+            material.SetColor("_BaseColor", color);
+        AssetDatabase.CreateAsset(material, path);
         return material;
     }
 }
