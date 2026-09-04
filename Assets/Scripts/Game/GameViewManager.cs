@@ -43,6 +43,13 @@ public sealed class GameViewManager : MonoBehaviour
     private void SetDuduMode(bool enabled)
     {
         duduMode = enabled;
+        GameObject player3D = haruMovement != null
+            ? haruMovement.transform.root.gameObject
+            : null;
+
+        if (!enabled && player3D != null)
+            player3D.SetActive(true);
+
         if (enabled && haruDrawing != null)
             haruDrawing.ForceDisableCameraLock();
         if (haruCamera != null)
@@ -59,6 +66,9 @@ public sealed class GameViewManager : MonoBehaviour
             haruDrawing.enabled = !enabled;
         if (crosshair != null)
             crosshair.SetVisible(!enabled);
+
+        if (enabled && player3D != null)
+            player3D.SetActive(false);
 
         if (enabled)
         {
