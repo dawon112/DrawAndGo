@@ -96,6 +96,12 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         if (currentSurface == null || body == null)
             return;
 
+        if (currentSurface.IsAtOrBelowBottom(body.position, characterHalfSize.y))
+        {
+            Respawn();
+            return;
+        }
+
         Vector3 right = currentSurface.Right.normalized;
         Vector3 up = currentSurface.Up.normalized;
         Vector3 normal = currentSurface.Normal.normalized;
@@ -122,6 +128,19 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         }
         body.linearVelocity = right * horizontalSpeed + up * verticalSpeed;
         body.AddForce(-up * gravity, ForceMode.Acceleration);
+    }
+
+    public void Respawn()
+    {
+        if (currentSurface == null || body == null)
+            return;
+
+        body.position = currentSurface.SurfaceToWorld(surfacePosition);
+        body.rotation = currentSurface.transform.rotation;
+        body.linearVelocity = Vector3.zero;
+        body.angularVelocity = Vector3.zero;
+        jumpRequested = false;
+        lastGroundedTime = float.NegativeInfinity;
     }
 
     private void OnCollisionStay(Collision collision)

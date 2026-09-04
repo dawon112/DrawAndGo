@@ -18,6 +18,21 @@ public sealed class DuduSurface : MonoBehaviour
         return transform.position + Right * surfacePosition.x + Up * surfacePosition.y + Normal * surfaceOffset;
     }
 
+    public Vector2 WorldToSurface(Vector3 worldPosition)
+    {
+        Vector3 relativePosition = worldPosition - transform.position;
+        return new Vector2(
+            Vector3.Dot(relativePosition, Right.normalized),
+            Vector3.Dot(relativePosition, Up.normalized));
+    }
+
+    public bool IsAtOrBelowBottom(Vector3 worldPosition, float lowerExtent)
+    {
+        Vector2 position = WorldToSurface(worldPosition);
+        float bottom = position.y - Mathf.Max(0f, lowerExtent);
+        return bottom <= -height * 0.5f;
+    }
+
     public Vector2 ClampPosition(Vector2 position, Vector2 characterHalfSize)
     {
         float horizontalLimit = Mathf.Max(0f, width * 0.5f - characterHalfSize.x);
