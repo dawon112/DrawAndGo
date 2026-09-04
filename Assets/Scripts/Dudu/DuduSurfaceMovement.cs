@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -5,15 +6,26 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(Rigidbody), typeof(Collider))]
 public sealed class DuduSurfaceMovement : MonoBehaviour
 {
+    [Header("Surface")]
     [SerializeField] private DuduSurface currentSurface;
+    [SerializeField] private Vector2 characterHalfSize = new Vector2(0.4f, 0.75f);
+    [SerializeField] private Vector2 surfacePosition = new Vector2(-5f, -1.65f);
+
+    [Header("Movement")]
     [SerializeField, Min(0f)] private float moveSpeed = 4f;
     [SerializeField, Min(0f)] private float gravity = 18f;
     [SerializeField, Min(0f)] private float jumpHeight = 1.4f;
     [SerializeField, Min(0f)] private float maximumFallSpeed = 20f;
-    [SerializeField] private Vector2 characterHalfSize = new Vector2(0.4f, 0.75f);
-    [SerializeField] private Vector2 surfacePosition = new Vector2(-5f, -1.65f);
+
+    [Header("Visuals")]
     [SerializeField] private Animator animator;
     [SerializeField] private SpriteRenderer spriteRenderer;
+
+    [Header("Hit Feedback")]
+    [Tooltip("Dudu opacity while showing a projectile hit.")]
+    [SerializeField, Range(0f, 1f)] private float hitOpacity = 0.5f;
+    [Tooltip("Seconds before Dudu returns to normal opacity.")]
+    [SerializeField, Min(0f)] private float hitFeedbackDuration = 0.5f;
 
     private Rigidbody body;
     private Collider duduCollider;
@@ -24,9 +36,13 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
     private float lastGroundedTime = float.NegativeInfinity;
     private float bounceHorizontalSpeed;
     private float bounceControlUntil = float.NegativeInfinity;
+    private Coroutine hitFeedbackRoutine;
+    private Color normalSpriteColor = Color.white;
 
     private static readonly int SpeedId = Animator.StringToHash("Speed");
     private static readonly int GroundedId = Animator.StringToHash("Grounded");
+
+    public bool InputEnabled => inputEnabled;
 
     public void SetSurface(DuduSurface surface)
     {
@@ -42,6 +58,7 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         currentSurface = surface;
         animator = newAnimator;
         spriteRenderer = newSpriteRenderer;
+        CacheNormalSpriteColor();
         surfacePosition.y = -1.65f;
         ApplySurfaceTransform();
     }
@@ -82,12 +99,23 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         lastGroundedTime = float.NegativeInfinity;
     }
 
+    public void ShowHitFeedback()
+    {
+        if (spriteRenderer == null)
+            return;
+
+        if (hitFeedbackRoutine != null)
+            StopCoroutine(hitFeedbackRoutine);
+        hitFeedbackRoutine = StartCoroutine(HitFeedbackRoutine());
+    }
+
     private void Awake()
     {
         body = GetComponent<Rigidbody>();
         if (body == null)
             body = gameObject.AddComponent<Rigidbody>();
         duduCollider = GetComponent<Collider>();
+        CacheNormalSpriteColor();
 
         body.useGravity = false;
         body.isKinematic = false;
@@ -95,6 +123,11 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         body.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
         body.constraints = RigidbodyConstraints.FreezeRotation;
         InitializeSurfacePhysics();
+    }
+
+    private void OnDisable()
+    {
+        RestoreSpriteColor();
     }
 
     private void Update()
@@ -212,5 +245,29 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
 
         transform.position = currentSurface.SurfaceToWorld(surfacePosition);
         transform.rotation = currentSurface.transform.rotation;
+    }
+
+    private IEnumerator HitFeedbackRoutine()
+    {
+        Color hitColor = normalSpriteColor;
+        hitColor.a = hitOpacity;
+        spriteRenderer.color = hitColor;
+
+        yield return new WaitForSeconds(hitFeedbackDuration);
+
+        RestoreSpriteColor();
+    }
+
+    private void CacheNormalSpriteColor()
+    {
+        if (spriteRenderer != null)
+            normalSpriteColor = spriteRenderer.color;
+    }
+
+    private void RestoreSpriteColor()
+    {
+        if (spriteRenderer != null)
+            spriteRenderer.color = normalSpriteColor;
+        hitFeedbackRoutine = null;
     }
 }

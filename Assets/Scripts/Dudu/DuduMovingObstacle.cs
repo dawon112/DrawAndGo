@@ -10,14 +10,26 @@ public sealed class DuduMovingObstacle : MonoBehaviour
         Vertical
     }
 
+    [Header("References")]
     [SerializeField] private DuduSurface surface;
+
+    [Header("Movement")]
     [SerializeField] private MovementAxis movementAxis = MovementAxis.Vertical;
+    [Tooltip("Center of the obstacle movement path on the Dudu surface.")]
     [SerializeField] private Vector2 centerPosition;
+    [Tooltip("Total distance between the two ends of the movement path.")]
     [SerializeField, Min(0f)] private float travelDistance = 4f;
+    [Tooltip("Seconds required to travel to the other end and return. Lower values move faster.")]
     [SerializeField, Min(0.1f)] private float roundTripDuration = 3f;
+    [Tooltip("Delay before the obstacle starts moving.")]
     [SerializeField, Min(0f)] private float startDelay;
+
+    [Header("Dudu Bounce")]
+    [Tooltip("Horizontal speed applied to Dudu when hit.")]
     [SerializeField, Min(0f)] private float horizontalBounceSpeed = 6f;
+    [Tooltip("Upward speed applied to Dudu when hit.")]
     [SerializeField, Min(0f)] private float upwardBounceSpeed = 5f;
+    [Tooltip("How long the bounce overrides horizontal player input.")]
     [SerializeField, Min(0f)] private float bounceControlDuration = 0.35f;
 
     private Rigidbody body;

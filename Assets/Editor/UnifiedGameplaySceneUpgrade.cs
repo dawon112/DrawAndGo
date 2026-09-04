@@ -53,7 +53,9 @@ public static class UnifiedGameplaySceneUpgrade
                 GameObject existingDudu = scene.GetRootGameObjects().First(root => root.name == "Dudu");
                 Animator animator = existingDudu.GetComponentInChildren<Animator>(true);
                 SpriteRenderer spriteRenderer = existingDudu.GetComponentInChildren<SpriteRenderer>(true);
-                existingDudu.GetComponent<DuduSurfaceMovement>().Configure(existingDuduSurface, animator, spriteRenderer);
+                DuduSurfaceMovement existingDuduMovement = existingDudu.GetComponent<DuduSurfaceMovement>();
+                existingDuduMovement.Configure(existingDuduSurface, animator, spriteRenderer);
+                EnsureHomingEnemy(scene, existingDuduSurface, existingDuduMovement);
                 EditorSceneManager.MarkSceneDirty(scene);
                 EditorSceneManager.SaveScene(scene);
                 return;
@@ -68,6 +70,7 @@ public static class UnifiedGameplaySceneUpgrade
             EnsureGroundLine(scene, surface);
             EnsureVerticalObstacle(scene, surface);
             DuduSurfaceMovement duduMovement = CreateDudu(scene, surface);
+            EnsureHomingEnemy(scene, surface, duduMovement);
             Camera duduCamera = CreateDuduCamera(scene, surface);
 
             GameObject managerObject = new GameObject("GameViewManager");
@@ -172,6 +175,32 @@ public static class UnifiedGameplaySceneUpgrade
             new Vector2(1.5f, -0.3f),
             2.8f,
             3f);
+    }
+
+    private static void EnsureHomingEnemy(
+        Scene scene,
+        DuduSurface surface,
+        DuduSurfaceMovement duduMovement)
+    {
+        const string enemyName = "Homing Enemy";
+        GameObject enemy = scene.GetRootGameObjects()
+            .FirstOrDefault(root => root.name == enemyName);
+        if (enemy != null)
+            return;
+
+        enemy = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        enemy.name = enemyName;
+        SceneManager.MoveGameObjectToScene(enemy, scene);
+        enemy.transform.localScale = new Vector3(0.55f, 1.4f, 0.12f);
+        enemy.GetComponent<Renderer>().sharedMaterial = EnsureGroundLineMaterial();
+        enemy.GetComponent<Collider>().isTrigger = true;
+
+        DuduHomingShooter shooter = enemy.AddComponent<DuduHomingShooter>();
+        shooter.Configure(
+            surface,
+            duduMovement,
+            new Vector2(-1f, 1.5f),
+            EnsureGroundLineMaterial());
     }
 
     private static Camera CreateDuduCamera(Scene scene, DuduSurface surface)
