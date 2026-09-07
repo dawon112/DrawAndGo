@@ -41,6 +41,7 @@ public static class UnifiedGameplaySceneUpgrade
         try
         {
             GameObject[] roots = scene.GetRootGameObjects();
+            if (roots.Any(root => root.GetComponent<CornerRoomLevel>() != null)) return;
             foreach (GameObject root in roots.Where(root => root.name == "View Scene Switcher"))
                 Object.DestroyImmediate(root);
 
@@ -187,9 +188,9 @@ public static class UnifiedGameplaySceneUpgrade
         movement.Configure(
             surface,
             DuduMovingObstacle.MovementAxis.Vertical,
-            new Vector2(1.5f, -0.3f),
-            2.8f,
-            3f);
+            new Vector2(1.5f, -0.5f),
+            1.6f,
+            4.5f);
     }
 
     private static void EnsureHomingEnemy(
@@ -407,3 +408,4 @@ public static class UnifiedGameplaySceneUpgrade
     }
 }
 #endif
+

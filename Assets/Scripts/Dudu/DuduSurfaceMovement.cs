@@ -6,6 +6,8 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(Rigidbody), typeof(Collider))]
 public sealed class DuduSurfaceMovement : MonoBehaviour
 {
+    private const float CornerSeamInset = 0.14f;
+    private const float FinalSurfaceVisualOffset = 0.1f;
     [Header("Surface")]
     [SerializeField] private DuduSurface currentSurface;
     [SerializeField] private Vector2 characterHalfSize = new Vector2(0.4f, 0.75f);
@@ -54,10 +56,13 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
     private static readonly int GroundedId = Animator.StringToHash("Grounded");
 
     public bool InputEnabled => inputEnabled;
+    public DuduSurface CurrentSurface => currentSurface;
+    public float VisualSeamOverlap => 2f * (characterHalfSize.x + CornerSeamInset);
 
     public void SetSurface(DuduSurface surface)
     {
         currentSurface = surface;
+        UpdateVisualSurfaceOffset();
         if (Application.isPlaying && body != null)
             InitializeSurfacePhysics();
         else
@@ -72,6 +77,7 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         CacheNormalSpriteColor();
         surfacePosition.y = -1.65f;
         ApplySurfaceTransform();
+        UpdateVisualSurfaceOffset();
     }
 
     public void SetInputEnabled(bool enabled)
@@ -212,9 +218,18 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         Vector3 normal = currentSurface.Normal.normalized;
         Vector3 relativePosition = body.position - currentSurface.transform.position;
 
+        if (TryCrossCorner())
+        {
+            right = currentSurface.Right.normalized;
+            up = currentSurface.Up.normalized;
+            normal = currentSurface.Normal.normalized;
+            relativePosition = body.position - currentSurface.transform.position;
+        }
+        UpdateVisualSurfaceOffset();
         float horizontalPosition = Vector3.Dot(relativePosition, right);
-        float horizontalLimit = Mathf.Max(0f, currentSurface.Width * 0.5f - characterHalfSize.x);
-        float clampedHorizontal = Mathf.Clamp(horizontalPosition, -horizontalLimit, horizontalLimit);
+        float horizontalMinimum = currentSurface.GetMinimumX(characterHalfSize.x);
+        float horizontalMaximum = currentSurface.GetMaximumX(characterHalfSize.x);
+        float clampedHorizontal = Mathf.Clamp(horizontalPosition, horizontalMinimum, horizontalMaximum);
         float normalPosition = Vector3.Dot(relativePosition, normal);
         Vector3 constraintCorrection = right * (clampedHorizontal - horizontalPosition) +
             normal * (surfaceDepth - normalPosition);
@@ -224,8 +239,8 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         float horizontalSpeed = Time.time < bounceControlUntil
             ? bounceHorizontalSpeed
             : horizontalInput * moveSpeed * stainSpeedMultiplier;
-        if ((clampedHorizontal <= -horizontalLimit && horizontalSpeed < 0f) ||
-            (clampedHorizontal >= horizontalLimit && horizontalSpeed > 0f))
+        if ((clampedHorizontal <= horizontalMinimum && horizontalSpeed < 0f) ||
+            (clampedHorizontal >= horizontalMaximum && horizontalSpeed > 0f))
             horizontalSpeed = 0f;
 
         float verticalSpeed = Mathf.Max(Vector3.Dot(body.linearVelocity, up), -maximumFallSpeed);
@@ -359,6 +374,32 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
             Physics.GetIgnoreCollision(duduCollider, other);
     }
 
+    private bool TryCrossCorner()
+    {
+        Vector2 position = currentSurface.WorldToSurface(body.position);
+        float speed = Time.time < bounceControlUntil ? bounceHorizontalSpeed : horizontalInput * moveSpeed * stainSpeedMultiplier;
+        int direction = speed > 0f ? 1 : speed < 0f ? -1 : 0;
+        float boundary = direction > 0
+            ? currentSurface.GetMaximumX(characterHalfSize.x)
+            : -currentSurface.GetMinimumX(characterHalfSize.x);
+        if (direction == 0 ||
+            position.x * direction + Mathf.Abs(speed) * Time.fixedDeltaTime < boundary - CornerSeamInset)
+            return false;
+        DuduSurface next = direction > 0 ? currentSurface.nextSurface : currentSurface.previousSurface;
+        if (next == null) return false;
+        float verticalSpeed = Vector3.Dot(body.linearVelocity, currentSurface.Up);
+        currentSurface = next;
+        surfaceDepth = next.SurfaceOffset;
+        float entryX = direction > 0
+            ? next.GetMinimumX(characterHalfSize.x) + CornerSeamInset
+            : next.GetMaximumX(characterHalfSize.x) - CornerSeamInset;
+        body.position = next.SurfaceToWorld(new Vector2(entryX, position.y));
+        body.rotation = next.transform.rotation;
+        body.linearVelocity = next.Right * speed + next.Up * verticalSpeed;
+        wasFollowingDrawnLine = false;
+        InitializeSurfacePhysics();
+        return true;
+    }
     public void Respawn()
     {
         if (currentSurface == null || body == null)
@@ -374,6 +415,19 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         wasFollowingDrawnLine = false;
         bounceControlUntil = float.NegativeInfinity;
         ResetStainEffects();
+        UpdateVisualSurfaceOffset();
+    }
+
+    private void UpdateVisualSurfaceOffset()
+    {
+        if (spriteRenderer == null || currentSurface == null)
+            return;
+
+        // The final doorway pieces extend in front of the surface plane.
+        // Move only the sprite toward the visible side; physics stays on the original plane.
+        Vector3 localPosition = spriteRenderer.transform.localPosition;
+        localPosition.z = currentSurface.nextSurface == null ? -FinalSurfaceVisualOffset : 0f;
+        spriteRenderer.transform.localPosition = localPosition;
     }
 
     private void OnCollisionStay(Collision collision)
@@ -461,3 +515,4 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         reverseEffectUntil = float.NegativeInfinity;
     }
 }
+

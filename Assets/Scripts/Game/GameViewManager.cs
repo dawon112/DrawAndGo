@@ -14,6 +14,18 @@ public sealed class GameViewManager : MonoBehaviour
 
     private bool duduMode;
 
+    private void Awake()
+    {
+        EnsureAudioListener(haruCamera);
+        EnsureAudioListener(duduCamera);
+    }
+
+    private static void EnsureAudioListener(Camera targetCamera)
+    {
+        if (targetCamera != null && targetCamera.GetComponent<AudioListener>() == null)
+            targetCamera.gameObject.AddComponent<AudioListener>();
+    }
+
     public void Configure(
         Camera newHaruCamera,
         Player3DMovement newHaruMovement,
