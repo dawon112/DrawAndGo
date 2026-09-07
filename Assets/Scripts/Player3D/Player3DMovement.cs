@@ -7,6 +7,8 @@ public sealed class Player3DMovement : MonoBehaviour
     [SerializeField, Min(0f)] private float moveSpeed = 5f;
     [SerializeField, Min(0f)] private float gravity = 20f;
     [SerializeField, Min(0f)] private float jumpHeight = 1.2f;
+    [SerializeField] private GameObject visualPrefab;
+    [SerializeField, Min(0.1f)] private float visualHeight = 1.8f;
 
     private CharacterController controller;
     private float verticalVelocity;
@@ -14,6 +16,32 @@ public sealed class Player3DMovement : MonoBehaviour
     private void Awake()
     {
         controller = GetComponent<CharacterController>();
+        EnsureVisual();
+    }
+
+    private void EnsureVisual()
+    {
+        Transform capsule = transform.Find("Capsule Visual");
+        if (capsule != null) capsule.gameObject.SetActive(false);
+        if (visualPrefab == null || transform.Find("Haru Visual") != null) return;
+
+        GameObject visual = Instantiate(visualPrefab, transform);
+        visual.name = "Haru Visual";
+        visual.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+        visual.transform.localScale = Vector3.one;
+        foreach (Camera modelCamera in visual.GetComponentsInChildren<Camera>(true)) modelCamera.enabled = false;
+        foreach (Light modelLight in visual.GetComponentsInChildren<Light>(true)) modelLight.enabled = false;
+
+        Renderer[] renderers = visual.GetComponentsInChildren<Renderer>(true);
+        if (renderers.Length == 0) return;
+        Bounds bounds = renderers[0].bounds;
+        for (int i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
+        if (bounds.size.y <= 0.001f) return;
+        visual.transform.localScale *= visualHeight / bounds.size.y;
+        bounds = visual.GetComponentsInChildren<Renderer>(true)[0].bounds;
+        Renderer[] scaledRenderers = visual.GetComponentsInChildren<Renderer>(true);
+        for (int i = 1; i < scaledRenderers.Length; i++) bounds.Encapsulate(scaledRenderers[i].bounds);
+        visual.transform.position += Vector3.up * (transform.position.y - bounds.min.y);
     }
 
     private void Update()

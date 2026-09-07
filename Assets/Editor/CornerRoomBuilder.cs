@@ -31,9 +31,13 @@ public static class CornerRoomBuilder
             Transform closureWall = existingLevel.transform.Find("Room Wall 6 - Closure");
             if (closureWall != null) Object.DestroyImmediate(closureWall.gameObject);
             existingLevel.player3D = Find("Player3D").GetComponent<Player3DMovement>();
-            var existingGround = Find("Ground3D");
+            EnsureHaruModel(existingLevel.player3D.gameObject, scene);
+            var existingGround = scene.GetRootGameObjects().First(x => x.name == "Floor3D" || x.name == "Ground3D");
+            existingGround.name = "Floor3D";
             existingGround.transform.position = new Vector3(5f, -0.1f, 8f);
             existingGround.transform.localScale = new Vector3(22f, 1f, 22f);
+            existingGround.GetComponent<Renderer>().sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>(
+                "Assets/YughuesFreeFlooringMaterials/Materials/M_YFFlM_01.mat");
             foreach (string frameName in new[] { "Door Frame Left", "Door Frame Right", "Door Frame Top" })
             {
                 var frame = GameObject.Find(frameName);
@@ -59,6 +63,7 @@ public static class CornerRoomBuilder
         var level = root.AddComponent<CornerRoomLevel>();
         level.player = player;
         level.player3D = Find("Player3D").GetComponent<Player3DMovement>();
+        EnsureHaruModel(level.player3D.gameObject, scene);
         level.surfaces = new DuduSurface[5];
         Vector3[] corners = { new Vector3(-5,3,8), new Vector3(5,3,8), new Vector3(5,3,18),
             new Vector3(15,3,18), new Vector3(15,3,-2), new Vector3(-5,3,-2) };
@@ -156,9 +161,12 @@ public static class CornerRoomBuilder
         Find("Slow Stain Obstacle").GetComponent<DuduStainObstacle>().Configure(level.surfaces[1],new Vector2(0,-2.1f),DuduStainObstacle.EffectType.Slow);
         ConfigurePassableMovingObstacle(level);
         Find("Reverse Stain Obstacle").GetComponent<DuduStainObstacle>().Configure(level.surfaces[3],new Vector2(-6.5f,-2.1f),DuduStainObstacle.EffectType.ReverseControls);
-        var ground = Find("Ground3D");
+        var ground = scene.GetRootGameObjects().First(x => x.name == "Floor3D" || x.name == "Ground3D");
+        ground.name = "Floor3D";
         ground.transform.position = new Vector3(5,-.1f,8);
         ground.transform.localScale = new Vector3(22,1,22);
+        ground.GetComponent<Renderer>().sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>(
+            "Assets/YughuesFreeFlooringMaterials/Materials/M_YFFlM_01.mat");
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene);
         AssetDatabase.SaveAssets();
@@ -212,6 +220,41 @@ public static class CornerRoomBuilder
                 drawingSurface = segment.AddComponent<DrawingSurface>();
             drawingSurface.SetStrokeRoot(strokeRoot);
         }
+    }
+
+    private static void EnsureHaruModel(GameObject player, Scene scene)
+    {
+        Transform capsule = player.transform.Find("Capsule Visual");
+        Transform existing = player.transform.Find("Haru Visual");
+        if (existing == null)
+        {
+            GameObject asset = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/Art/Characters/Haru/haru.fbx");
+            if (asset == null) return;
+            GameObject visual = PrefabUtility.InstantiatePrefab(asset, scene) as GameObject;
+            if (visual == null) return;
+            visual.name = "Haru Visual";
+            visual.transform.SetParent(player.transform, false);
+            visual.transform.localPosition = Vector3.zero;
+            visual.transform.localRotation = Quaternion.identity;
+            visual.transform.localScale = Vector3.one;
+
+            Renderer[] renderers = visual.GetComponentsInChildren<Renderer>(true);
+            if (renderers.Length > 0)
+            {
+                Bounds bounds = renderers[0].bounds;
+                foreach (Renderer renderer in renderers.Skip(1)) bounds.Encapsulate(renderer.bounds);
+                if (bounds.size.y > 0.001f)
+                {
+                    visual.transform.localScale *= 1.8f / bounds.size.y;
+                    bounds = visual.GetComponentsInChildren<Renderer>(true)[0].bounds;
+                    foreach (Renderer renderer in visual.GetComponentsInChildren<Renderer>(true).Skip(1))
+                        bounds.Encapsulate(renderer.bounds);
+                    visual.transform.position += Vector3.up * (player.transform.position.y - bounds.min.y);
+                }
+            }
+        }
+        if (capsule != null) Object.DestroyImmediate(capsule.gameObject);
     }
 
     private static void ValidateThreeDimensionalDoorway(CornerRoomLevel level)
