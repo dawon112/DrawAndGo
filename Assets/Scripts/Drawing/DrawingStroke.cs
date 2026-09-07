@@ -61,7 +61,7 @@ public sealed class DrawingStroke : MonoBehaviour
         gameObject.layer = strokeLayer;
         lineRenderer.useWorldSpace = true;
         lineRenderer.alignment = LineAlignment.View;
-        lineRenderer.textureMode = LineTextureMode.Stretch;
+        lineRenderer.textureMode = LineTextureMode.Tile;
         lineRenderer.numCapVertices = 4;
         lineRenderer.numCornerVertices = 4;
         lineRenderer.shadowCastingMode = ShadowCastingMode.Off;

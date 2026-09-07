@@ -4586,6 +4586,7 @@ MonoBehaviour:
   colliderThickness: 0.08
   colliderDepth: 0.12
   penColor: {r: 0.08627451, g: 0.49803922, b: 0.7647059, a: 1}
+  lineMaterialTemplate: {fileID: 2100000, guid: c45f7a82b9d641fd94307ea68c215b39, type: 2}
   drawingSurfaceMask:
     serializedVersion: 2
     m_Bits: 1024

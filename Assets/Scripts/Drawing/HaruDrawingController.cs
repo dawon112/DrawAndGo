@@ -20,6 +20,7 @@ public sealed class HaruDrawingController : MonoBehaviour
     [SerializeField, Min(0.001f)] private float colliderThickness = 0.06f;
     [SerializeField, Min(0.001f)] private float colliderDepth = 0.12f;
     [SerializeField] private Color penColor = new Color(22f / 255f, 127f / 255f, 195f / 255f, 1f);
+    [SerializeField] private Material lineMaterialTemplate;
     [SerializeField] private LayerMask drawingSurfaceMask;
     [SerializeField] private LayerMask drawingBlockerMask;
     [SerializeField] private CrosshairController crosshair;
@@ -50,7 +51,7 @@ public sealed class HaruDrawingController : MonoBehaviour
     {
         drawingCamera = GetComponent<Camera>();
         ConfigurePhysicsLayers();
-        lineMaterial = CreateLineMaterial();
+        lineMaterial = CreateLineMaterial(lineMaterialTemplate);
         ApplyPenColor();
         SetTool(DrawingTool.Pen);
     }
@@ -308,8 +309,17 @@ public sealed class HaruDrawingController : MonoBehaviour
             Destroy(lineMaterial);
     }
 
-    private static Material CreateLineMaterial()
+    private static Material CreateLineMaterial(Material template)
     {
+        if (template != null)
+        {
+            Material instance = new Material(template)
+            {
+                name = "Runtime Crayon Line Material"
+            };
+            return instance;
+        }
+
         Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
         if (shader == null)
             shader = Shader.Find("Sprites/Default");

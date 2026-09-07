@@ -22,7 +22,11 @@ public static class CornerRoomBuilder
         const string path = "Assets/Scenes/Player3DScene.unity";
         Scene scene = SceneManager.GetSceneByPath(path);
         if (!scene.isLoaded) scene = EditorSceneManager.OpenScene(path);
-        GameObject Find(string name) => scene.GetRootGameObjects().First(x => x.name == name);
+        GameObject[] roots = scene.GetRootGameObjects();
+        GameObject Find(string name) => roots.FirstOrDefault(x => x.name == name);
+        Player3DMovement FindPlayer3D() => roots
+            .SelectMany(x => x.GetComponentsInChildren<Player3DMovement>(true))
+            .FirstOrDefault();
         if (scene.GetRootGameObjects().Any(x => x.GetComponent<CornerRoomLevel>() != null))
         {
             var existingLevel = scene.GetRootGameObjects()
@@ -30,9 +34,19 @@ public static class CornerRoomBuilder
                 .First(x => x != null);
             Transform closureWall = existingLevel.transform.Find("Room Wall 6 - Closure");
             if (closureWall != null) Object.DestroyImmediate(closureWall.gameObject);
-            existingLevel.player3D = Find("Player3D").GetComponent<Player3DMovement>();
+            existingLevel.player3D = FindPlayer3D();
+            if (existingLevel.player3D == null)
+            {
+                Debug.LogError("Corner room build skipped: Player3DMovement was not found in Player3DScene.");
+                return;
+            }
             EnsureHaruModel(existingLevel.player3D.gameObject, scene);
-            var existingGround = scene.GetRootGameObjects().First(x => x.name == "Floor3D" || x.name == "Ground3D");
+            var existingGround = roots.FirstOrDefault(x => x.name == "Floor3D" || x.name == "Ground3D");
+            if (existingGround == null)
+            {
+                Debug.LogError("Corner room build skipped: Floor3D was not found in Player3DScene.");
+                return;
+            }
             existingGround.name = "Floor3D";
             existingGround.transform.position = new Vector3(5f, -0.1f, 8f);
             existingGround.transform.localScale = new Vector3(22f, 1f, 22f);
@@ -62,7 +76,13 @@ public static class CornerRoomBuilder
         SceneManager.MoveGameObjectToScene(root, scene);
         var level = root.AddComponent<CornerRoomLevel>();
         level.player = player;
-        level.player3D = Find("Player3D").GetComponent<Player3DMovement>();
+        level.player3D = FindPlayer3D();
+        if (level.player3D == null)
+        {
+            Object.DestroyImmediate(root);
+            Debug.LogError("Corner room build skipped: Player3DMovement was not found in Player3DScene.");
+            return;
+        }
         EnsureHaruModel(level.player3D.gameObject, scene);
         level.surfaces = new DuduSurface[5];
         Vector3[] corners = { new Vector3(-5,3,8), new Vector3(5,3,8), new Vector3(5,3,18),
