@@ -5,6 +5,7 @@ using UnityEngine.UI;
 public sealed class CrayonGaugeUI : MonoBehaviour
 {
     private RectTransform fill;
+    private RectTransform background;
     private Text label;
 
     private void Awake()
@@ -24,6 +25,14 @@ public sealed class CrayonGaugeUI : MonoBehaviour
                 : $"CRAYON {Mathf.RoundToInt(amount * 100f)}%";
     }
 
+    public void SetSplitScreenLayout(bool split)
+    {
+        Build();
+        float centerX = split ? 0.75f : 0.5f;
+        background.anchorMin = new Vector2(centerX, 0f);
+        background.anchorMax = new Vector2(centerX, 0f);
+    }
+
     private void Build()
     {
         if (fill != null) return;
@@ -36,6 +45,7 @@ public sealed class CrayonGaugeUI : MonoBehaviour
 
         GameObject background = CreateImage(canvasObject.transform, "Crayon Gauge", new Color(0.04f, 0.05f, 0.07f, 0.88f));
         RectTransform backgroundRect = background.GetComponent<RectTransform>();
+        this.background = backgroundRect;
         backgroundRect.anchorMin = new Vector2(0.5f, 0f);
         backgroundRect.anchorMax = new Vector2(0.5f, 0f);
         backgroundRect.pivot = new Vector2(0.5f, 0f);

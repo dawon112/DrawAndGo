@@ -388,15 +388,15 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: 79d7a0565cea8f043aaad8260432f4c1, type: 3}
       propertyPath: m_LocalScale.x
-      value: 1.73426
+      value: 3.46852
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 79d7a0565cea8f043aaad8260432f4c1, type: 3}
       propertyPath: m_LocalScale.y
-      value: 1.73426
+      value: 3.46852
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 79d7a0565cea8f043aaad8260432f4c1, type: 3}
       propertyPath: m_LocalScale.z
-      value: 1.73426
+      value: 3.46852
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 79d7a0565cea8f043aaad8260432f4c1, type: 3}
       propertyPath: m_LocalPosition.x
@@ -1656,6 +1656,7 @@ MonoBehaviour:
   duduMovement: {fileID: 1973135219}
   haruDrawing: {fileID: 3000000003}
   crosshair: {fileID: 3000000002}
+  splitScreenDuration: 4
 --- !u!4 &911315875
 Transform:
   m_ObjectHideFlags: 0
@@ -4102,6 +4103,10 @@ MonoBehaviour:
   orthographicSize: 3.5
   followSmoothTime: 0.15
   horizontalOffset: 1
+  silhouetteStartDistance: 3
+  silhouetteFullDistance: 0.75
+  silhouetteMaxAlpha: 0.35
+  silhouetteFadeSpeed: 5
 --- !u!4 &2112354183
 Transform:
   m_ObjectHideFlags: 0

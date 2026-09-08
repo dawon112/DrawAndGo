@@ -12,6 +12,11 @@ public sealed class DuduCameraController : MonoBehaviour
     [SerializeField, Min(0.1f)] private float orthographicSize = 3.5f;
     [SerializeField, Min(0.01f)] private float followSmoothTime = 0.15f;
     [SerializeField] private float horizontalOffset = 1f;
+    [Header("Haru Silhouette")]
+    [SerializeField, Min(0.1f)] private float silhouetteStartDistance = 3f;
+    [SerializeField, Min(0f)] private float silhouetteFullDistance = 0.75f;
+    [SerializeField, Range(0f, 1f)] private float silhouetteMaxAlpha = 0.35f;
+    [SerializeField, Min(0.01f)] private float silhouetteFadeSpeed = 5f;
 
     private readonly List<VisualProxy> visualProxies = new List<VisualProxy>();
     private Camera cameraComponent;
@@ -21,6 +26,12 @@ public sealed class DuduCameraController : MonoBehaviour
     private float totalWidth;
     private float horizontalVelocity;
     private float nextProxyRefresh;
+    private Player3DMovement player3D;
+    private Transform silhouetteRoot;
+    private Transform[] sourceHaruBones;
+    private Transform[] silhouetteBones;
+    private Material[] silhouetteMaterials;
+    private float silhouetteAlpha;
 
     public void SetSurface(DuduSurface surface) => targetSurface = surface;
     public void SetTarget(Transform target) => targetDudu = target;
@@ -59,6 +70,8 @@ public sealed class DuduCameraController : MonoBehaviour
 
         proxyRoot = new GameObject("Dudu Unwrapped View").transform;
         proxyRoot.gameObject.layer = UnwrappedLayer;
+        player3D = FindAnyObjectByType<Player3DMovement>(FindObjectsInactive.Include);
+        CreateHaruSilhouette();
         ConfigureCameraMasks();
         RefreshVisualProxies();
         SnapToTarget();
@@ -79,6 +92,7 @@ public sealed class DuduCameraController : MonoBehaviour
             targetSurface = movement.CurrentSurface;
         if (Time.unscaledTime >= nextProxyRefresh) RefreshVisualProxies();
         UpdateVisualProxies();
+        UpdateHaruSilhouette();
 
         float targetX = GetUnwrappedX(targetDudu.position, targetSurface) + horizontalOffset;
         float viewHalfWidth = orthographicSize * cameraComponent.aspect;
@@ -86,6 +100,83 @@ public sealed class DuduCameraController : MonoBehaviour
         targetX = Mathf.Clamp(targetX, -limit, limit);
         float x = Mathf.SmoothDamp(transform.position.x, targetX, ref horizontalVelocity, followSmoothTime);
         transform.SetPositionAndRotation(new Vector3(x, 0f, -cameraDistance), Quaternion.identity);
+    }
+
+    private void CreateHaruSilhouette()
+    {
+        if (player3D == null) return;
+        Transform source = player3D.transform.Find("Haru Visual");
+        if (source == null) return;
+
+        silhouetteRoot = Instantiate(source.gameObject, proxyRoot).transform;
+        silhouetteRoot.name = "Haru Silhouette [2D View]";
+        foreach (Animator animator in silhouetteRoot.GetComponentsInChildren<Animator>(true)) animator.enabled = false;
+        SetLayerRecursively(silhouetteRoot, UnwrappedLayer);
+        sourceHaruBones = source.GetComponentsInChildren<Transform>(true);
+        silhouetteBones = silhouetteRoot.GetComponentsInChildren<Transform>(true);
+
+        Shader shader = Shader.Find("DrawAndGo/HaruSilhouette");
+        if (shader == null) shader = Shader.Find("Universal Render Pipeline/Unlit");
+        Renderer[] renderers = silhouetteRoot.GetComponentsInChildren<Renderer>(true);
+        List<Material> materials = new List<Material>();
+        foreach (Renderer renderer in renderers)
+        {
+            Material[] replacements = new Material[renderer.sharedMaterials.Length];
+            for (int i = 0; i < replacements.Length; i++)
+            {
+                replacements[i] = new Material(shader) { name = "Haru Silhouette Material" };
+                materials.Add(replacements[i]);
+            }
+            renderer.sharedMaterials = replacements;
+            renderer.sortingOrder = 5;
+            renderer.shadowCastingMode = ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+        }
+        silhouetteMaterials = materials.ToArray();
+        silhouetteRoot.gameObject.SetActive(false);
+    }
+
+    private void UpdateHaruSilhouette()
+    {
+        if (silhouetteRoot == null || player3D == null || targetSurface == null) return;
+
+        Vector2 local = targetSurface.WorldToSurface(player3D.transform.position);
+        float planeDistance = Mathf.Abs(Vector3.Dot(
+            player3D.transform.position - targetSurface.transform.position,
+            targetSurface.Normal.normalized));
+        bool insideCurrentSection = Mathf.Abs(local.x) <= targetSurface.Width * 0.5f + 0.5f &&
+            Mathf.Abs(local.y) <= targetSurface.Height * 0.5f + 1f;
+        float distanceFade = 1f - Mathf.InverseLerp(silhouetteFullDistance, silhouetteStartDistance, planeDistance);
+        float targetAlpha = insideCurrentSection ? Mathf.Clamp01(distanceFade) * silhouetteMaxAlpha : 0f;
+        silhouetteAlpha = Mathf.MoveTowards(
+            silhouetteAlpha, targetAlpha, silhouetteFadeSpeed * silhouetteMaxAlpha * Time.deltaTime);
+
+        int surfaceIndex = System.Array.IndexOf(surfaces, targetSurface);
+        if (surfaceIndex < 0) silhouetteAlpha = 0f;
+        silhouetteRoot.gameObject.SetActive(silhouetteAlpha > 0.002f);
+        if (!silhouetteRoot.gameObject.activeSelf) return;
+
+        int boneCount = Mathf.Min(sourceHaruBones.Length, silhouetteBones.Length);
+        for (int i = 1; i < boneCount; i++)
+        {
+            silhouetteBones[i].localPosition = sourceHaruBones[i].localPosition;
+            silhouetteBones[i].localRotation = sourceHaruBones[i].localRotation;
+            silhouetteBones[i].localScale = sourceHaruBones[i].localScale;
+        }
+        silhouetteRoot.position = new Vector3(surfaceCenters[surfaceIndex] + local.x, local.y, -0.05f);
+        silhouetteRoot.rotation = MapRotation(player3D.transform, targetSurface);
+        foreach (Material material in silhouetteMaterials)
+        {
+            Color color = new Color(0.05f, 0.06f, 0.08f, silhouetteAlpha);
+            if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", color);
+            if (material.HasProperty("_Color")) material.SetColor("_Color", color);
+        }
+    }
+
+    private static void SetLayerRecursively(Transform root, int layer)
+    {
+        root.gameObject.layer = layer;
+        foreach (Transform child in root) SetLayerRecursively(child, layer);
     }
 
     private void SnapToTarget()
@@ -108,7 +199,7 @@ public sealed class DuduCameraController : MonoBehaviour
         foreach (Renderer source in FindObjectsByType<Renderer>(FindObjectsInactive.Include))
         {
             string sourceName = source.gameObject.name;
-            if (source.transform.IsChildOf(proxyRoot) || visualProxies.Exists(item => item.source == source) ||
+            if (source is SkinnedMeshRenderer || source.transform.IsChildOf(proxyRoot) || visualProxies.Exists(item => item.source == source) ||
                 sourceName == "Room Wall 6 - Closure" || sourceName.StartsWith("START") ||
                 sourceName.StartsWith("SECTION")) continue;
             Vector3 referencePosition = GetReferencePosition(source);
@@ -250,7 +341,12 @@ public sealed class DuduCameraController : MonoBehaviour
         Vector3.Dot(direction, surface.Right.normalized), Vector3.Dot(direction, surface.Up.normalized),
         Vector3.Dot(direction, surface.transform.forward.normalized));
 
-    private void OnDestroy() { if (proxyRoot != null) Destroy(proxyRoot.gameObject); }
+    private void OnDestroy()
+    {
+        if (silhouetteMaterials != null)
+            foreach (Material material in silhouetteMaterials) if (material != null) Destroy(material);
+        if (proxyRoot != null) Destroy(proxyRoot.gameObject);
+    }
 
     private sealed class VisualProxy
     {

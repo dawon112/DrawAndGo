@@ -45,6 +45,21 @@ public sealed class CrosshairController : MonoBehaviour
         RefreshStatus();
     }
 
+    public void SetSplitScreenLayout(bool split)
+    {
+        BuildCrosshair();
+        float centerX = split ? 0.75f : 0.5f;
+        foreach (Image bar in new[] { horizontalBar, verticalBar })
+        {
+            RectTransform rect = bar.rectTransform;
+            rect.anchorMin = new Vector2(centerX, 0.5f);
+            rect.anchorMax = new Vector2(centerX, 0.5f);
+        }
+        RectTransform statusRect = statusText.rectTransform;
+        statusRect.anchorMin = new Vector2(split ? 0.5f : 0f, 1f);
+        statusRect.anchorMax = statusRect.anchorMin;
+    }
+
     private void BuildCrosshair()
     {
         if (canvas != null)

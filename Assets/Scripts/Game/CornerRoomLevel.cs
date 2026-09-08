@@ -92,6 +92,8 @@ public sealed class CornerRoomLevel : MonoBehaviour
             door.SetActive(false);
             if (goalLabel != null)
                 goalLabel.text = "ALL COINS!\nRETURN TO 3D";
+            GameViewManager viewManager = FindAnyObjectByType<GameViewManager>();
+            if (viewManager != null) viewManager.PlayAllCoinsCollectedSequence();
             Debug.Log("All 3 coins collected: door opened.", this);
         }
     }
@@ -101,6 +103,8 @@ public sealed class CornerRoomLevel : MonoBehaviour
         if (!IsClear && IsOpen && candidate != null && candidate == player3D)
         {
             IsClear = true;
+            GameViewManager viewManager = FindAnyObjectByType<GameViewManager>();
+            if (viewManager != null) viewManager.HideExitInstruction();
             Debug.Log("Clear: the 3D player passed through the opened wall.", this);
         }
     }
