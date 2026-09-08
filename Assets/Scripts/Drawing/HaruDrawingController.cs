@@ -31,6 +31,12 @@ public sealed class HaruDrawingController : MonoBehaviour
     [SerializeField] private string duduLayerName = "Dudu";
     [SerializeField] private string strokeLayerName = "DrawnStroke";
 
+    [Header("Crayon Usage")]
+    [SerializeField, Min(1f)] private float maxCrayon = 100f;
+    [SerializeField, Min(0.01f)] private float consumptionPerWorldUnit = 10f;
+    [SerializeField, Min(0f)] private float rechargeDelay = 5f;
+    [SerializeField, Min(0.01f)] private float rechargeRate = 20f;
+
     private Camera drawingCamera;
     private DrawingStroke currentStroke;
     private DrawingSurface currentSurface;
@@ -40,16 +46,28 @@ public sealed class HaruDrawingController : MonoBehaviour
     private DrawingTool currentTool = DrawingTool.Pen;
     private bool cameraLock;
     private int strokeLayer;
+    private float currentCrayon;
+    private float emptyWaitTime;
+    private bool crayonDepleted;
+    private CrayonGaugeUI crayonGauge;
 
     public DrawingTool CurrentTool => currentTool;
     public bool CameraLock => cameraLock;
     public bool HasValidSurfaceAim { get; private set; }
     public Vector3 CurrentSurfaceAimPosition { get; private set; }
     public bool CanDrawAtCurrentAim { get; private set; }
+    public bool IsDrawing => isActiveAndEnabled && currentStroke != null && CanDrawAtCurrentAim;
+    public float CrayonNormalized => maxCrayon > 0f ? Mathf.Clamp01(currentCrayon / maxCrayon) : 0f;
+    public bool CanUseCrayon => !crayonDepleted && currentCrayon > 0f;
 
     private void Awake()
     {
         drawingCamera = GetComponent<Camera>();
+        if (GetComponent<HaruDrawingArm>() == null) gameObject.AddComponent<HaruDrawingArm>();
+        crayonGauge = GetComponent<CrayonGaugeUI>();
+        if (crayonGauge == null) crayonGauge = gameObject.AddComponent<CrayonGaugeUI>();
+        currentCrayon = maxCrayon;
+        RefreshCrayonGauge();
         ConfigurePhysicsLayers();
         lineMaterial = CreateLineMaterial(lineMaterialTemplate);
         ApplyPenColor();
@@ -58,6 +76,8 @@ public sealed class HaruDrawingController : MonoBehaviour
 
     private void Update()
     {
+        UpdateCrayonRecharge();
+
         Keyboard keyboard = Keyboard.current;
         if (keyboard != null && keyboard.eKey.wasPressedThisFrame)
             SetTool(currentTool == DrawingTool.Pen ? DrawingTool.Eraser : DrawingTool.Pen);
@@ -108,13 +128,60 @@ public sealed class HaruDrawingController : MonoBehaviour
             EndStroke();
             EraseStrokeParts(surface, point);
         }
+        else if (!CanUseCrayon)
+            EndStroke();
         else if (mouse.leftButton.wasPressedThisFrame || currentStroke == null || currentSurface != surface)
             StartStroke(surface, point);
         else if (Vector3.Distance(lastPoint, point) >= minPointDistance)
         {
-            currentStroke.AddPoint(point);
-            lastPoint = point;
+            float distance = Vector3.Distance(lastPoint, point);
+            float drawableDistance = Mathf.Min(distance, currentCrayon / consumptionPerWorldUnit);
+            if (drawableDistance > 0f)
+            {
+                Vector3 consumedPoint = Vector3.Lerp(lastPoint, point, drawableDistance / distance);
+                currentStroke.AddPoint(consumedPoint);
+                lastPoint = consumedPoint;
+                ConsumeCrayon(drawableDistance * consumptionPerWorldUnit);
+            }
+            if (!CanUseCrayon) EndStroke();
         }
+    }
+
+    private void ConsumeCrayon(float amount)
+    {
+        if (crayonDepleted || amount <= 0f) return;
+        currentCrayon = Mathf.Max(0f, currentCrayon - amount);
+        if (currentCrayon <= 0f)
+        {
+            currentCrayon = 0f;
+            crayonDepleted = true;
+            emptyWaitTime = 0f;
+        }
+        RefreshCrayonGauge();
+    }
+
+    private void UpdateCrayonRecharge()
+    {
+        if (!crayonDepleted) return;
+        if (currentCrayon <= 0f && emptyWaitTime < rechargeDelay)
+        {
+            emptyWaitTime += Time.deltaTime;
+            return;
+        }
+
+        currentCrayon = Mathf.MoveTowards(currentCrayon, maxCrayon, rechargeRate * Time.deltaTime);
+        if (currentCrayon >= maxCrayon)
+        {
+            currentCrayon = maxCrayon;
+            crayonDepleted = false;
+            emptyWaitTime = 0f;
+        }
+        RefreshCrayonGauge();
+    }
+
+    private void RefreshCrayonGauge()
+    {
+        if (crayonGauge != null) crayonGauge.SetAmount(CrayonNormalized, crayonDepleted);
     }
 
     public bool TryGetCurrentSurfaceAim(
@@ -307,6 +374,14 @@ public sealed class HaruDrawingController : MonoBehaviour
     {
         if (lineMaterial != null)
             Destroy(lineMaterial);
+    }
+
+    private void OnValidate()
+    {
+        maxCrayon = Mathf.Max(1f, maxCrayon);
+        consumptionPerWorldUnit = Mathf.Max(0.01f, consumptionPerWorldUnit);
+        rechargeDelay = Mathf.Max(0f, rechargeDelay);
+        rechargeRate = Mathf.Max(0.01f, rechargeRate);
     }
 
     private static Material CreateLineMaterial(Material template)

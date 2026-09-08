@@ -16,12 +16,6 @@ public sealed class CornerRoomLevel : MonoBehaviour
 
     private void Awake()
     {
-        Transform closureWall = transform.Find("Room Wall 6 - Closure");
-        if (closureWall != null)
-        {
-            closureWall.gameObject.SetActive(false);
-            Destroy(closureWall.gameObject);
-        }
         ApplyRequestedLayout();
         RemoveGuideLabels();
     }

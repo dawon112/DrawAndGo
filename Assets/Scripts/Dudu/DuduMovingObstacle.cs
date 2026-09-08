@@ -60,6 +60,26 @@ public sealed class DuduMovingObstacle : MonoBehaviour
         body.interpolation = RigidbodyInterpolation.Interpolate;
         body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
         body.constraints = RigidbodyConstraints.FreezeRotation;
+        // Prefab assets cannot store scene surface references. Preserve assigned
+        // scene instances, and bind newly placed copies to their nearest paper.
+        if (surface == null)
+        {
+            float nearest = float.PositiveInfinity;
+            foreach (var candidate in FindObjectsByType<DuduSurface>())
+            {
+                Vector2 p = candidate.WorldToSurface(transform.position);
+                Vector2 clamped = new Vector2(Mathf.Clamp(p.x, -candidate.Width / 2, candidate.Width / 2),
+                    Mathf.Clamp(p.y, -candidate.Height / 2, candidate.Height / 2));
+                float distance = (candidate.SurfaceToWorld(clamped) - transform.position).sqrMagnitude;
+                if (distance >= nearest) continue;
+                nearest = distance; surface = candidate;
+            }
+            if (surface != null)
+            {
+                Vector2 axis = movementAxis == MovementAxis.Horizontal ? Vector2.right : Vector2.up;
+                centerPosition = surface.WorldToSurface(transform.position) + axis * (travelDistance * .5f);
+            }
+        }
     }
 
     private void FixedUpdate()

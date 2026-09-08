@@ -32,8 +32,6 @@ public static class CornerRoomBuilder
             var existingLevel = scene.GetRootGameObjects()
                 .Select(x => x.GetComponent<CornerRoomLevel>())
                 .First(x => x != null);
-            Transform closureWall = existingLevel.transform.Find("Room Wall 6 - Closure");
-            if (closureWall != null) Object.DestroyImmediate(closureWall.gameObject);
             existingLevel.player3D = FindPlayer3D();
             if (existingLevel.player3D == null)
             {
