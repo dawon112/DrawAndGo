@@ -71,9 +71,9 @@ public sealed class CrayonGaugeUI : MonoBehaviour
         textRect.offsetMin = Vector2.zero;
         textRect.offsetMax = Vector2.zero;
         label = textObject.GetComponent<Text>();
-        label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        label.font = GameFont.Bold;
         label.fontSize = 13;
-        label.fontStyle = FontStyle.Bold;
+        label.fontStyle = FontStyle.Normal;
         label.alignment = TextAnchor.MiddleCenter;
         label.color = Color.white;
         label.raycastTarget = false;

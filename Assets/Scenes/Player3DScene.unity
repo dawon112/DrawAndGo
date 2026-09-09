@@ -2311,7 +2311,7 @@ MonoBehaviour:
   attackRange: 9
   fireSound: {fileID: 0}
   fireSoundVolume: 0.85
-  projectileSpeed: 2.45
+  projectileSpeed: 1.6
   projectileTurnSpeed: 180
   projectileLifetime: 8
   projectileScale: {x: 0.35, y: 0.35, z: 0.12}
@@ -3773,6 +3773,9 @@ MonoBehaviour:
   gravity: 18
   jumpHeight: 1.4
   maximumFallSpeed: 20
+  stageStartPoint: {fileID: 0}
+  respawnDelay: 3
+  respawnProtectionDuration: 0.75
   maxWalkableSlopeAngle: 45
   drawnLineStepHeight: 0.04
   animator: {fileID: 493869931}

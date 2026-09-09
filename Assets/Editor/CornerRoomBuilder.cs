@@ -104,6 +104,7 @@ public static class CornerRoomBuilder
             obj.transform.SetParent(root.transform);
             obj.transform.SetPositionAndRotation(surface.SurfaceToWorld(new Vector2(x,y)) + surface.Normal * .04f, surface.transform.rotation);
             var label = obj.AddComponent<TextMesh>();
+            GameFont.Apply(label);
             label.text = text; label.fontSize = 64; label.characterSize = .08f;
             label.anchor = TextAnchor.MiddleCenter; label.color = new Color(.1f,.25f,.35f);
             return label;

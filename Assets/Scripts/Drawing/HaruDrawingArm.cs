@@ -7,8 +7,8 @@ using UnityEngine.Rendering;
 [DefaultExecutionOrder(100)]
 public sealed class HaruDrawingArm : MonoBehaviour
 {
-    private static readonly Vector2 RestShoulder = new Vector2(0.94f, 0.05f);
-    private static readonly Vector2 RestHand = new Vector2(0.71f, 0.42f);
+    private static readonly Vector2 RestShoulder = new Vector2(0.94f, 0.08f);
+    private static readonly Vector2 RestHand = new Vector2(0.72f, 0.51f);
 
     private HaruDrawingController drawing;
     private Camera view;
@@ -87,7 +87,9 @@ public sealed class HaruDrawingArm : MonoBehaviour
 
         Color blue = new Color(22f / 255f, 127f / 255f, 195f / 255f, 1f);
         Material crayonMaterial = CreateOverlayMaterial(null, blue, "First Person Blue Crayon");
-        crayonMaterial.renderQueue = 5000;
+        // Draw the hand over the crayon where they overlap, so the crayon looks
+        // enclosed by the grip instead of pasted in front of every finger.
+        crayonMaterial.renderQueue = 4997;
         crayon = CreateCrayon(crayonMaterial);
         Renderer crayonRenderer = crayon.GetComponent<Renderer>();
         visibleRenderers.Add(crayonRenderer);
@@ -98,7 +100,7 @@ public sealed class HaruDrawingArm : MonoBehaviour
             renderer.receiveShadows = false;
             // Sprite collectibles use sorting orders, so force view-model parts
             // to the final renderer order as well as using an overlay depth test.
-            renderer.sortingOrder = renderer == crayonRenderer ? short.MaxValue : short.MaxValue - 1;
+            renderer.sortingOrder = renderer == crayonRenderer ? short.MaxValue - 2 : short.MaxValue - 1;
             renderer.enabled = false;
         }
         return true;
@@ -189,7 +191,7 @@ public sealed class HaruDrawingArm : MonoBehaviour
                 Mathf.Clamp(aim.y - 0.5f, -0.5f, 0.5f) * 0.10f);
         }
         desiredViewport.x = Mathf.Clamp(desiredViewport.x, 0.66f, 0.77f);
-        desiredViewport.y = Mathf.Clamp(desiredViewport.y, 0.36f, 0.49f);
+        desiredViewport.y = Mathf.Clamp(desiredViewport.y, 0.46f, 0.55f);
         smoothedHandViewport = Vector2.SmoothDamp(smoothedHandViewport, desiredViewport, ref handVelocity, 0.075f);
 
         float slideDown = Mathf.Lerp(0.24f, 0f, visibility);
@@ -200,17 +202,41 @@ public sealed class HaruDrawingArm : MonoBehaviour
         hand.localRotation = handRest;
         AlignShoulder(shoulderTarget);
 
-        for (int i = 0; i < 10; i++)
-        {
-            forearm.rotation = Quaternion.FromToRotation(hand.position - forearm.position, transform.TransformPoint(handTarget) - forearm.position) * forearm.rotation;
-            upperArm.rotation = Quaternion.FromToRotation(hand.position - upperArm.position, transform.TransformPoint(handTarget) - upperArm.position) * upperArm.rotation;
-        }
+        SolveStableArm(transform.TransformPoint(handTarget));
 
-        Vector3 handPosition = transform.InverseTransformPoint(hand.position);
-        Vector2 penTipViewport = Vector2.Lerp(smoothedHandViewport, new Vector2(0.57f, 0.53f), 0.72f);
-        Vector3 fullPenTip = ViewportPoint(penTipViewport, 0.735f);
-        float visibleLength = Mathf.Lerp(0.05f, 1f, drawing.CrayonNormalized);
-        PositionCrayon(handPosition, Vector3.Lerp(handPosition, fullPenTip, visibleLength));
+        // Match the requested silhouette: the crayon crosses the hand diagonally,
+        // extending farther toward the lower-left and slightly behind the fingers.
+        Vector2 gripViewport = smoothedHandViewport + new Vector2(-0.07f, 0.03f);
+        Vector2 crayonDirection = new Vector2(-0.42f, -0.91f).normalized;
+        Vector3 crayonTip = ViewportPoint(gripViewport + crayonDirection * 0.18f, 0.70f);
+        Vector3 crayonBack = ViewportPoint(gripViewport - crayonDirection * 0.16f, 0.70f);
+        PositionCrayon(crayonBack, crayonTip);
+    }
+
+    private void SolveStableArm(Vector3 target)
+    {
+        Vector3 shoulder = upperArm.position;
+        float upperLength = Vector3.Distance(shoulder, forearm.position);
+        float lowerLength = Vector3.Distance(forearm.position, hand.position);
+        Vector3 toTarget = target - shoulder;
+        float distance = Mathf.Clamp(toTarget.magnitude,
+            Mathf.Abs(upperLength - lowerLength) + 0.001f,
+            upperLength + lowerLength - 0.001f);
+        Vector3 direction = toTarget.sqrMagnitude > 0.000001f ? toTarget.normalized : transform.forward;
+
+        // A camera-relative pole keeps the elbow down and to the screen edge,
+        // preventing the unconstrained IK from flipping through the arm.
+        Vector3 pole = Vector3.ProjectOnPlane(transform.right - transform.up * 0.65f, direction).normalized;
+        if (pole.sqrMagnitude < 0.001f) pole = Vector3.ProjectOnPlane(transform.forward, direction).normalized;
+        float along = (upperLength * upperLength - lowerLength * lowerLength + distance * distance) /
+            (2f * distance);
+        float away = Mathf.Sqrt(Mathf.Max(0f, upperLength * upperLength - along * along));
+        Vector3 elbowTarget = shoulder + direction * along + pole * away;
+
+        upperArm.rotation = Quaternion.FromToRotation(
+            forearm.position - shoulder, elbowTarget - shoulder) * upperArm.rotation;
+        forearm.rotation = Quaternion.FromToRotation(
+            hand.position - forearm.position, target - forearm.position) * forearm.rotation;
     }
 
     private void AlignShoulder(Vector3 desiredLocalPosition)
@@ -238,7 +264,7 @@ public sealed class HaruDrawingArm : MonoBehaviour
         Vector3 delta = to - from;
         crayon.localPosition = (from + to) * 0.5f;
         if (delta.sqrMagnitude > 0.000001f) crayon.localRotation = Quaternion.FromToRotation(Vector3.up, delta.normalized);
-        crayon.localScale = new Vector3(0.014f, delta.magnitude * 0.5f, 0.014f);
+        crayon.localScale = new Vector3(0.017f, delta.magnitude * 0.5f, 0.017f);
     }
 
     private Material CreateOverlayMaterial(Material source, Color fallbackColor, string materialName)

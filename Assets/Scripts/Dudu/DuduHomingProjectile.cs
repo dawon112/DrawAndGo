@@ -89,7 +89,7 @@ public sealed class DuduHomingProjectile : MonoBehaviour
         if (dudu == null || dudu != target)
             return;
 
-        dudu.ShowHitFeedback();
+        dudu.Die();
         Destroy(gameObject);
     }
 

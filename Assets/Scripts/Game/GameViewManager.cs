@@ -5,6 +5,7 @@ using UnityEngine.UI;
 
 public sealed class GameViewManager : MonoBehaviour
 {
+    public enum CameraState { Gameplay, IntroCinematic, SplitScreen, ClearCinematic }
     [SerializeField] private bool developmentViewSwitch = true;
     [SerializeField] private Camera haruCamera;
     [SerializeField] private Player3DMovement haruMovement;
@@ -19,12 +20,18 @@ public sealed class GameViewManager : MonoBehaviour
     private bool splitSequencePlayed;
     private bool splitSequenceActive;
     private Canvas exitInstructionCanvas;
+    private StageCinematicController stageCinematic;
+    public CameraState CurrentCameraState { get; private set; }
 
     private void Awake()
     {
         EnsureAudioListener(haruCamera);
         EnsureAudioListener(duduCamera);
         BuildExitInstruction();
+        stageCinematic = GetComponent<StageCinematicController>();
+        if (stageCinematic == null) stageCinematic = gameObject.AddComponent<StageCinematicController>();
+        stageCinematic.Configure(this, haruCamera, haruMovement, haruLook, duduCamera,
+            duduMovement, haruDrawing, crosshair);
     }
 
     private static void EnsureAudioListener(Camera targetCamera)
@@ -50,6 +57,8 @@ public sealed class GameViewManager : MonoBehaviour
     private void Start()
     {
         SetDuduMode(false);
+        CornerRoomLevel level = FindAnyObjectByType<CornerRoomLevel>();
+        if (level != null) stageCinematic.PlayIntro(level);
     }
 
     private void Update()
@@ -73,6 +82,8 @@ public sealed class GameViewManager : MonoBehaviour
 
     private IEnumerator PlaySplitScreenSequence()
     {
+        while (CurrentCameraState == CameraState.IntroCinematic) yield return null;
+        CurrentCameraState = CameraState.SplitScreen;
         splitSequenceActive = true;
         bool restoreDuduMode = duduMode;
         Rect haruRect = haruCamera.rect;
@@ -105,8 +116,40 @@ public sealed class GameViewManager : MonoBehaviour
         if (crosshair != null) crosshair.SetSplitScreenLayout(false);
         if (gauge != null) gauge.SetSplitScreenLayout(false);
         splitSequenceActive = false;
-        SetDuduMode(restoreDuduMode);
-        if (exitInstructionCanvas != null) exitInstructionCanvas.enabled = true;
+        SetDuduMode(false);
+        CornerRoomLevel level = FindAnyObjectByType<CornerRoomLevel>();
+        if (level != null) stageCinematic.PlayClear(level);
+        else
+        {
+            CurrentCameraState = CameraState.Gameplay;
+            SetDuduMode(restoreDuduMode);
+        }
+    }
+
+    public void EnterCinematic(CameraState state)
+    {
+        CurrentCameraState = state;
+        HideExitInstruction();
+        if (haruDrawing != null) haruDrawing.ForceDisableCameraLock();
+        if (haruMovement != null) haruMovement.enabled = false;
+        if (haruLook != null) haruLook.enabled = false;
+        if (duduMovement != null) duduMovement.SetInputEnabled(false);
+        if (haruDrawing != null) haruDrawing.enabled = false;
+        if (crosshair != null) crosshair.SetVisible(false);
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+    }
+
+    public void FinishIntro()
+    {
+        CurrentCameraState = CameraState.Gameplay;
+        SetDuduMode(false);
+    }
+
+    public void ShowHaruCameraWithoutInput()
+    {
+        if (duduCamera != null) duduCamera.gameObject.SetActive(false);
+        if (haruCamera != null) haruCamera.gameObject.SetActive(true);
     }
 
     private void BuildExitInstruction()
@@ -128,9 +171,9 @@ public sealed class GameViewManager : MonoBehaviour
         rect.sizeDelta = new Vector2(480f, 55f);
         Text text = textObject.GetComponent<Text>();
         text.text = "문 밖으로 나가자!";
-        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        text.font = GameFont.Bold;
         text.fontSize = 28;
-        text.fontStyle = FontStyle.Bold;
+        text.fontStyle = FontStyle.Normal;
         text.alignment = TextAnchor.MiddleCenter;
         text.color = Color.white;
         text.raycastTarget = false;

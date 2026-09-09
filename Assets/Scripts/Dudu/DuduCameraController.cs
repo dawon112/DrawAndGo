@@ -179,9 +179,12 @@ public sealed class DuduCameraController : MonoBehaviour
         foreach (Transform child in root) SetLayerRecursively(child, layer);
     }
 
-    private void SnapToTarget()
+    public void SnapToTarget()
     {
-        if (targetDudu == null || targetSurface == null) return;
+        if (targetDudu == null) return;
+        if (targetDudu.TryGetComponent(out DuduSurfaceMovement movement) && movement.CurrentSurface != null)
+            targetSurface = movement.CurrentSurface;
+        if (targetSurface == null) return;
         transform.SetPositionAndRotation(new Vector3(
             GetUnwrappedX(targetDudu.position, targetSurface) + horizontalOffset, 0f, -cameraDistance), Quaternion.identity);
         horizontalVelocity = 0f;
@@ -258,11 +261,15 @@ public sealed class DuduCameraController : MonoBehaviour
         if (source.TryGetComponent(out TextMesh sourceText))
         {
             TextMesh text = copy.AddComponent<TextMesh>();
-            text.font = sourceText.font; text.fontSize = sourceText.fontSize;
-            text.characterSize = sourceText.characterSize; text.anchor = sourceText.anchor;
+            int highResolutionSize = Mathf.Max(sourceText.fontSize, 128);
+            text.font = sourceText.font; text.fontSize = highResolutionSize;
+            text.characterSize = sourceText.characterSize * sourceText.fontSize / highResolutionSize;
+            text.anchor = sourceText.anchor;
             text.alignment = sourceText.alignment; text.fontStyle = sourceText.fontStyle;
             text.richText = sourceText.richText;
-            return text.GetComponent<Renderer>();
+            Renderer textRenderer = text.GetComponent<Renderer>();
+            if (text.font != null) textRenderer.sharedMaterial = text.font.material;
+            return textRenderer;
         }
         if (source is MeshRenderer && source.TryGetComponent(out MeshFilter sourceFilter))
         {
@@ -318,7 +325,14 @@ public sealed class DuduCameraController : MonoBehaviour
                 }
             }
             else if (item.source.TryGetComponent(out TextMesh sourceText) && item.proxy.TryGetComponent(out TextMesh text))
-            { text.text = sourceText.text; text.color = sourceText.color; }
+            {
+                text.text = sourceText.text; text.color = sourceText.color;
+                if (text.font != sourceText.font)
+                {
+                    text.font = sourceText.font;
+                    if (text.font != null) item.proxy.sharedMaterial = text.font.material;
+                }
+            }
         }
     }
 

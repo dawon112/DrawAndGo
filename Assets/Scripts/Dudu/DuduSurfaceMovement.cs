@@ -19,6 +19,11 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
     [SerializeField, Min(0f)] private float jumpHeight = 1.4f;
     [SerializeField, Min(0f)] private float maximumFallSpeed = 20f;
 
+    [Header("Death / Respawn")]
+    [SerializeField] private Transform stageStartPoint;
+    [SerializeField, Min(0f)] private float respawnDelay = 3f;
+    [SerializeField, Min(0f)] private float respawnProtectionDuration = 0.75f;
+
     [Header("Drawn Line Walking")]
     [SerializeField, Range(0f, 60f)] private float maxWalkableSlopeAngle = 45f;
     [Tooltip("Maximum small seam height to step over on a drawn line, in world units.")]
@@ -51,6 +56,10 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
     private float reverseEffectUntil = float.NegativeInfinity;
     private float stainSpeedMultiplier = 1f;
     private bool wasFollowingDrawnLine;
+    private DuduSurface startSurface;
+    private Vector2 startSurfacePosition;
+    private bool isRespawning;
+    private float respawnProtectedUntil = float.NegativeInfinity;
 
     private static readonly int SpeedId = Animator.StringToHash("Speed");
     private static readonly int GroundedId = Animator.StringToHash("Grounded");
@@ -158,6 +167,15 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
             body = gameObject.AddComponent<Rigidbody>();
         duduCollider = GetComponent<Collider>();
         CacheNormalSpriteColor();
+        startSurface = currentSurface;
+        startSurfacePosition = surfacePosition;
+        if (stageStartPoint == null)
+        {
+            stageStartPoint = new GameObject("StageStartPoint").transform;
+            stageStartPoint.position = currentSurface != null
+                ? currentSurface.SurfaceToWorld(startSurfacePosition)
+                : transform.position;
+        }
 
         body.useGravity = false;
         body.isKinematic = false;
@@ -206,10 +224,12 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
     {
         if (currentSurface == null || body == null)
             return;
+        if (isRespawning)
+            return;
 
         if (currentSurface.IsAtOrBelowBottom(body.position, characterHalfSize.y))
         {
-            Respawn();
+            Die();
             return;
         }
 
@@ -400,12 +420,42 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         InitializeSurfacePhysics();
         return true;
     }
+    public void Die()
+    {
+        if (isRespawning || Time.time < respawnProtectedUntil)
+            return;
+        StartCoroutine(DeathAndRespawnRoutine());
+    }
+
     public void Respawn()
     {
-        if (currentSurface == null || body == null)
+        RespawnAtStageStart();
+    }
+
+    private IEnumerator DeathAndRespawnRoutine()
+    {
+        isRespawning = true;
+        bool restoreInput = inputEnabled;
+        SetInputEnabled(false);
+        body.linearVelocity = Vector3.zero;
+        body.angularVelocity = Vector3.zero;
+        if (spriteRenderer != null) spriteRenderer.enabled = false;
+        yield return new WaitForSecondsRealtime(respawnDelay);
+        RespawnAtStageStart();
+        if (spriteRenderer != null) spriteRenderer.enabled = true;
+        respawnProtectedUntil = Time.time + respawnProtectionDuration;
+        isRespawning = false;
+        SetInputEnabled(restoreInput);
+    }
+
+    private void RespawnAtStageStart()
+    {
+        if (startSurface == null || body == null)
             return;
 
-        body.position = currentSurface.SurfaceToWorld(surfacePosition);
+        currentSurface = startSurface;
+        surfacePosition = startSurfacePosition;
+        body.position = currentSurface.SurfaceToWorld(startSurfacePosition);
         body.rotation = currentSurface.transform.rotation;
         body.linearVelocity = Vector3.zero;
         body.angularVelocity = Vector3.zero;
@@ -415,7 +465,10 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         wasFollowingDrawnLine = false;
         bounceControlUntil = float.NegativeInfinity;
         ResetStainEffects();
+        InitializeSurfacePhysics();
         UpdateVisualSurfaceOffset();
+        DuduCameraController cameraController = FindAnyObjectByType<DuduCameraController>();
+        if (cameraController != null) cameraController.SnapToTarget();
     }
 
     private void UpdateVisualSurfaceOffset()

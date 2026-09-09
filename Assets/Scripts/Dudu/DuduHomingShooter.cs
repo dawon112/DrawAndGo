@@ -25,7 +25,7 @@ public sealed class DuduHomingShooter : MonoBehaviour
 
     [Header("Homing Projectile")]
     [Tooltip("Projectile movement speed.")]
-    [SerializeField, Min(0f)] private float projectileSpeed = 2.45f;
+    [SerializeField, Min(0f)] private float projectileSpeed = 1.6f;
     [Tooltip("Maximum homing turn speed in degrees per second.")]
     [SerializeField, Min(0f)] private float projectileTurnSpeed = 180f;
     [Tooltip("Seconds before a projectile is automatically removed.")]
@@ -37,6 +37,7 @@ public sealed class DuduHomingShooter : MonoBehaviour
     private bool targetWasActive;
     private float nextShotTime;
     private AudioSource audioSource;
+    private DuduHomingProjectile activeProjectile;
     private static AudioClip defaultFireSound;
     private static Sprite projectileSprite;
 
@@ -70,6 +71,9 @@ public sealed class DuduHomingShooter : MonoBehaviour
         }
 
         if (Time.time < nextShotTime)
+            return;
+
+        if (activeProjectile != null)
             return;
 
         nextShotTime = Time.time + fireInterval;
@@ -110,6 +114,7 @@ public sealed class DuduHomingShooter : MonoBehaviour
         projectileCollider.isTrigger = true;
         projectile.AddComponent<Rigidbody>();
         DuduHomingProjectile homingProjectile = projectile.AddComponent<DuduHomingProjectile>();
+        activeProjectile = homingProjectile;
         homingProjectile.Configure(
             surface,
             target,

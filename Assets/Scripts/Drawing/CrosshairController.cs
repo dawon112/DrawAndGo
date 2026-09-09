@@ -107,9 +107,9 @@ public sealed class CrosshairController : MonoBehaviour
         rect.sizeDelta = new Vector2(260f, 32f);
 
         Text text = label.GetComponent<Text>();
-        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        text.font = GameFont.Bold;
         text.fontSize = 18;
-        text.fontStyle = FontStyle.Bold;
+        text.fontStyle = FontStyle.Normal;
         text.alignment = TextAnchor.UpperLeft;
         text.color = Color.white;
         text.supportRichText = false;
