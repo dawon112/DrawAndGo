@@ -24,6 +24,7 @@ public sealed class DuduHomingShooter : MonoBehaviour
     [SerializeField, Range(0f, 1f)] private float fireSoundVolume = 0.85f;
 
     [Header("Homing Projectile")]
+    [SerializeField] private GameObject projectilePrefab;
     [Tooltip("Projectile movement speed.")]
     [SerializeField, Min(0f)] private float projectileSpeed = 1.6f;
     [Tooltip("Maximum homing turn speed in degrees per second.")]
@@ -31,7 +32,7 @@ public sealed class DuduHomingShooter : MonoBehaviour
     [Tooltip("Seconds before a projectile is automatically removed.")]
     [SerializeField, Min(0.1f)] private float projectileLifetime = 8f;
     [Tooltip("Temporary projectile visual size.")]
-    [SerializeField] private Vector3 projectileScale = new Vector3(0.35f, 0.35f, 0.12f);
+    [SerializeField] private Vector3 projectileScale = Vector3.one * 0.12f;
     [SerializeField] private Material projectileMaterial;
 
     private bool targetWasActive;
@@ -86,7 +87,7 @@ public sealed class DuduHomingShooter : MonoBehaviour
         if (surface == null || target == null || target.CurrentSurface != surface)
             return false;
         Vector2 targetPosition = surface.WorldToSurface(target.transform.position);
-        return Vector2.Distance(surfacePosition, targetPosition) <= attackRange;
+        return Vector2.Distance(GetEmitterSurfacePosition(), targetPosition) <= attackRange;
     }
 
     private void FireProjectile()
@@ -94,26 +95,34 @@ public sealed class DuduHomingShooter : MonoBehaviour
         if (surface == null || target == null)
             return;
 
+        Vector2 emitterPosition = GetEmitterSurfacePosition();
         Vector2 targetPosition = surface.WorldToSurface(target.transform.position);
-        Vector2 fireDirection = (targetPosition - surfacePosition).normalized;
-        Vector2 spawnPosition = surfacePosition + fireDirection * 0.9f;
+        Vector2 fireDirection = (targetPosition - emitterPosition).normalized;
+        // Spawn at the cloud artwork itself. The old 0.9-unit offset pushed the
+        // first visible bolt downward and made it look as if it came from the floor.
+        Vector2 spawnPosition = emitterPosition + fireDirection * 0.12f;
 
-        GameObject projectile = new GameObject("Homing Projectile");
+        GameObject projectile = projectilePrefab != null
+            ? Instantiate(projectilePrefab)
+            : new GameObject("Homing Projectile");
         projectile.name = "Homing Projectile";
         projectile.transform.SetPositionAndRotation(
             surface.SurfaceToWorld(spawnPosition) + surface.Normal.normalized * 0.1f,
             surface.transform.rotation);
         projectile.transform.localScale = projectileScale;
 
-        SpriteRenderer projectileRenderer = projectile.AddComponent<SpriteRenderer>();
-        projectileRenderer.sprite = GetProjectileSprite();
-        projectileRenderer.color = Color.black;
+        SpriteRenderer projectileRenderer = projectile.GetComponent<SpriteRenderer>();
+        if (projectileRenderer == null) projectileRenderer = projectile.AddComponent<SpriteRenderer>();
+        if (projectileRenderer.sprite == null) projectileRenderer.sprite = GetProjectileSprite();
         projectileRenderer.sortingOrder = 25;
+        DuduCameraController.RegisterRuntimeRenderer(projectileRenderer);
 
-        SphereCollider projectileCollider = projectile.AddComponent<SphereCollider>();
+        SphereCollider projectileCollider = projectile.GetComponent<SphereCollider>();
+        if (projectileCollider == null) projectileCollider = projectile.AddComponent<SphereCollider>();
         projectileCollider.isTrigger = true;
-        projectile.AddComponent<Rigidbody>();
-        DuduHomingProjectile homingProjectile = projectile.AddComponent<DuduHomingProjectile>();
+        if (projectile.GetComponent<Rigidbody>() == null) projectile.AddComponent<Rigidbody>();
+        DuduHomingProjectile homingProjectile = projectile.GetComponent<DuduHomingProjectile>();
+        if (homingProjectile == null) homingProjectile = projectile.AddComponent<DuduHomingProjectile>();
         activeProjectile = homingProjectile;
         homingProjectile.Configure(
             surface,
@@ -122,6 +131,15 @@ public sealed class DuduHomingShooter : MonoBehaviour
             projectileTurnSpeed,
             projectileLifetime);
         PlayFireSound();
+    }
+
+    private Vector2 GetEmitterSurfacePosition()
+    {
+        SpriteRenderer cloudRenderer = GetComponentInChildren<SpriteRenderer>();
+        Vector3 emitterWorldPosition = cloudRenderer != null
+            ? cloudRenderer.bounds.center
+            : transform.position;
+        return surface.WorldToSurface(emitterWorldPosition);
     }
 
     private static Sprite GetProjectileSprite()

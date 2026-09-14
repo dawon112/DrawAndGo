@@ -6,6 +6,7 @@ using UnityEngine.Rendering;
 public sealed class DuduCameraController : MonoBehaviour
 {
     private const int UnwrappedLayer = 30;
+    private static DuduCameraController activeInstance;
     [SerializeField] private DuduSurface targetSurface;
     [SerializeField] private Transform targetDudu;
     [SerializeField, Min(0.1f)] private float cameraDistance = 10f;
@@ -45,8 +46,17 @@ public sealed class DuduCameraController : MonoBehaviour
 
     private void OnEnable()
     {
+        activeInstance = this;
         if (cameraComponent == null) cameraComponent = GetComponent<Camera>();
         ConfigureCameraMasks();
+    }
+
+    public static void RegisterRuntimeRenderer(Renderer source)
+    {
+        if (activeInstance == null || source == null)
+            return;
+
+        activeInstance.AddVisualProxy(source);
     }
 
     private void Start()
@@ -201,16 +211,25 @@ public sealed class DuduCameraController : MonoBehaviour
         nextProxyRefresh = Time.unscaledTime + 0.25f;
         foreach (Renderer source in FindObjectsByType<Renderer>(FindObjectsInactive.Include))
         {
-            string sourceName = source.gameObject.name;
-            if (source is SkinnedMeshRenderer || source.transform.IsChildOf(proxyRoot) || visualProxies.Exists(item => item.source == source) ||
-                sourceName == "Room Wall 6 - Closure" || sourceName.StartsWith("START") ||
-                sourceName.StartsWith("SECTION")) continue;
-            Vector3 referencePosition = GetReferencePosition(source);
-            DuduSurface surface = FindSurface(referencePosition);
-            if (surface == null) continue;
-            Renderer proxy = CreateProxy(source);
-            if (proxy != null) visualProxies.Add(new VisualProxy(source, proxy, surface));
+            AddVisualProxy(source);
         }
+    }
+
+    private void AddVisualProxy(Renderer source)
+    {
+        if (source == null || proxyRoot == null)
+            return;
+
+        string sourceName = source.gameObject.name;
+        if (source is SkinnedMeshRenderer || source.transform.IsChildOf(proxyRoot) ||
+            visualProxies.Exists(item => item.source == source) ||
+            sourceName == "Room Wall 6 - Closure" || sourceName.StartsWith("START") ||
+            sourceName.StartsWith("SECTION")) return;
+
+        DuduSurface sourceSurface = FindSurface(GetReferencePosition(source));
+        if (sourceSurface == null) return;
+        Renderer proxy = CreateProxy(source);
+        if (proxy != null) visualProxies.Add(new VisualProxy(source, proxy, sourceSurface));
     }
 
     private DuduSurface FindSurface(Vector3 position)
@@ -357,6 +376,7 @@ public sealed class DuduCameraController : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (activeInstance == this) activeInstance = null;
         if (silhouetteMaterials != null)
             foreach (Material material in silhouetteMaterials) if (material != null) Destroy(material);
         if (proxyRoot != null) Destroy(proxyRoot.gameObject);

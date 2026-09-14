@@ -10,7 +10,6 @@ public sealed class DuduHomingProjectile : MonoBehaviour
     private SphereCollider projectileSphere;
     private Vector3 movementDirection;
     private float moveSpeed;
-    private float turnSpeedRadians;
     private float remainingLifetime;
 
     public void Configure(
@@ -23,7 +22,6 @@ public sealed class DuduHomingProjectile : MonoBehaviour
         surface = targetSurface;
         target = targetDudu;
         moveSpeed = Mathf.Max(0f, speed);
-        turnSpeedRadians = Mathf.Max(0f, turnSpeedDegrees) * Mathf.Deg2Rad;
         remainingLifetime = Mathf.Max(0.1f, lifetime);
         movementDirection = GetDirectionToTarget();
     }
@@ -35,7 +33,7 @@ public sealed class DuduHomingProjectile : MonoBehaviour
         body.isKinematic = true;
         body.interpolation = RigidbodyInterpolation.Interpolate;
         body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
-        body.constraints = RigidbodyConstraints.FreezeRotation;
+        body.constraints = RigidbodyConstraints.None;
 
         Collider projectileCollider = GetComponent<Collider>();
         projectileCollider.isTrigger = true;
@@ -59,22 +57,78 @@ public sealed class DuduHomingProjectile : MonoBehaviour
 
         Vector3 desiredDirection = GetDirectionToTarget();
         if (desiredDirection.sqrMagnitude > 0.0001f)
-        {
-            movementDirection = Vector3.RotateTowards(
-                movementDirection,
-                desiredDirection,
-                turnSpeedRadians * Time.fixedDeltaTime,
-                0f).normalized;
-        }
+            movementDirection = desiredDirection.normalized;
 
-        Vector3 displacement = movementDirection * moveSpeed * Time.fixedDeltaTime;
+        // Direction changes must never change the projectile's travel speed.
+        Vector3 displacement = movementDirection.normalized * moveSpeed * Time.fixedDeltaTime;
         if (TouchesDrawnLineAlongMove(displacement))
         {
             Destroy(gameObject);
             return;
         }
+        if (TouchesTargetAlongMove(displacement))
+        {
+            target.Die();
+            Destroy(gameObject);
+            return;
+        }
 
+        body.MoveRotation(GetMovementRotation());
         body.MovePosition(body.position + displacement);
+    }
+
+    private bool TouchesTargetAlongMove(Vector3 displacement)
+    {
+        if (projectileSphere == null || target == null)
+            return false;
+
+        // The game is presented in unwrapped 2D coordinates. Test the complete
+        // visible travel segment there as well, so a rendered overlap can never
+        // slip through because of 3D layers, sprite padding, or trigger timing.
+        Vector2 start2D = surface.WorldToSurface(body.position);
+        Vector2 end2D = surface.WorldToSurface(body.position + displacement);
+        Vector2 target2D = surface.WorldToSurface(target.transform.position);
+        Vector2 segment2D = end2D - start2D;
+        float segmentT = segment2D.sqrMagnitude > Mathf.Epsilon
+            ? Mathf.Clamp01(Vector2.Dot(target2D - start2D, segment2D) / segment2D.sqrMagnitude)
+            : 0f;
+        Vector2 closest2D = start2D + segment2D * segmentT;
+        const float visibleHitRadius = 0.85f;
+        if (Vector2.Distance(closest2D, target2D) <= visibleHitRadius)
+            return true;
+
+        Vector3 scale = transform.lossyScale;
+        float radius = projectileSphere.radius * Mathf.Max(
+            Mathf.Abs(scale.x), Mathf.Abs(scale.y), Mathf.Abs(scale.z));
+        Vector3 center = body.position + body.rotation * Vector3.Scale(projectileSphere.center, scale);
+
+        foreach (Collider other in Physics.OverlapSphere(
+            center, radius, Physics.AllLayers, QueryTriggerInteraction.Collide))
+            if (other.GetComponentInParent<DuduSurfaceMovement>() == target)
+                return true;
+
+        float distance = displacement.magnitude;
+        if (distance <= Mathf.Epsilon)
+            return false;
+
+        foreach (RaycastHit hit in Physics.SphereCastAll(
+            center, radius, displacement / distance, distance, Physics.AllLayers, QueryTriggerInteraction.Collide))
+            if (hit.collider.GetComponentInParent<DuduSurfaceMovement>() == target)
+                return true;
+
+        return false;
+    }
+
+    private Quaternion GetMovementRotation()
+    {
+        if (surface == null || movementDirection.sqrMagnitude <= 0.0001f)
+            return body != null ? body.rotation : transform.rotation;
+
+        // The thunder artwork points along local down, so rotate that tip toward Dudu.
+        float angle = Mathf.Atan2(
+            Vector3.Dot(movementDirection, surface.Up.normalized),
+            Vector3.Dot(movementDirection, surface.Right.normalized)) * Mathf.Rad2Deg;
+        return surface.transform.rotation * Quaternion.Euler(0f, 0f, angle + 90f);
     }
 
     private void OnTriggerEnter(Collider other)

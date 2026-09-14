@@ -39,17 +39,18 @@ public static class CornerRoomBuilder
                 return;
             }
             EnsureHaruModel(existingLevel.player3D.gameObject, scene);
-            var existingGround = roots.FirstOrDefault(x => x.name == "Floor3D" || x.name == "Ground3D");
+            var existingGround = roots
+                .SelectMany(root => root.GetComponentsInChildren<Transform>(true))
+                .Select(item => item.gameObject)
+                .FirstOrDefault(item => item.name == "Floor3D" || item.name == "Ground3D");
             if (existingGround == null)
             {
                 Debug.LogError("Corner room build skipped: Floor3D was not found in Player3DScene.");
                 return;
             }
-            existingGround.name = "Floor3D";
-            existingGround.transform.position = new Vector3(5f, -0.1f, 8f);
-            existingGround.transform.localScale = new Vector3(22f, 1f, 22f);
-            existingGround.GetComponent<Renderer>().sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>(
-                "Assets/YughuesFreeFlooringMaterials/Materials/M_YFFlM_01.mat");
+            // The current room uses a tiled "Floors" hierarchy. Keep each tile's
+            // authored transform and Chevron URP material instead of treating one
+            // child tile as the old single primitive floor.
             foreach (string frameName in new[] { "Door Frame Left", "Door Frame Right", "Door Frame Top" })
             {
                 var frame = GameObject.Find(frameName);
