@@ -3,6 +3,9 @@ using UnityEngine;
 // Owns only the prototype's three coins, door and finish state.
 public sealed class CornerRoomLevel : MonoBehaviour
 {
+    private const float CoinVisualScale = 0.07f;
+    private static readonly Vector3 CoinPickupWorldSize = new Vector3(0.7f, 0.9f, 0.3f);
+
     public DuduSurface[] surfaces;
     public GameObject[] coins;
     public GameObject door;
@@ -128,7 +131,7 @@ public sealed class CornerRoomLevel : MonoBehaviour
         if (coins != null)
             foreach (GameObject coin in coins)
                 if (coin != null)
-                    coin.transform.localScale = Vector3.one * 0.96f;
+                    ApplyCoinScaleAndPickupSize(coin);
 
         if (surfaces == null || surfaces.Length < 4 || surfaces[3] == null)
             return;
@@ -153,6 +156,23 @@ public sealed class CornerRoomLevel : MonoBehaviour
                 surface.SurfaceToWorld(new Vector2(x, -2.4f)), surface.transform.rotation);
             segment.transform.localScale = new Vector3(sectionWidth, 0.14f, 0.16f);
         }
+    }
+
+    private static void ApplyCoinScaleAndPickupSize(GameObject coin)
+    {
+        coin.transform.localScale = Vector3.one * CoinVisualScale;
+
+        // Keep the pickup volume independent from the visual scale. Otherwise shrinking the
+        // coin also makes its trigger too thin to reach the player on the drawing surface.
+        BoxCollider trigger = coin.GetComponent<BoxCollider>();
+        if (trigger == null)
+            return;
+
+        Vector3 scale = coin.transform.lossyScale;
+        trigger.size = new Vector3(
+            CoinPickupWorldSize.x / Mathf.Max(0.0001f, Mathf.Abs(scale.x)),
+            CoinPickupWorldSize.y / Mathf.Max(0.0001f, Mathf.Abs(scale.y)),
+            CoinPickupWorldSize.z / Mathf.Max(0.0001f, Mathf.Abs(scale.z)));
     }
 
     private void Update()
