@@ -63,6 +63,9 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
 
     private static readonly int SpeedId = Animator.StringToHash("Speed");
     private static readonly int GroundedId = Animator.StringToHash("Grounded");
+    private static readonly int IdleStateId = Animator.StringToHash("Idle");
+    private static readonly int DieStateId = Animator.StringToHash("Die");
+    private static readonly int RebirthStateId = Animator.StringToHash("Rebirth");
 
     public bool InputEnabled => inputEnabled;
     public DuduSurface CurrentSurface => currentSurface;
@@ -439,13 +442,31 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         SetInputEnabled(false);
         body.linearVelocity = Vector3.zero;
         body.angularVelocity = Vector3.zero;
-        if (spriteRenderer != null) spriteRenderer.enabled = false;
+        if (animator != null)
+            animator.Play(DieStateId, 0, 0f);
         yield return new WaitForSecondsRealtime(respawnDelay);
         RespawnAtStageStart();
-        if (spriteRenderer != null) spriteRenderer.enabled = true;
+        if (animator != null)
+        {
+            animator.Play(RebirthStateId, 0, 0f);
+            yield return WaitForCurrentAnimationRealtime();
+            animator.Play(IdleStateId, 0, 0f);
+        }
         respawnProtectedUntil = Time.time + respawnProtectionDuration;
         isRespawning = false;
         SetInputEnabled(restoreInput);
+    }
+
+    private IEnumerator WaitForCurrentAnimationRealtime()
+    {
+        // Give Animator one frame to enter Rebirth, then wait for its non-looping clip.
+        yield return null;
+        if (animator == null)
+            yield break;
+
+        float duration = animator.GetCurrentAnimatorStateInfo(0).length;
+        if (duration > 0f)
+            yield return new WaitForSecondsRealtime(duration);
     }
 
     private void RespawnAtStageStart()

@@ -11,8 +11,8 @@ public static class UnifiedGameplaySceneUpgrade
 {
     private const string MainScenePath = "Assets/Scenes/Player3DScene.unity";
     private const string Legacy2DScenePath = "Assets/Scenes/SideScrollerPrototype.unity";
-    private const string KnightPath = "Assets/Art/Characters/Knight/Knight.png";
-    private const string KnightControllerPath = "Assets/Animations/Player/Knight.controller";
+    private const string DuduIdlePath = "Assets/Art/Characters/Dudu/dudu_idle.png";
+    private const string DuduControllerPath = "Assets/Animations/Dudu/Dudu.controller";
     private const string PaperMaterialPath = "Assets/Materials/PaperBackground.mat";
     private const string GroundLineMaterialPath = "Assets/Materials/DuduGroundLine.mat";
     private const string SlowStainMaterialPath = "Assets/Materials/DuduSlowStain.mat";
@@ -116,16 +116,16 @@ public static class UnifiedGameplaySceneUpgrade
         GameObject dudu = new GameObject("Dudu");
         SceneManager.MoveGameObjectToScene(dudu, scene);
 
-        GameObject visual = new GameObject("Dudu Sprite");
+        GameObject visual = new GameObject("DuduVisual");
         visual.transform.SetParent(dudu.transform, false);
-        visual.transform.localPosition = new Vector3(0f, -0.75f, 0f);
-        visual.transform.localScale = Vector3.one * 1.5f;
+        visual.transform.localPosition = new Vector3(0f, -0.1f, 0f);
+        visual.transform.localScale = Vector3.one * (1.5f / 13.6f);
         SpriteRenderer spriteRenderer = visual.AddComponent<SpriteRenderer>();
-        spriteRenderer.sprite = AssetDatabase.LoadAllAssetsAtPath(KnightPath).OfType<Sprite>()
-            .First(sprite => sprite.name == "Knight_0");
+        spriteRenderer.sprite = AssetDatabase.LoadAllAssetsAtPath(DuduIdlePath).OfType<Sprite>()
+            .First(sprite => sprite.name == "dudu_idle_0");
         spriteRenderer.sortingOrder = 10;
         Animator animator = visual.AddComponent<Animator>();
-        animator.runtimeAnimatorController = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>(KnightControllerPath);
+        animator.runtimeAnimatorController = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>(DuduControllerPath);
 
         BoxCollider collider = dudu.AddComponent<BoxCollider>();
         collider.size = new Vector3(0.8f, 1.5f, 0.08f);

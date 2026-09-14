@@ -7,12 +7,14 @@ using UnityEngine.Rendering;
 [DefaultExecutionOrder(100)]
 public sealed class HaruDrawingArm : MonoBehaviour
 {
-    private static readonly Vector2 RestShoulder = new Vector2(0.94f, 0.08f);
-    private static readonly Vector2 RestHand = new Vector2(0.72f, 0.51f);
+    private static readonly Vector2 RestShoulder = new Vector2(1.04f, 0.16f);
+    private static readonly Vector2 RestHand = new Vector2(0.83f, 0.38f);
 
     private HaruDrawingController drawing;
     private Camera view;
     private Transform armRoot, rigRoot, upperArm, forearm, hand, crayon;
+    private Renderer[] crayonRenderers;
+    private float crayonSourceLength = 1f;
     private Quaternion upperRest, forearmRest, handRest;
     private Renderer[] worldRenderers, armRenderers;
     private readonly Dictionary<Renderer, bool> worldRendererStates = new Dictionary<Renderer, bool>();
@@ -62,6 +64,7 @@ public sealed class HaruDrawingArm : MonoBehaviour
         rigRoot.SetParent(armRoot, false);
         rigRoot.localPosition = Vector3.zero;
         rigRoot.localRotation = Quaternion.identity;
+        SetLayerRecursively(rigRoot, 0);
         foreach (Animator animator in rigRoot.GetComponentsInChildren<Animator>(true)) animator.enabled = false;
 
         Transform[] bones = rigRoot.GetComponentsInChildren<Transform>(true);
@@ -86,13 +89,8 @@ public sealed class HaruDrawingArm : MonoBehaviour
         AlignShoulder(desiredShoulder);
 
         Color blue = new Color(22f / 255f, 127f / 255f, 195f / 255f, 1f);
-        Material crayonMaterial = CreateOverlayMaterial(null, blue, "First Person Blue Crayon");
-        // Draw the hand over the crayon where they overlap, so the crayon looks
-        // enclosed by the grip instead of pasted in front of every finger.
-        crayonMaterial.renderQueue = 4997;
-        crayon = CreateCrayon(crayonMaterial);
-        Renderer crayonRenderer = crayon.GetComponent<Renderer>();
-        visibleRenderers.Add(crayonRenderer);
+        crayon = CreateCrayon(blue);
+        visibleRenderers.AddRange(crayonRenderers);
         armRenderers = visibleRenderers.ToArray();
         foreach (Renderer renderer in armRenderers)
         {
@@ -100,7 +98,7 @@ public sealed class HaruDrawingArm : MonoBehaviour
             renderer.receiveShadows = false;
             // Sprite collectibles use sorting orders, so force view-model parts
             // to the final renderer order as well as using an overlay depth test.
-            renderer.sortingOrder = renderer == crayonRenderer ? short.MaxValue - 2 : short.MaxValue - 1;
+            renderer.sortingOrder = crayonRenderers.Contains(renderer) ? short.MaxValue - 2 : short.MaxValue - 1;
             renderer.enabled = false;
         }
         return true;
@@ -120,7 +118,7 @@ public sealed class HaruDrawingArm : MonoBehaviour
 
             HashSet<int> armBoneIndices = new HashSet<int>();
             for (int i = 0; i < skinned.bones.Length; i++)
-                if (skinned.bones[i] == upperArm || skinned.bones[i].IsChildOf(upperArm)) armBoneIndices.Add(i);
+                if (skinned.bones[i] == forearm || skinned.bones[i].IsChildOf(forearm)) armBoneIndices.Add(i);
             if (armBoneIndices.Count == 0)
             {
                 renderer.enabled = false;
@@ -182,16 +180,8 @@ public sealed class HaruDrawingArm : MonoBehaviour
 
         float blend = 1f - Mathf.Exp(-12f * Time.deltaTime);
         visibility = Mathf.Lerp(visibility, view.enabled ? 1f : 0f, blend);
-        Vector2 desiredViewport = RestHand;
-        if (drawing.HasValidSurfaceAim)
-        {
-            Vector3 aim = view.WorldToViewportPoint(drawing.CurrentSurfaceAimPosition);
-            desiredViewport += new Vector2(
-                Mathf.Clamp(aim.x - 0.5f, -0.5f, 0.5f) * 0.10f,
-                Mathf.Clamp(aim.y - 0.5f, -0.5f, 0.5f) * 0.10f);
-        }
-        desiredViewport.x = Mathf.Clamp(desiredViewport.x, 0.66f, 0.77f);
-        desiredViewport.y = Mathf.Clamp(desiredViewport.y, 0.46f, 0.55f);
+        float writingMotion = drawing.IsDrawing ? Mathf.Sin(Time.time * 18f) * 0.0025f : 0f;
+        Vector2 desiredViewport = RestHand + new Vector2(writingMotion, -writingMotion * 0.5f);
         smoothedHandViewport = Vector2.SmoothDamp(smoothedHandViewport, desiredViewport, ref handVelocity, 0.075f);
 
         float slideDown = Mathf.Lerp(0.24f, 0f, visibility);
@@ -206,10 +196,11 @@ public sealed class HaruDrawingArm : MonoBehaviour
 
         // Match the requested silhouette: the crayon crosses the hand diagonally,
         // extending farther toward the lower-left and slightly behind the fingers.
-        Vector2 gripViewport = smoothedHandViewport + new Vector2(-0.07f, 0.03f);
-        Vector2 crayonDirection = new Vector2(-0.42f, -0.91f).normalized;
-        Vector3 crayonTip = ViewportPoint(gripViewport + crayonDirection * 0.18f, 0.70f);
-        Vector3 crayonBack = ViewportPoint(gripViewport - crayonDirection * 0.16f, 0.70f);
+        Vector2 gripViewport = smoothedHandViewport + new Vector2(-0.015f, 0.035f);
+        Vector2 crayonDirection = new Vector2(-0.86f, 0.51f).normalized;
+        float visibleLength = Mathf.Lerp(0.045f, 0.16f, drawing.CrayonNormalized);
+        Vector3 crayonTip = ViewportPoint(gripViewport + crayonDirection * visibleLength, 0.70f);
+        Vector3 crayonBack = ViewportPoint(gripViewport - crayonDirection * 0.035f, 0.70f);
         PositionCrayon(crayonBack, crayonTip);
     }
 
@@ -249,13 +240,34 @@ public sealed class HaruDrawingArm : MonoBehaviour
         return transform.InverseTransformPoint(view.ViewportToWorldPoint(new Vector3(viewport.x, viewport.y, depth)));
     }
 
-    private Transform CreateCrayon(Material material)
+    private Transform CreateCrayon(Color fallbackColor)
     {
-        GameObject result = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        result.name = "Blue Crayon";
+        GameObject prefab = Resources.Load<GameObject>("FirstPersonCrayon");
+        GameObject result = prefab != null
+            ? Instantiate(prefab, armRoot)
+            : GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        result.name = "Haru Crayon";
         result.transform.SetParent(armRoot, false);
-        Destroy(result.GetComponent<Collider>());
-        result.GetComponent<Renderer>().sharedMaterial = material;
+        SetLayerRecursively(result.transform, 0);
+        foreach (Collider collider in result.GetComponentsInChildren<Collider>(true)) Destroy(collider);
+
+        crayonRenderers = result.GetComponentsInChildren<Renderer>(true);
+        foreach (Renderer renderer in crayonRenderers)
+        {
+            Material[] materials = renderer.sharedMaterials;
+            for (int i = 0; i < materials.Length; i++)
+            {
+                materials[i] = CreateOverlayMaterial(materials[i], fallbackColor, "First Person Crayon");
+                materials[i].renderQueue = 4997;
+            }
+            renderer.sharedMaterials = materials;
+        }
+        if (crayonRenderers.Length > 0)
+        {
+            Bounds bounds = crayonRenderers[0].bounds;
+            for (int i = 1; i < crayonRenderers.Length; i++) bounds.Encapsulate(crayonRenderers[i].bounds);
+            crayonSourceLength = Mathf.Max(bounds.size.x, bounds.size.y, bounds.size.z, 0.001f);
+        }
         return result.transform;
     }
 
@@ -264,7 +276,13 @@ public sealed class HaruDrawingArm : MonoBehaviour
         Vector3 delta = to - from;
         crayon.localPosition = (from + to) * 0.5f;
         if (delta.sqrMagnitude > 0.000001f) crayon.localRotation = Quaternion.FromToRotation(Vector3.up, delta.normalized);
-        crayon.localScale = new Vector3(0.017f, delta.magnitude * 0.5f, 0.017f);
+        crayon.localScale = Vector3.one * (delta.magnitude / crayonSourceLength);
+    }
+
+    private static void SetLayerRecursively(Transform root, int layer)
+    {
+        root.gameObject.layer = layer;
+        foreach (Transform child in root) SetLayerRecursively(child, layer);
     }
 
     private Material CreateOverlayMaterial(Material source, Color fallbackColor, string materialName)
