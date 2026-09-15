@@ -21,9 +21,47 @@ public sealed class CornerRoomLevel : MonoBehaviour
     private void Awake()
     {
         ApplyRequestedLayout();
+        EnsureDoorBottomFiller();
         EnsureWoodDoorVisual();
         foreach (TextMesh text in GetComponentsInChildren<TextMesh>(true)) GameFont.Apply(text);
         RemoveGuideLabels();
+    }
+
+    private void EnsureDoorBottomFiller()
+    {
+        if (door == null || surfaces == null || surfaces.Length < 5 || surfaces[4] == null)
+            return;
+
+        DuduSurface surface = surfaces[4];
+        door.transform.SetPositionAndRotation(
+            surface.SurfaceToWorld(new Vector2(7.5f, -0.3f)),
+            surface.transform.rotation);
+        door.transform.localScale = new Vector3(1.8f, 4f, 0.5f);
+
+        Transform filler = transform.Find(
+            "3D Doorway Wall - Permanent Opening/Doorway Wall Bottom Filler");
+        if (filler == null)
+            filler = transform.Find("Doorway Wall Bottom Filler");
+        if (filler == null)
+        {
+            filler = GameObject.CreatePrimitive(PrimitiveType.Cube).transform;
+            filler.name = "Doorway Wall Bottom Filler";
+            filler.SetParent(transform);
+        }
+
+        filler.gameObject.layer = surface.gameObject.layer;
+        filler.SetPositionAndRotation(
+            surface.SurfaceToWorld(new Vector2(7.5f, -2.65f)),
+            surface.transform.rotation);
+        filler.localScale = new Vector3(1.8f, 0.7f, 0.12f);
+
+        Renderer fillerRenderer = filler.GetComponent<Renderer>();
+        Renderer surfaceRenderer = surface.GetComponent<Renderer>();
+        if (fillerRenderer != null && surfaceRenderer != null)
+            fillerRenderer.sharedMaterial = surfaceRenderer.sharedMaterial;
+        Collider fillerCollider = filler.GetComponent<Collider>();
+        if (fillerCollider != null)
+            fillerCollider.enabled = false;
     }
 
     private void EnsureWoodDoorVisual()

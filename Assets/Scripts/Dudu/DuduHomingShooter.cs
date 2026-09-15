@@ -3,6 +3,8 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public sealed class DuduHomingShooter : MonoBehaviour
 {
+    private const float LightningVisualOffset = 0.02f;
+
     [Header("References")]
     [SerializeField] private DuduSurface surface;
     [SerializeField] private DuduSurfaceMovement target;
@@ -34,6 +36,7 @@ public sealed class DuduHomingShooter : MonoBehaviour
     [Tooltip("Temporary projectile visual size.")]
     [SerializeField] private Vector3 projectileScale = Vector3.one * 0.12f;
     [SerializeField] private Material projectileMaterial;
+    [SerializeField] private Transform lightningSpawnPoint;
 
     private bool targetWasActive;
     private float nextShotTime;
@@ -41,6 +44,12 @@ public sealed class DuduHomingShooter : MonoBehaviour
     private DuduHomingProjectile activeProjectile;
     private static AudioClip defaultFireSound;
     private static Sprite projectileSprite;
+
+    private void Awake()
+    {
+        gameObject.name = "StormCloud";
+        EnsureLightningSpawnPoint();
+    }
 
     public void Configure(
         DuduSurface targetSurface,
@@ -78,16 +87,47 @@ public sealed class DuduHomingShooter : MonoBehaviour
             return;
 
         nextShotTime = Time.time + fireInterval;
-        if (IsTargetInRange())
+        if (CanRecognizeTarget())
             FireProjectile();
     }
 
-    private bool IsTargetInRange()
+    private bool CanRecognizeTarget()
     {
         if (surface == null || target == null || target.CurrentSurface != surface)
             return false;
+
+        EnsureLightningSpawnPoint();
+        Vector2 emitterPosition = surface.WorldToSurface(lightningSpawnPoint.position);
         Vector2 targetPosition = surface.WorldToSurface(target.transform.position);
-        return Vector2.Distance(GetEmitterSurfacePosition(), targetPosition) <= attackRange;
+        return Vector2.Distance(emitterPosition, targetPosition) <= attackRange &&
+            HasClearLineOfSight(emitterPosition, targetPosition);
+    }
+
+    private bool HasClearLineOfSight(Vector2 emitterPosition, Vector2 targetPosition)
+    {
+        Vector3 start = SurfaceToWorld(emitterPosition);
+        Vector3 end = SurfaceToWorld(targetPosition);
+        Vector3 direction = end - start;
+        float distance = direction.magnitude;
+        if (distance <= Mathf.Epsilon)
+            return true;
+
+        // Drawn strokes use child BoxColliders. A thin sphere cast makes the
+        // visibility test agree with the line that the player sees on the wall.
+        Physics.SyncTransforms();
+        foreach (RaycastHit hit in Physics.SphereCastAll(
+            start,
+            0.02f,
+            direction / distance,
+            distance,
+            Physics.AllLayers,
+            QueryTriggerInteraction.Collide))
+        {
+            if (hit.collider.GetComponentInParent<DrawingStroke>() != null)
+                return false;
+        }
+
+        return true;
     }
 
     private void FireProjectile()
@@ -95,19 +135,18 @@ public sealed class DuduHomingShooter : MonoBehaviour
         if (surface == null || target == null)
             return;
 
-        Vector2 emitterPosition = GetEmitterSurfacePosition();
+        EnsureLightningSpawnPoint();
+        Vector2 emitterPosition = surface.WorldToSurface(lightningSpawnPoint.position);
         Vector2 targetPosition = surface.WorldToSurface(target.transform.position);
         Vector2 fireDirection = (targetPosition - emitterPosition).normalized;
-        // Spawn at the cloud artwork itself. The old 0.9-unit offset pushed the
-        // first visible bolt downward and made it look as if it came from the floor.
-        Vector2 spawnPosition = emitterPosition + fireDirection * 0.12f;
+        Vector2 spawnPosition = emitterPosition + fireDirection * 0.05f;
 
         GameObject projectile = projectilePrefab != null
             ? Instantiate(projectilePrefab)
             : new GameObject("Homing Projectile");
-        projectile.name = "Homing Projectile";
+        projectile.name = "Lightning";
         projectile.transform.SetPositionAndRotation(
-            surface.SurfaceToWorld(spawnPosition) + surface.Normal.normalized * 0.1f,
+            SurfaceToWorld(spawnPosition),
             surface.transform.rotation);
         projectile.transform.localScale = projectileScale;
 
@@ -129,7 +168,9 @@ public sealed class DuduHomingShooter : MonoBehaviour
             target,
             projectileSpeed,
             projectileTurnSpeed,
-            projectileLifetime);
+            projectileLifetime,
+            spawnPosition,
+            LightningVisualOffset);
         PlayFireSound();
     }
 
@@ -140,6 +181,40 @@ public sealed class DuduHomingShooter : MonoBehaviour
             ? cloudRenderer.bounds.center
             : transform.position;
         return surface.WorldToSurface(emitterWorldPosition);
+    }
+
+    private void EnsureLightningSpawnPoint()
+    {
+        if (lightningSpawnPoint != null || surface == null)
+            return;
+
+        Transform existing = transform.Find("LightningSpawnPoint");
+        if (existing != null)
+        {
+            lightningSpawnPoint = existing;
+            return;
+        }
+
+        GameObject spawnObject = new GameObject("LightningSpawnPoint");
+        lightningSpawnPoint = spawnObject.transform;
+        lightningSpawnPoint.SetParent(transform, true);
+
+        Vector2 emitter = GetEmitterSurfacePosition();
+        SpriteRenderer cloudRenderer = GetComponentInChildren<SpriteRenderer>();
+        float downwardOffset = cloudRenderer != null
+            ? Mathf.Max(0.15f, cloudRenderer.bounds.extents.y * 0.65f)
+            : 0.35f;
+        lightningSpawnPoint.SetPositionAndRotation(
+            SurfaceToWorld(emitter - Vector2.up * downwardOffset),
+            surface.transform.rotation);
+    }
+
+    private Vector3 SurfaceToWorld(Vector2 position)
+    {
+        return surface.transform.position +
+            surface.Right.normalized * position.x +
+            surface.Up.normalized * position.y +
+            surface.Normal.normalized * LightningVisualOffset;
     }
 
     private static Sprite GetProjectileSprite()

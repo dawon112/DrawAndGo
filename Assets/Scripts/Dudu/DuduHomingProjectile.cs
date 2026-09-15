@@ -8,22 +8,29 @@ public sealed class DuduHomingProjectile : MonoBehaviour
     private DuduSurfaceMovement target;
     private Rigidbody body;
     private SphereCollider projectileSphere;
-    private Vector3 movementDirection;
+    private Vector2 surfacePosition;
+    private Vector2 movementDirection;
     private float moveSpeed;
     private float remainingLifetime;
+    private float visualOffset;
 
     public void Configure(
         DuduSurface targetSurface,
         DuduSurfaceMovement targetDudu,
         float speed,
         float turnSpeedDegrees,
-        float lifetime)
+        float lifetime,
+        Vector2 startSurfacePosition,
+        float surfaceVisualOffset)
     {
         surface = targetSurface;
         target = targetDudu;
         moveSpeed = Mathf.Max(0f, speed);
         remainingLifetime = Mathf.Max(0.1f, lifetime);
+        surfacePosition = startSurfacePosition;
+        visualOffset = Mathf.Clamp(surfaceVisualOffset, 0.01f, 0.03f);
         movementDirection = GetDirectionToTarget();
+        transform.SetPositionAndRotation(SurfaceToWorld(surfacePosition), GetMovementRotation());
     }
 
     private void Awake()
@@ -33,7 +40,7 @@ public sealed class DuduHomingProjectile : MonoBehaviour
         body.isKinematic = true;
         body.interpolation = RigidbodyInterpolation.Interpolate;
         body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
-        body.constraints = RigidbodyConstraints.None;
+        body.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationY;
 
         Collider projectileCollider = GetComponent<Collider>();
         projectileCollider.isTrigger = true;
@@ -55,12 +62,20 @@ public sealed class DuduHomingProjectile : MonoBehaviour
             return;
         }
 
-        Vector3 desiredDirection = GetDirectionToTarget();
+        if (target.CurrentSurface != surface)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        Vector2 desiredDirection = GetDirectionToTarget();
         if (desiredDirection.sqrMagnitude > 0.0001f)
             movementDirection = desiredDirection.normalized;
 
         // Direction changes must never change the projectile's travel speed.
-        Vector3 displacement = movementDirection.normalized * moveSpeed * Time.fixedDeltaTime;
+        Vector2 nextSurfacePosition = surfacePosition + movementDirection.normalized * moveSpeed * Time.fixedDeltaTime;
+        Vector3 nextWorldPosition = SurfaceToWorld(nextSurfacePosition);
+        Vector3 displacement = nextWorldPosition - body.position;
         if (TouchesDrawnLineAlongMove(displacement))
         {
             Destroy(gameObject);
@@ -74,7 +89,8 @@ public sealed class DuduHomingProjectile : MonoBehaviour
         }
 
         body.MoveRotation(GetMovementRotation());
-        body.MovePosition(body.position + displacement);
+        body.MovePosition(nextWorldPosition);
+        surfacePosition = nextSurfacePosition;
     }
 
     private bool TouchesTargetAlongMove(Vector3 displacement)
@@ -126,8 +142,8 @@ public sealed class DuduHomingProjectile : MonoBehaviour
 
         // The thunder artwork points along local down, so rotate that tip toward Dudu.
         float angle = Mathf.Atan2(
-            Vector3.Dot(movementDirection, surface.Up.normalized),
-            Vector3.Dot(movementDirection, surface.Right.normalized)) * Mathf.Rad2Deg;
+            movementDirection.y,
+            movementDirection.x) * Mathf.Rad2Deg;
         return surface.transform.rotation * Quaternion.Euler(0f, 0f, angle + 90f);
     }
 
@@ -180,22 +196,27 @@ public sealed class DuduHomingProjectile : MonoBehaviour
         return false;
     }
 
-    private Vector3 GetDirectionToTarget()
+    private Vector2 GetDirectionToTarget()
     {
         if (surface == null || target == null)
-            return Vector3.right;
+            return Vector2.right;
 
-        Vector3 direction = target.transform.position - transform.position;
-        Vector3 normal = surface.Normal.normalized;
-        direction -= normal * Vector3.Dot(direction, normal);
-        return direction.sqrMagnitude > 0.0001f ? direction.normalized : surface.Right.normalized;
+        Vector2 direction = surface.WorldToSurface(target.transform.position) - surfacePosition;
+        return direction.sqrMagnitude > 0.0001f ? direction.normalized : Vector2.right;
+    }
+
+    private Vector3 SurfaceToWorld(Vector2 position)
+    {
+        return surface.transform.position +
+            surface.Right.normalized * position.x +
+            surface.Up.normalized * position.y +
+            surface.Normal.normalized * visualOffset;
     }
 
     private bool IsOutsideSurface()
     {
-        Vector2 position = surface.WorldToSurface(body.position);
         const float boundaryMargin = 1f;
-        return Mathf.Abs(position.x) > surface.Width * 0.5f + boundaryMargin ||
-               Mathf.Abs(position.y) > surface.Height * 0.5f + boundaryMargin;
+        return Mathf.Abs(surfacePosition.x) > surface.Width * 0.5f + boundaryMargin ||
+               Mathf.Abs(surfacePosition.y) > surface.Height * 0.5f + boundaryMargin;
     }
 }
