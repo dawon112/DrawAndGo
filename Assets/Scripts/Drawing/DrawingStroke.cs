@@ -14,6 +14,7 @@ public sealed class DrawingStroke : MonoBehaviour
     private float colliderDepth;
     private Vector3 surfaceNormal;
     private int strokeLayer;
+    private bool isFinished;
     private static int splitNumber;
     private readonly List<BoxCollider> colliderSegments = new List<BoxCollider>();
 
@@ -88,6 +89,43 @@ public sealed class DrawingStroke : MonoBehaviour
         if (index >= 2)
             CreateColliderSegment(GetPhysicsPoint(index - 2), GetPhysicsPoint(index - 1), index - 2);
         CreateColliderSegment(GetPhysicsPoint(index - 1), point, index - 1);
+    }
+
+    public void FinishDrawing()
+    {
+        isFinished = true;
+    }
+
+    private void FixedUpdate()
+    {
+        if (!isFinished || lineRenderer == null || lineRenderer.positionCount == 0)
+            return;
+
+        Vector3 windVelocity = Vector3.zero;
+        for (int i = 0; i < lineRenderer.positionCount; i++)
+        {
+            windVelocity = WindZone.GetWorldVelocity(lineRenderer.GetPosition(i), surfaceNormal);
+            if (windVelocity.sqrMagnitude > 0.000001f) break;
+
+            if (i + 1 < lineRenderer.positionCount)
+            {
+                Vector3 midpoint = (lineRenderer.GetPosition(i) + lineRenderer.GetPosition(i + 1)) * 0.5f;
+                windVelocity = WindZone.GetWorldVelocity(midpoint, surfaceNormal);
+                if (windVelocity.sqrMagnitude > 0.000001f) break;
+            }
+        }
+
+        if (windVelocity.sqrMagnitude <= 0.000001f)
+            return;
+
+        // Translate the entire stroke rigidly. Moving only the points inside the
+        // zone pins them at its boundary and destroys the shape of the drawing.
+        Vector3 displacement = windVelocity * Time.fixedDeltaTime;
+        for (int i = 0; i < lineRenderer.positionCount; i++)
+            lineRenderer.SetPosition(i, lineRenderer.GetPosition(i) + displacement);
+
+        for (int i = 1; i < lineRenderer.positionCount; i++)
+            CreateColliderSegment(GetPhysicsPoint(i - 1), GetPhysicsPoint(i), i - 1);
     }
 
     private Vector3 GetPhysicsPoint(int index)
@@ -169,6 +207,7 @@ public sealed class DrawingStroke : MonoBehaviour
                 colliderDepth,
                 surfaceNormal,
                 strokeLayer);
+            part.FinishDrawing();
         }
 
         Destroy(gameObject);

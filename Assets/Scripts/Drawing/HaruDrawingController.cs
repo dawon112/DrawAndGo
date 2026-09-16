@@ -94,7 +94,8 @@ public sealed class HaruDrawingController : MonoBehaviour
         CanDrawAtCurrentAim =
             hasSurfaceAim &&
             aimDistance <= maxDrawDistance &&
-            !IsDrawingBlocked(aimDistance);
+            !IsDrawingBlocked(aimDistance) &&
+            !NoDrawZone.Blocks(surface, hitPoint);
         if (hasSurfaceAim)
             SetSurfaceAim(surface, hitPoint, hitNormal);
         else
@@ -323,8 +324,13 @@ public sealed class HaruDrawingController : MonoBehaviour
 
     private void EndStroke()
     {
-        if (currentStroke != null && currentStroke.PointCount < 2)
-            Destroy(currentStroke.gameObject);
+        if (currentStroke != null)
+        {
+            if (currentStroke.PointCount < 2)
+                Destroy(currentStroke.gameObject);
+            else
+                currentStroke.FinishDrawing();
+        }
         currentStroke = null;
         currentSurface = null;
     }

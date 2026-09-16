@@ -42,13 +42,22 @@ public sealed class DuduCameraController : MonoBehaviour
         cameraComponent = GetComponent<Camera>();
         cameraComponent.orthographic = true;
         cameraComponent.orthographicSize = orthographicSize;
+        SetWhiteBackground();
     }
 
     private void OnEnable()
     {
         activeInstance = this;
         if (cameraComponent == null) cameraComponent = GetComponent<Camera>();
+        SetWhiteBackground();
         ConfigureCameraMasks();
+    }
+
+    private void SetWhiteBackground()
+    {
+        if (cameraComponent == null) return;
+        cameraComponent.clearFlags = CameraClearFlags.SolidColor;
+        cameraComponent.backgroundColor = Color.white;
     }
 
     public static void RegisterRuntimeRenderer(Renderer source)

@@ -63,6 +63,9 @@ public sealed class GameViewManager : MonoBehaviour
 
     private void Update()
     {
+        if (CurrentCameraState != CameraState.Gameplay)
+            return;
+
         Keyboard keyboard = Keyboard.current;
         if (!splitSequenceActive && developmentViewSwitch && keyboard != null && keyboard.tabKey.wasPressedThisFrame)
             SetDuduMode(!duduMode);
