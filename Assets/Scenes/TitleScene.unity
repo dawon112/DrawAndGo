@@ -3153,6 +3153,7 @@ GameObject:
   - component: {fileID: 1043069727}
   - component: {fileID: 1043069726}
   - component: {fileID: 1043069725}
+  - component: {fileID: 2109000021}
   m_Layer: 5
   m_Name: Canvas
   m_TagString: Untagged
@@ -3160,6 +3161,38 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
+--- !u!114 &2109000021
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1043069724}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5e8aa7e118754da9ab258ba8764a271c, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::RoomSessionUI
+  roomSelectPanel: {fileID: 1630464762}
+  hostRoomPanel: {fileID: 694098228}
+  joinRoomPanel: {fileID: 273006491}
+  rolePanel: {fileID: 1454106913}
+  createRoomButton: {fileID: 1566336283}
+  openJoinButton: {fileID: 1599400768}
+  confirmJoinButton: {fileID: 1874537181}
+  hostCloseButton: {fileID: 436427386}
+  joinCloseButton: {fileID: 229322563}
+  roomCodeText: {fileID: 643261502}
+  hostGuideText: {fileID: 1852906285}
+  roomCodeInput: {fileID: 2109000020}
+  joinGuideText: {fileID: 1192074258}
+  friendNameText: {fileID: 305666985}
+  myNameText: {fileID: 1297975905}
+  connectionText: {fileID: 996002600}
+  friendIcon: {fileID: 777239046}
+  myIcon: {fileID: 415726191}
+  haruIcon: {fileID: 21300000, guid: 177f81a57224e0140b9f6569daeb9628, type: 3}
+  duduIcon: {fileID: 21300000, guid: 34beed0fda844364a924689dfd3b7d1b, type: 3}
 --- !u!114 &1043069725
 MonoBehaviour:
   m_ObjectHideFlags: 0
