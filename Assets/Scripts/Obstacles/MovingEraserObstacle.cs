@@ -14,8 +14,12 @@ public sealed class MovingEraserObstacle : MonoBehaviour
     [SerializeField, Min(0.1f)] private float moveSpeed = 5f;
     [SerializeField, Min(0.01f)] private float eraseRadius = 0.22f;
     [SerializeField, Min(0.01f)] private float visualOffset = 0.025f;
+    [Tooltip("Slightly smaller than the visual collider for fair near-misses.")]
+    [SerializeField, Range(0.5f, 1f)] private float hitboxScale = 0.8f;
 
     private Rigidbody body;
+    private BoxCollider eraserCollider;
+    private Collider targetCollider;
     private Vector2 surfacePosition;
     private Vector2 launchDirection = Vector2.right;
     private float aimElapsed;
@@ -24,12 +28,13 @@ public sealed class MovingEraserObstacle : MonoBehaviour
     private void Awake()
     {
         body = GetComponent<Rigidbody>();
+        eraserCollider = GetComponent<BoxCollider>();
         body.useGravity = false;
         body.isKinematic = true;
         body.interpolation = RigidbodyInterpolation.Interpolate;
         body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
         body.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationY;
-        GetComponent<BoxCollider>().isTrigger = true;
+        eraserCollider.isTrigger = true;
         ResolveReferencesAndPlacement();
     }
 
@@ -91,14 +96,35 @@ public sealed class MovingEraserObstacle : MonoBehaviour
 
     private bool TouchesDuduAlongMove(Vector3 displacement)
     {
-        Vector2 start = surface.WorldToSurface(body.position);
-        Vector2 end = surface.WorldToSurface(body.position + displacement);
-        Vector2 dudu = surface.WorldToSurface(target.transform.position);
-        Vector2 segment = end - start;
-        float t = segment.sqrMagnitude > Mathf.Epsilon
-            ? Mathf.Clamp01(Vector2.Dot(dudu - start, segment) / segment.sqrMagnitude)
-            : 0f;
-        return Vector2.Distance(start + segment * t, dudu) <= 0.7f;
+        if (target.CurrentSurface != surface || eraserCollider == null)
+            return false;
+        if (targetCollider == null)
+            targetCollider = target.GetComponent<Collider>();
+        if (targetCollider == null)
+            return false;
+
+        Vector3 scale = transform.lossyScale;
+        Vector3 absoluteScale = new Vector3(Mathf.Abs(scale.x), Mathf.Abs(scale.y), Mathf.Abs(scale.z));
+        Vector3 halfExtents = Vector3.Scale(eraserCollider.size * 0.5f, absoluteScale) * hitboxScale;
+        Vector3 center = body.position + body.rotation * Vector3.Scale(eraserCollider.center, scale);
+
+        foreach (Collider overlap in Physics.OverlapBox(
+            center, halfExtents, body.rotation, Physics.AllLayers, QueryTriggerInteraction.Collide))
+            if (IsTargetCollider(overlap)) return true;
+
+        float distance = displacement.magnitude;
+        if (distance <= Mathf.Epsilon)
+            return false;
+        foreach (RaycastHit hit in Physics.BoxCastAll(
+            center, halfExtents, displacement / distance, body.rotation,
+            distance, Physics.AllLayers, QueryTriggerInteraction.Collide))
+            if (IsTargetCollider(hit.collider)) return true;
+        return false;
+    }
+
+    private bool IsTargetCollider(Collider candidate)
+    {
+        return candidate == targetCollider || candidate.GetComponentInParent<DuduSurfaceMovement>() == target;
     }
 
     private void ResolveReferencesAndPlacement()
@@ -119,6 +145,7 @@ public sealed class MovingEraserObstacle : MonoBehaviour
         }
 
         target = FindAnyObjectByType<DuduSurfaceMovement>(FindObjectsInactive.Include);
+        targetCollider = target != null ? target.GetComponent<Collider>() : null;
         if (surface == null) return;
         surfacePosition = surface.WorldToSurface(placedPosition);
         transform.SetPositionAndRotation(SurfaceToWorld(surfacePosition), surface.transform.rotation);
@@ -150,5 +177,6 @@ public sealed class MovingEraserObstacle : MonoBehaviour
         moveSpeed = Mathf.Max(0.1f, moveSpeed);
         eraseRadius = Mathf.Max(0.01f, eraseRadius);
         visualOffset = Mathf.Max(0.01f, visualOffset);
+        hitboxScale = Mathf.Clamp(hitboxScale, 0.5f, 1f);
     }
 }

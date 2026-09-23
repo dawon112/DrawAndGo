@@ -263,13 +263,14 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
             ? bounceHorizontalSpeed
             : horizontalInput * moveSpeed * stainSpeedMultiplier;
         Vector2 windVelocity = WindZone.GetSurfaceVelocity(currentSurface, body.position);
-        horizontalSpeed += windVelocity.x;
+        Vector2 magnetVelocity = LineMagnet.GetSurfaceVelocity(currentSurface, body.position);
+        horizontalSpeed += windVelocity.x + magnetVelocity.x;
         if ((clampedHorizontal <= horizontalMinimum && horizontalSpeed < 0f) ||
             (clampedHorizontal >= horizontalMaximum && horizontalSpeed > 0f))
             horizontalSpeed = 0f;
 
         float verticalSpeed = Mathf.Max(Vector3.Dot(body.linearVelocity, up), -maximumFallSpeed) +
-            windVelocity.y;
+            windVelocity.y + magnetVelocity.y * Time.fixedDeltaTime;
         bool followingDrawnLine = !jumpRequested && Time.time >= bounceControlUntil &&
             (verticalSpeed <= 0.01f || wasFollowingDrawnLine) &&
             TryFollowDrawnLine(right, up, horizontalSpeed, ref verticalSpeed);

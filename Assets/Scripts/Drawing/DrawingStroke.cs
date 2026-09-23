@@ -15,6 +15,11 @@ public sealed class DrawingStroke : MonoBehaviour
     private Vector3 surfaceNormal;
     private int strokeLayer;
     private bool isFinished;
+    private bool isFading;
+    private float fadeStartedAt;
+    private float fadeDuration;
+    private Color fadeStartColor;
+    private Color fadeEndColor;
     private static int splitNumber;
     private readonly List<BoxCollider> colliderSegments = new List<BoxCollider>();
 
@@ -77,6 +82,7 @@ public sealed class DrawingStroke : MonoBehaviour
             lineRenderer.SetPosition(i, points[i]);
         for (int i = 1; i < points.Count; i++)
             CreateColliderSegment(GetPhysicsPoint(i - 1), GetPhysicsPoint(i), i - 1);
+        TryStartHotZoneFade(firstPoint: points[0]);
     }
 
     public void AddPoint(Vector3 point)
@@ -89,6 +95,7 @@ public sealed class DrawingStroke : MonoBehaviour
         if (index >= 2)
             CreateColliderSegment(GetPhysicsPoint(index - 2), GetPhysicsPoint(index - 1), index - 2);
         CreateColliderSegment(GetPhysicsPoint(index - 1), point, index - 1);
+        TryStartHotZoneFade(point);
     }
 
     public void FinishDrawing()
@@ -96,9 +103,36 @@ public sealed class DrawingStroke : MonoBehaviour
         isFinished = true;
     }
 
+    private void Update()
+    {
+        if (!isFading || lineRenderer == null) return;
+        float progress = Mathf.Clamp01((Time.time - fadeStartedAt) / fadeDuration);
+        Color start = fadeStartColor;
+        Color end = fadeEndColor;
+        start.a *= 1f - progress;
+        end.a *= 1f - progress;
+        lineRenderer.startColor = start;
+        lineRenderer.endColor = end;
+        if (progress >= 1f) Destroy(gameObject);
+    }
+
     private void FixedUpdate()
     {
-        if (!isFinished || lineRenderer == null || lineRenderer.positionCount == 0)
+        if (lineRenderer == null || lineRenderer.positionCount == 0)
+            return;
+
+        if (!isFading)
+        {
+            for (int i = 0; i < lineRenderer.positionCount; i++)
+            {
+                if (TryStartHotZoneFade(lineRenderer.GetPosition(i))) break;
+                if (i + 1 >= lineRenderer.positionCount) continue;
+                Vector3 midpoint = (lineRenderer.GetPosition(i) + lineRenderer.GetPosition(i + 1)) * 0.5f;
+                if (TryStartHotZoneFade(midpoint)) break;
+            }
+        }
+
+        if (!isFinished)
             return;
 
         Vector3 windVelocity = Vector3.zero;
@@ -126,6 +160,18 @@ public sealed class DrawingStroke : MonoBehaviour
 
         for (int i = 1; i < lineRenderer.positionCount; i++)
             CreateColliderSegment(GetPhysicsPoint(i - 1), GetPhysicsPoint(i), i - 1);
+    }
+
+    private bool TryStartHotZoneFade(Vector3 firstPoint)
+    {
+        if (isFading || !HotZone.TryGetFadeDuration(firstPoint, surfaceNormal, out float duration))
+            return false;
+        isFading = true;
+        fadeStartedAt = Time.time;
+        fadeDuration = duration;
+        fadeStartColor = lineRenderer.startColor;
+        fadeEndColor = lineRenderer.endColor;
+        return true;
     }
 
     private Vector3 GetPhysicsPoint(int index)
