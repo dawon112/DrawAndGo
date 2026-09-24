@@ -40,6 +40,9 @@ public sealed class MovingEraserObstacle : MonoBehaviour
 
     private void FixedUpdate()
     {
+        // Dudu's client owns hazards; Haru's host displays their synced poses.
+        if (GameSession.Current != null && GameSession.Current.IsHost)
+            return;
         if (surface == null || target == null || body == null)
             return;
 
@@ -72,6 +75,19 @@ public sealed class MovingEraserObstacle : MonoBehaviour
         body.MovePosition(nextWorldPosition);
         surfacePosition = nextSurfacePosition;
         if (IsOutsideSurface()) Destroy(gameObject);
+    }
+
+    public void ApplyRemotePose(bool active, Vector3 position, Quaternion rotation)
+    {
+        if (gameObject.activeSelf != active)
+            gameObject.SetActive(active);
+        if (!active) return;
+        transform.SetPositionAndRotation(position, rotation);
+        if (body != null)
+        {
+            body.position = position;
+            body.rotation = rotation;
+        }
     }
 
     private bool CanAimAtTarget()

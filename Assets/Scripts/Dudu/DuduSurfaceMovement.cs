@@ -108,6 +108,8 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
     {
         public int animation;
         public float normalizedTime;
+        public float speed;
+        public bool grounded;
         public Color color;
     }
 
@@ -118,8 +120,10 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         {
             var animation = animator.IsInTransition(0)
                 ? animator.GetNextAnimatorStateInfo(0) : animator.GetCurrentAnimatorStateInfo(0);
-            state.animation = animation.fullPathHash;
+            state.animation = animation.shortNameHash;
             state.normalizedTime = animation.normalizedTime;
+            state.speed = animator.GetFloat(SpeedId);
+            state.grounded = animator.GetBool(GroundedId);
         }
         return state;
     }
@@ -128,11 +132,17 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
     {
         if (GameSession.Current == null || !GameSession.Current.IsHost) return;
         if (spriteRenderer != null) spriteRenderer.color = state.color;
-        if (animator != null && animator.runtimeAnimatorController != null && animator.HasState(0, state.animation))
+        if (animator != null && animator.runtimeAnimatorController != null)
         {
-            animator.speed = 0f;
-            animator.Play(state.animation, 0, state.normalizedTime);
-            animator.Update(0f);
+            // Let the remote Animator perform its own transitions. Replaying the
+            // received state every packet can keep Dudu permanently in Jump.
+            animator.speed = 1f;
+            animator.SetFloat(SpeedId, state.speed);
+            animator.SetBool(GroundedId, state.grounded);
+            int current = animator.GetCurrentAnimatorStateInfo(0).shortNameHash;
+            if ((state.animation == DieStateId || state.animation == RebirthStateId) &&
+                current != state.animation && animator.HasState(0, state.animation))
+                animator.Play(state.animation, 0, Mathf.Clamp01(state.normalizedTime));
         }
     }
 

@@ -16,6 +16,7 @@ public sealed class StageStateSync : MonoBehaviour
     private NetworkManager network;
     private CornerRoomLevel level;
     private DuduMovingObstacle[] movers;
+    private MovingEraserObstacle[] erasers;
     private DuduHomingShooter[] shooters;
     private string layout;
     private bool ready;
@@ -50,7 +51,7 @@ public sealed class StageStateSync : MonoBehaviour
     {
         public int collected;
         public DuduSurfaceMovement.NetworkVisualState duduVisual;
-        public Pose[] movers, projectiles;
+        public Pose[] movers, erasers, projectiles;
         public bool doorOpen, clear;
     }
 
@@ -61,12 +62,15 @@ public sealed class StageStateSync : MonoBehaviour
         if (network == null || !network.IsConnectedClient || level == null)
         { enabled = false; return; }
         movers = FindObjectsByType<DuduMovingObstacle>();
+        erasers = FindObjectsByType<MovingEraserObstacle>();
         shooters = FindObjectsByType<DuduHomingShooter>();
         Array.Sort(movers, (a, b) => string.CompareOrdinal(Path(a.transform), Path(b.transform)));
+        Array.Sort(erasers, (a, b) => string.CompareOrdinal(Path(a.transform), Path(b.transform)));
         Array.Sort(shooters, (a, b) => string.CompareOrdinal(Path(a.transform), Path(b.transform)));
         layout = "stage-v1";
         foreach (var coin in level.coins) layout += "|coin:" + (coin != null ? Path(coin.transform) : "null");
         foreach (var mover in movers) layout += "|move:" + Path(mover.transform);
+        foreach (var eraser in erasers) layout += "|eraser:" + Path(eraser.transform);
         foreach (var shooter in shooters) layout += "|shoot:" + Path(shooter.transform);
         network.CustomMessagingManager.RegisterNamedMessageHandler(ReadyMessage, OnReady);
         network.CustomMessagingManager.RegisterNamedMessageHandler(StrokeMessage, OnStroke);
@@ -99,11 +103,17 @@ public sealed class StageStateSync : MonoBehaviour
         }
         else
         {
-            var state = new WorldState { movers = new Pose[movers.Length], projectiles = new Pose[shooters.Length] };
+            var state = new WorldState
+            {
+                movers = new Pose[movers.Length],
+                erasers = new Pose[erasers.Length],
+                projectiles = new Pose[shooters.Length]
+            };
             if (level.player != null) state.duduVisual = level.player.CaptureNetworkVisual();
             for (int i = 0; i < level.coins.Length; i++)
                 if (level.coins[i] == null || !level.coins[i].activeSelf) state.collected |= 1 << i;
             for (int i = 0; i < movers.Length; i++) state.movers[i] = Pose.Capture(movers[i].transform);
+            for (int i = 0; i < erasers.Length; i++) state.erasers[i] = Pose.Capture(erasers[i] != null ? erasers[i].transform : null);
             for (int i = 0; i < shooters.Length; i++) state.projectiles[i] = Pose.Capture(shooters[i].ActiveProjectile);
             Send(WorldMessage, NetworkManager.ServerClientId, JsonUtility.ToJson(state));
         }
@@ -211,12 +221,16 @@ public sealed class StageStateSync : MonoBehaviour
             return;
         }
         if (state.movers == null || state.movers.Length != movers.Length ||
+            state.erasers == null || state.erasers.Length != erasers.Length ||
             state.projectiles == null || state.projectiles.Length != shooters.Length) return;
         if (level.player != null) level.player.ApplyNetworkVisual(state.duduVisual);
         for (int i = 0; i < level.coins.Length; i++)
             if ((state.collected & (1 << i)) != 0 && level.coins[i] != null) level.coins[i].SetActive(false);
         for (int i = 0; i < movers.Length; i++)
             movers[i].ApplyRemotePose(state.movers[i].position, state.movers[i].rotation);
+        for (int i = 0; i < erasers.Length; i++)
+            erasers[i].ApplyRemotePose(state.erasers[i].active,
+                state.erasers[i].position, state.erasers[i].rotation);
         for (int i = 0; i < shooters.Length; i++)
             shooters[i].ApplyRemoteProjectile(state.projectiles[i].active,
                 state.projectiles[i].position, state.projectiles[i].rotation);
