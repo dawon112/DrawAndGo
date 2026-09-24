@@ -69,6 +69,7 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
 
     public bool InputEnabled => inputEnabled;
     public DuduSurface CurrentSurface => currentSurface;
+    public bool FacingLeft => spriteRenderer != null && spriteRenderer.flipX;
     public float VisualSeamOverlap => 2f * (characterHalfSize.x + CornerSeamInset);
 
     public void SetSurface(DuduSurface surface)
@@ -102,12 +103,72 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         }
     }
 
+    [System.Serializable]
+    public struct NetworkVisualState
+    {
+        public int animation;
+        public float normalizedTime;
+        public Color color;
+    }
+
+    public NetworkVisualState CaptureNetworkVisual()
+    {
+        var state = new NetworkVisualState { color = spriteRenderer != null ? spriteRenderer.color : Color.white };
+        if (animator != null && animator.runtimeAnimatorController != null)
+        {
+            var animation = animator.IsInTransition(0)
+                ? animator.GetNextAnimatorStateInfo(0) : animator.GetCurrentAnimatorStateInfo(0);
+            state.animation = animation.fullPathHash;
+            state.normalizedTime = animation.normalizedTime;
+        }
+        return state;
+    }
+
+    public void ApplyNetworkVisual(NetworkVisualState state)
+    {
+        if (GameSession.Current == null || !GameSession.Current.IsHost) return;
+        if (spriteRenderer != null) spriteRenderer.color = state.color;
+        if (animator != null && animator.runtimeAnimatorController != null && animator.HasState(0, state.animation))
+        {
+            animator.speed = 0f;
+            animator.Play(state.animation, 0, state.normalizedTime);
+            animator.Update(0f);
+        }
+    }
+
+    public void SetRemoteControlled()
+    {
+        SetInputEnabled(false);
+        enabled = false;
+        if (body == null) return;
+        body.linearVelocity = Vector3.zero;
+        body.isKinematic = true;
+    }
+
+    public void ApplyRemotePose(DuduSurface surface, Vector3 position, Quaternion rotation, bool facingLeft)
+    {
+        if (surface != null && currentSurface != surface)
+        {
+            currentSurface = surface;
+            UpdateVisualSurfaceOffset();
+        }
+
+        if (body != null)
+        {
+            body.position = position;
+            body.rotation = rotation;
+        }
+        transform.SetPositionAndRotation(position, rotation);
+        if (spriteRenderer != null) spriteRenderer.flipX = facingLeft;
+    }
+
     public void BounceAwayFrom(
         Vector3 sourcePosition,
         float horizontalSpeed,
         float upwardSpeed,
         float controlDuration)
     {
+        if (GameSession.Current != null && GameSession.Current.IsHost) return;
         if (currentSurface == null || body == null)
             return;
 
@@ -143,6 +204,7 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         float speedMultiplier,
         float duration)
     {
+        if (GameSession.Current != null && GameSession.Current.IsHost) return;
         float effectEndTime = Time.time + Mathf.Max(0f, duration);
         switch (effectType)
         {
@@ -425,6 +487,7 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
     }
     public void Die()
     {
+        if (GameSession.Current != null && GameSession.Current.IsHost) return;
         if (isRespawning || Time.time < respawnProtectedUntil)
             return;
         StartCoroutine(DeathAndRespawnRoutine());

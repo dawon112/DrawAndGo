@@ -15,9 +15,14 @@ public sealed class DrawingStroke : MonoBehaviour
     private Vector3 surfaceNormal;
     private int strokeLayer;
     private static int splitNumber;
+    private static int nextNetworkId;
+    public int NetworkStrokeId { get; private set; }
     private readonly List<BoxCollider> colliderSegments = new List<BoxCollider>();
 
     public int PointCount => lineRenderer != null ? lineRenderer.positionCount : 0;
+    public float ColliderThickness => colliderThickness;
+    public float ColliderDepth => colliderDepth;
+    public Vector3 SurfaceNormal => surfaceNormal;
 
     public void Initialize(
         Material material,
@@ -51,6 +56,7 @@ public sealed class DrawingStroke : MonoBehaviour
         int newStrokeLayer)
     {
         lineRenderer = GetComponent<LineRenderer>();
+        if (NetworkStrokeId == 0) NetworkStrokeId = ++nextNetworkId;
         strokeMaterial = material;
         strokeWidth = width;
         strokeColor = color;

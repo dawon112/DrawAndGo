@@ -1,10 +1,13 @@
 using System;
+using System.Collections;
 using System.Threading.Tasks;
 using TMPro;
 using Unity.Services.Authentication;
 using Unity.Services.Core;
 using Unity.Services.Multiplayer;
+using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class RoomSessionUI : MonoBehaviour
@@ -41,6 +44,7 @@ public class RoomSessionUI : MonoBehaviour
     private bool operationInFlight;
     private int requestVersion;
     private float nextPlayerCheck;
+    private Coroutine mapCountdown;
 
     private void Awake()
     {
@@ -53,11 +57,11 @@ public class RoomSessionUI : MonoBehaviour
 
     private void OnDestroy()
     {
-        createRoomButton.onClick.RemoveListener(OnCreateRoom);
-        openJoinButton.onClick.RemoveListener(OnOpenJoin);
-        confirmJoinButton.onClick.RemoveListener(OnConfirmJoin);
-        hostCloseButton.onClick.RemoveListener(OnCloseRoom);
-        joinCloseButton.onClick.RemoveListener(OnCloseRoom);
+        if (createRoomButton != null) createRoomButton.onClick.RemoveListener(OnCreateRoom);
+        if (openJoinButton != null) openJoinButton.onClick.RemoveListener(OnOpenJoin);
+        if (confirmJoinButton != null) confirmJoinButton.onClick.RemoveListener(OnConfirmJoin);
+        if (hostCloseButton != null) hostCloseButton.onClick.RemoveListener(OnCloseRoom);
+        if (joinCloseButton != null) joinCloseButton.onClick.RemoveListener(OnCloseRoom);
         requestVersion++;
         if (session == null) return;
         ISession closingSession = session;
@@ -89,10 +93,11 @@ public class RoomSessionUI : MonoBehaviour
         operationInFlight = true;
         try
         {
+            NetworkBootstrap.Ensure();
             await SignInAsync();
             if (version != requestVersion) return;
             ISession created = await MultiplayerService.Instance.CreateSessionAsync(
-                new SessionOptions { MaxPlayers = 2, IsPrivate = true });
+                new SessionOptions { MaxPlayers = 2, IsPrivate = true }.WithRelayNetwork());
             if (version != requestVersion)
             {
                 await CloseSessionAsync(created);
@@ -142,6 +147,7 @@ public class RoomSessionUI : MonoBehaviour
         operationInFlight = true;
         try
         {
+            NetworkBootstrap.Ensure();
             await SignInAsync();
             if (version != requestVersion) return;
             ISession joined = await MultiplayerService.Instance.JoinSessionByCodeAsync(code);
@@ -211,13 +217,20 @@ public class RoomSessionUI : MonoBehaviour
             myIcon.sprite = isHost ? haruIcon : duduIcon;
             friendIcon.gameObject.SetActive(true);
             myIcon.gameObject.SetActive(true);
-            connectionText.text = "두 명이 연결됐어요";
             if (!rolePanel.activeSelf) rolePanel.SetActive(true);
             hostRoomPanel.SetActive(false);
             joinRoomPanel.SetActive(false);
+            if (!Application.CanStreamedLevelBeLoaded(GameSession.MapSceneName))
+                connectionText.text = "맵 씬이 빌드 목록에 없어요";
+            else if (!NetworkReady())
+                connectionText.text = "게임 연결 중이에요...";
+            else if (mapCountdown == null)
+                mapCountdown = StartCoroutine(EnterMapAfterCountdown());
         }
-        else if (rolePanel.activeSelf)
+        else
         {
+            StopMapCountdown();
+            if (!rolePanel.activeSelf) return;
             rolePanel.SetActive(false);
             if (session.IsHost)
             {
@@ -232,8 +245,42 @@ public class RoomSessionUI : MonoBehaviour
         }
     }
 
+    private bool NetworkReady()
+    {
+        NetworkManager manager = NetworkManager.Singleton;
+        return manager != null && manager.IsConnectedClient &&
+            (!session.IsHost || manager.ConnectedClientsIds.Count >= 2);
+    }
+
+    private IEnumerator EnterMapAfterCountdown()
+    {
+        for (int remaining = 5; remaining > 0; remaining--)
+        {
+            connectionText.text = $"{remaining}초 후에 시작합니다.";
+            yield return new WaitForSecondsRealtime(1f);
+            if (session == null || session.PlayerCount < 2 || !NetworkReady())
+            {
+                mapCountdown = null;
+                yield break;
+            }
+        }
+
+        ISession activeSession = session;
+        DetachSession();
+        GameSession.Keep(activeSession);
+        SceneManager.LoadSceneAsync(GameSession.MapSceneName);
+    }
+
+    private void StopMapCountdown()
+    {
+        if (mapCountdown == null) return;
+        StopCoroutine(mapCountdown);
+        mapCountdown = null;
+    }
+
     private void OnSessionEnded()
     {
+        StopMapCountdown();
         DetachSession();
         requestVersion++;
         confirmJoinButton.interactable = true;
@@ -246,6 +293,7 @@ public class RoomSessionUI : MonoBehaviour
 
     private void OnCloseRoom()
     {
+        StopMapCountdown();
         requestVersion++;
         confirmJoinButton.interactable = true;
         if (session == null) return;

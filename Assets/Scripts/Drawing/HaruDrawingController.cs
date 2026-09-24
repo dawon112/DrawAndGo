@@ -384,6 +384,13 @@ public sealed class HaruDrawingController : MonoBehaviour
         rechargeRate = Mathf.Max(0.01f, rechargeRate);
     }
 
+    public Material CreateStrokeMaterialCopy()
+    {
+        Material copy = CreateLineMaterial(lineMaterialTemplate);
+        copy.color = penColor;
+        return copy;
+    }
+
     private static Material CreateLineMaterial(Material template)
     {
         if (template != null)

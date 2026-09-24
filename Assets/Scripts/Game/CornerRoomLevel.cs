@@ -203,8 +203,16 @@ public sealed class CornerRoomLevel : MonoBehaviour
         Debug.Log("Door opened during the stage clear cinematic.", this);
     }
 
+    public void ApplyRemoteClear()
+    {
+        if (GameSession.Current == null || GameSession.Current.IsHost) return;
+        IsClear = true;
+        FindAnyObjectByType<GameViewManager>()?.HideExitInstruction();
+    }
+
     public void TryCompleteThreeDimensionalGoal(Player3DMovement candidate)
     {
+        if (GameSession.Current != null && !GameSession.Current.IsHost) return;
         if (!IsClear && IsOpen && candidate != null && candidate == player3D)
         {
             IsClear = true;

@@ -56,6 +56,21 @@ public sealed class GameViewManager : MonoBehaviour
 
     private void Start()
     {
+        GameSession activeSession = GameSession.Current;
+        if (activeSession != null)
+        {
+            developmentViewSwitch = false;
+            SetDuduMode(!activeSession.IsHost);
+            if (activeSession.IsHost && duduMovement != null)
+                duduMovement.SetRemoteControlled();
+            CornerRoomLevel multiplayerLevel = FindAnyObjectByType<CornerRoomLevel>();
+            gameObject.AddComponent<StageStateSync>();
+            PlayerPoseSync poseSync = gameObject.AddComponent<PlayerPoseSync>();
+            poseSync.Configure(haruMovement != null ? haruMovement.transform : null,
+                duduMovement, multiplayerLevel != null ? multiplayerLevel.surfaces : null);
+            return;
+        }
+
         SetDuduMode(false);
         CornerRoomLevel level = FindAnyObjectByType<CornerRoomLevel>();
         if (level != null) stageCinematic.PlayIntro(level);
@@ -116,7 +131,7 @@ public sealed class GameViewManager : MonoBehaviour
         if (crosshair != null) crosshair.SetSplitScreenLayout(false);
         if (gauge != null) gauge.SetSplitScreenLayout(false);
         splitSequenceActive = false;
-        SetDuduMode(false);
+        SetDuduMode(GameSession.Current != null && !GameSession.Current.IsHost);
         CornerRoomLevel level = FindAnyObjectByType<CornerRoomLevel>();
         if (level != null) stageCinematic.PlayClear(level);
         else
@@ -143,7 +158,7 @@ public sealed class GameViewManager : MonoBehaviour
     public void FinishIntro()
     {
         CurrentCameraState = CameraState.Gameplay;
-        SetDuduMode(false);
+        SetDuduMode(GameSession.Current != null && !GameSession.Current.IsHost);
     }
 
     public void ShowHaruCameraWithoutInput()

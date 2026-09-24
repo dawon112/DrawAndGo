@@ -84,6 +84,7 @@ public sealed class DuduMovingObstacle : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (GameSession.Current != null && GameSession.Current.IsHost) return;
         if (surface == null || body == null)
             return;
 
@@ -95,6 +96,13 @@ public sealed class DuduMovingObstacle : MonoBehaviour
 
         body.MovePosition(targetPosition);
         body.MoveRotation(surface.transform.rotation);
+    }
+
+    public void ApplyRemotePose(Vector3 position, Quaternion rotation)
+    {
+        if (body == null) return;
+        body.MovePosition(position);
+        body.MoveRotation(rotation);
     }
 
     private void OnCollisionEnter(Collision collision)
