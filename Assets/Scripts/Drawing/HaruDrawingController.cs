@@ -11,7 +11,7 @@ public enum DrawingTool
 [RequireComponent(typeof(Camera))]
 public sealed class HaruDrawingController : MonoBehaviour
 {
-    [SerializeField, Min(0.1f)] private float maxDrawDistance = 3f;
+    [SerializeField, Min(0.1f)] private float maxDrawDistance = 6f;
     [SerializeField, Min(1f)] private float aimRayDistance = 100f;
     [SerializeField, Min(0.001f)] private float minPointDistance = 0.02f;
     [SerializeField, Min(0.001f)] private float lineWidth = 0.03f;
@@ -96,6 +96,8 @@ public sealed class HaruDrawingController : MonoBehaviour
             aimDistance <= maxDrawDistance &&
             !IsDrawingBlocked(aimDistance) &&
             !NoDrawZone.Blocks(surface, hitPoint);
+        if (crosshair != null)
+            crosshair.SetDrawAvailability(hasSurfaceAim && aimDistance <= maxDrawDistance);
         if (hasSurfaceAim)
             SetSurfaceAim(surface, hitPoint, hitNormal);
         else
@@ -219,6 +221,8 @@ public sealed class HaruDrawingController : MonoBehaviour
     {
         HasValidSurfaceAim = false;
         CanDrawAtCurrentAim = false;
+        if (crosshair != null)
+            crosshair.SetDrawAvailability(false);
         if (surfaceAimMarker != null)
             surfaceAimMarker.ClearAim();
     }

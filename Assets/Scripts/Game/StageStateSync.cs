@@ -12,6 +12,7 @@ public sealed class StageStateSync : MonoBehaviour
     private const string ReadyMessage = "StageReadyV1";
     private const string StrokeMessage = "StageStrokeV1";
     private const string WorldMessage = "StageWorldV1";
+    private const string SkipMessage = "StageClearSkipV1";
     private const int ChunkPoints = 16;
     private NetworkManager network;
     private CornerRoomLevel level;
@@ -75,6 +76,7 @@ public sealed class StageStateSync : MonoBehaviour
         network.CustomMessagingManager.RegisterNamedMessageHandler(ReadyMessage, OnReady);
         network.CustomMessagingManager.RegisterNamedMessageHandler(StrokeMessage, OnStroke);
         network.CustomMessagingManager.RegisterNamedMessageHandler(WorldMessage, OnWorld);
+        network.CustomMessagingManager.RegisterNamedMessageHandler(SkipMessage, OnCinematicSkip);
         if (!network.IsHost)
         {
             var drawing = FindAnyObjectByType<HaruDrawingController>(FindObjectsInactive.Include);
@@ -236,6 +238,40 @@ public sealed class StageStateSync : MonoBehaviour
                 state.projectiles[i].position, state.projectiles[i].rotation);
     }
 
+    public void BroadcastCinematicSkip()
+    {
+        if (network == null || !network.IsConnectedClient || !ready) return;
+        if (network.IsHost)
+        {
+            foreach (ulong clientId in network.ConnectedClientsIds)
+                if (clientId != network.LocalClientId) SendCinematicSkip(clientId);
+        }
+        else
+            SendCinematicSkip(NetworkManager.ServerClientId);
+    }
+
+    private void OnCinematicSkip(ulong sender, FastBufferReader reader)
+    {
+        if (!ready || !ValidSender(sender) || !reader.TryBeginRead(sizeof(byte))) return;
+        reader.ReadValueSafe(out byte requested);
+        if (requested == 0) return;
+        FindAnyObjectByType<StageCinematicController>()?.RequestNetworkClearSkip();
+
+        // Relay a client's request through the host so every connected view skips.
+        if (!network.IsHost) return;
+        foreach (ulong clientId in network.ConnectedClientsIds)
+            if (clientId != network.LocalClientId && clientId != sender)
+                SendCinematicSkip(clientId);
+    }
+
+    private void SendCinematicSkip(ulong destination)
+    {
+        using var writer = new FastBufferWriter(sizeof(byte), Allocator.Temp);
+        writer.WriteValueSafe((byte)1);
+        network.CustomMessagingManager.SendNamedMessage(
+            SkipMessage, destination, writer, NetworkDelivery.ReliableSequenced);
+    }
+
     private void Send(string name, ulong destination, string payload)
     {
         using var writer = new FastBufferWriter(8 + payload.Length * 2, Allocator.Temp);
@@ -251,6 +287,7 @@ public sealed class StageStateSync : MonoBehaviour
             network.CustomMessagingManager.UnregisterNamedMessageHandler(ReadyMessage);
             network.CustomMessagingManager.UnregisterNamedMessageHandler(StrokeMessage);
             network.CustomMessagingManager.UnregisterNamedMessageHandler(WorldMessage);
+            network.CustomMessagingManager.UnregisterNamedMessageHandler(SkipMessage);
         }
         if (remoteMaterial != null) Destroy(remoteMaterial);
     }

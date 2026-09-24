@@ -5931,6 +5931,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CrosshairController
   color: {r: 0, g: 0, b: 0, a: 1}
+  drawableColor: {r: 0.1, g: 0.45, b: 1, a: 1}
+  outOfRangeColor: {r: 1, g: 0.15, b: 0.15, a: 1}
   armLength: 12
   thickness: 2
 --- !u!114 &3000000003
@@ -5945,7 +5947,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7e1de668ec8d460d9f1dc4475d65bb88, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HaruDrawingController
-  maxDrawDistance: 3
+  maxDrawDistance: 6
   aimRayDistance: 100
   minPointDistance: 0.02
   lineWidth: 0.06

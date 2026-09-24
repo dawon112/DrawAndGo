@@ -5,6 +5,8 @@ using UnityEngine.UI;
 public sealed class CrosshairController : MonoBehaviour
 {
     [SerializeField] private Color color = Color.black;
+    [SerializeField] private Color drawableColor = new Color(0.1f, 0.45f, 1f, 1f);
+    [SerializeField] private Color outOfRangeColor = new Color(1f, 0.15f, 0.15f, 1f);
     [SerializeField, Min(1f)] private float armLength = 12f;
     [SerializeField, Min(1f)] private float thickness = 2f;
 
@@ -13,6 +15,7 @@ public sealed class CrosshairController : MonoBehaviour
     private Image verticalBar;
     private Text statusText;
     private bool eraserMode;
+    private bool canDrawAtAim;
     private bool cameraLock;
 
     private void Awake()
@@ -30,10 +33,15 @@ public sealed class CrosshairController : MonoBehaviour
     {
         BuildCrosshair();
         this.eraserMode = eraserMode;
-        Color toolColor = eraserMode ? new Color(1f, 0.2f, 0.2f, 1f) : color;
-        horizontalBar.color = toolColor;
-        verticalBar.color = toolColor;
+        RefreshCrosshairColor();
         RefreshStatus();
+    }
+
+    public void SetDrawAvailability(bool canDraw)
+    {
+        BuildCrosshair();
+        canDrawAtAim = canDraw;
+        RefreshCrosshairColor();
     }
 
     public void SetCameraLock(bool locked)
@@ -74,7 +82,18 @@ public sealed class CrosshairController : MonoBehaviour
         horizontalBar = CreateBar(canvasObject.transform, "Horizontal", new Vector2(armLength, thickness));
         verticalBar = CreateBar(canvasObject.transform, "Vertical", new Vector2(thickness, armLength));
         statusText = CreateStatusText(canvasObject.transform);
+        RefreshCrosshairColor();
         RefreshStatus();
+    }
+
+    private void RefreshCrosshairColor()
+    {
+        if (horizontalBar == null || verticalBar == null) return;
+        Color crosshairColor = eraserMode
+            ? color
+            : canDrawAtAim ? drawableColor : outOfRangeColor;
+        horizontalBar.color = crosshairColor;
+        verticalBar.color = crosshairColor;
     }
 
     private Image CreateBar(Transform parent, string objectName, Vector2 size)

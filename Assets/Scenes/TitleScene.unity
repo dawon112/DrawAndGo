@@ -3182,6 +3182,7 @@ MonoBehaviour:
   confirmJoinButton: {fileID: 1874537181}
   hostCloseButton: {fileID: 436427386}
   joinCloseButton: {fileID: 229322563}
+  quitButton: {fileID: 2008859383}
   roomCodeText: {fileID: 643261502}
   hostGuideText: {fileID: 1852906285}
   roomCodeInput: {fileID: 2109000020}

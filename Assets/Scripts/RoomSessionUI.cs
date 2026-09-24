@@ -24,6 +24,7 @@ public class RoomSessionUI : MonoBehaviour
     [SerializeField] private Button confirmJoinButton;
     [SerializeField] private Button hostCloseButton;
     [SerializeField] private Button joinCloseButton;
+    [SerializeField] private Button quitButton;
 
     [Header("Room")]
     [SerializeField] private TMP_Text roomCodeText;
@@ -53,6 +54,7 @@ public class RoomSessionUI : MonoBehaviour
         confirmJoinButton.onClick.AddListener(OnConfirmJoin);
         hostCloseButton.onClick.AddListener(OnCloseRoom);
         joinCloseButton.onClick.AddListener(OnCloseRoom);
+        quitButton.onClick.AddListener(OnQuit);
     }
 
     private void OnDestroy()
@@ -62,11 +64,21 @@ public class RoomSessionUI : MonoBehaviour
         if (confirmJoinButton != null) confirmJoinButton.onClick.RemoveListener(OnConfirmJoin);
         if (hostCloseButton != null) hostCloseButton.onClick.RemoveListener(OnCloseRoom);
         if (joinCloseButton != null) joinCloseButton.onClick.RemoveListener(OnCloseRoom);
+        if (quitButton != null) quitButton.onClick.RemoveListener(OnQuit);
         requestVersion++;
         if (session == null) return;
         ISession closingSession = session;
         DetachSession();
         _ = CloseSessionAsync(closingSession);
+    }
+
+    private void OnQuit()
+    {
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
     }
 
     private void Update()
