@@ -8,6 +8,9 @@
 /[Oo]bj/
 /[Bb]uild/
 /[Bb]uilds/
+/BuildTest/
+/BuildTest.zip
+/.codex-video-tools/
 /[Ll]ogs/
 /[Uu]ser[Ss]ettings/
 *.log
