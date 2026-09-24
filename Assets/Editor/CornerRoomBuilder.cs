@@ -224,6 +224,27 @@ public static class CornerRoomBuilder
         CreateDoorwaySegment("Doorway Wall Top", new Vector2(7.5f, 2.35f), new Vector2(2f, 1.3f));
 
         level.door.name = "3D Door - Blocks Wall Opening Until Three Coins";
+        level.door.transform.SetPositionAndRotation(
+            finalSurface.SurfaceToWorld(new Vector2(7.5f, -0.3f)),
+            finalSurface.transform.rotation);
+        level.door.transform.localScale = new Vector3(1.8f, 4f, 0.5f);
+
+        Transform bottomFiller = doorwayRoot.Find("Doorway Wall Bottom Filler");
+        if (bottomFiller == null)
+        {
+            bottomFiller = GameObject.CreatePrimitive(PrimitiveType.Cube).transform;
+            bottomFiller.name = "Doorway Wall Bottom Filler";
+            bottomFiller.SetParent(doorwayRoot);
+        }
+        bottomFiller.gameObject.layer = finalSurface.gameObject.layer;
+        bottomFiller.SetPositionAndRotation(
+            finalSurface.SurfaceToWorld(new Vector2(7.5f, -2.65f)),
+            finalSurface.transform.rotation);
+        bottomFiller.localScale = new Vector3(1.8f, 0.7f, 0.12f);
+        bottomFiller.GetComponent<Renderer>().sharedMaterial = paperMaterial;
+        Collider bottomCollider = bottomFiller.GetComponent<Collider>();
+        if (bottomCollider != null)
+            Object.DestroyImmediate(bottomCollider);
 
         void CreateDoorwaySegment(string name, Vector2 position, Vector2 size)
         {

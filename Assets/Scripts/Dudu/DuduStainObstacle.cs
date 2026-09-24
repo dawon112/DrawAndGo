@@ -32,6 +32,7 @@ public sealed class DuduStainObstacle : MonoBehaviour
     private void Awake()
     {
         GetComponent<Collider>().isTrigger = true;
+        ResolveSurface();
     }
 
     private void OnTriggerEnter(Collider other)
@@ -51,6 +52,29 @@ public sealed class DuduStainObstacle : MonoBehaviour
         transform.SetPositionAndRotation(
             surface.SurfaceToWorld(surfacePosition),
             surface.transform.rotation);
+    }
+
+    [ContextMenu("Auto Assign Nearest Surface")]
+    private void ResolveSurface()
+    {
+        Vector3 placedPosition = transform.position;
+        surface = null;
+        float nearest = float.PositiveInfinity;
+        foreach (DuduSurface candidate in FindObjectsByType<DuduSurface>(FindObjectsInactive.Exclude))
+        {
+            Vector2 position = candidate.WorldToSurface(placedPosition);
+            Vector2 clamped = new Vector2(
+                Mathf.Clamp(position.x, -candidate.Width * 0.5f, candidate.Width * 0.5f),
+                Mathf.Clamp(position.y, -candidate.Height * 0.5f, candidate.Height * 0.5f));
+            float distance = (candidate.SurfaceToWorld(clamped) - placedPosition).sqrMagnitude;
+            if (distance >= nearest) continue;
+            nearest = distance;
+            surface = candidate;
+        }
+
+        if (surface == null) return;
+        surfacePosition = surface.WorldToSurface(placedPosition);
+        ApplySurfaceTransform();
     }
 
     private void OnValidate()

@@ -33,6 +33,7 @@ public sealed class DuduCameraController : MonoBehaviour
     private Transform[] silhouetteBones;
     private Material[] silhouetteMaterials;
     private float silhouetteAlpha;
+    private MaterialPropertyBlock proxyPropertyBlock;
 
     public void SetSurface(DuduSurface surface) => targetSurface = surface;
     public void SetTarget(Transform target) => targetDudu = target;
@@ -40,15 +41,25 @@ public sealed class DuduCameraController : MonoBehaviour
     private void Awake()
     {
         cameraComponent = GetComponent<Camera>();
+        proxyPropertyBlock = new MaterialPropertyBlock();
         cameraComponent.orthographic = true;
         cameraComponent.orthographicSize = orthographicSize;
+        SetWhiteBackground();
     }
 
     private void OnEnable()
     {
         activeInstance = this;
         if (cameraComponent == null) cameraComponent = GetComponent<Camera>();
+        SetWhiteBackground();
         ConfigureCameraMasks();
+    }
+
+    private void SetWhiteBackground()
+    {
+        if (cameraComponent == null) return;
+        cameraComponent.clearFlags = CameraClearFlags.SolidColor;
+        cameraComponent.backgroundColor = Color.white;
     }
 
     public static void RegisterRuntimeRenderer(Renderer source)
@@ -226,7 +237,10 @@ public sealed class DuduCameraController : MonoBehaviour
             sourceName == "Room Wall 6 - Closure" || sourceName.StartsWith("START") ||
             sourceName.StartsWith("SECTION")) return;
 
-        DuduSurface sourceSurface = FindSurface(GetReferencePosition(source));
+        LineMagnet magnet = source.GetComponentInParent<LineMagnet>();
+        DuduSurface sourceSurface = magnet != null && magnet.Surface != null
+            ? magnet.Surface
+            : FindSurface(GetReferencePosition(source));
         if (sourceSurface == null) return;
         Renderer proxy = CreateProxy(source);
         if (proxy != null) visualProxies.Add(new VisualProxy(source, proxy, sourceSurface));
@@ -315,16 +329,22 @@ public sealed class DuduCameraController : MonoBehaviour
                 continue;
             }
             Vector3 referencePosition = GetReferencePosition(item.source);
-            DuduSurface liveSurface = FindSurface(referencePosition);
+            LineMagnet magnet = item.source.GetComponentInParent<LineMagnet>();
+            DuduSurface liveSurface = magnet != null && magnet.Surface != null
+                ? magnet.Surface
+                : FindSurface(referencePosition);
             if (liveSurface != null) item.surface = liveSurface;
             int surfaceIndex = System.Array.IndexOf(surfaces, item.surface);
             if (surfaceIndex < 0) continue;
             Vector2 local = item.surface.WorldToSurface(item.source.transform.position);
-            float displayDepth = item.proxy is SpriteRenderer ? -0.2f : 0f;
+            // Keep magnets in front of wall proxies, but behind Dudu's sprite.
+            float displayDepth = magnet != null ? -0.1f : item.proxy is SpriteRenderer ? -0.2f : 0f;
             item.proxy.transform.position = new Vector3(surfaceCenters[surfaceIndex] + local.x, local.y, displayDepth);
             item.proxy.transform.rotation = MapRotation(item.source.transform, item.surface);
             item.proxy.transform.localScale = item.source.transform.lossyScale;
             item.proxy.enabled = item.source.enabled && item.source.gameObject.activeInHierarchy;
+            item.source.GetPropertyBlock(proxyPropertyBlock);
+            item.proxy.SetPropertyBlock(proxyPropertyBlock);
             if (item.source is SpriteRenderer sourceSprite && item.proxy is SpriteRenderer sprite)
             {
                 sprite.sprite = sourceSprite.sprite; sprite.color = sourceSprite.color;

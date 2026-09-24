@@ -34,8 +34,6 @@ public sealed class HaruDrawingController : MonoBehaviour
     [Header("Crayon Usage")]
     [SerializeField, Min(1f)] private float maxCrayon = 100f;
     [SerializeField, Min(0.01f)] private float consumptionPerWorldUnit = 10f;
-    [SerializeField, Min(0f)] private float rechargeDelay = 5f;
-    [SerializeField, Min(0.01f)] private float rechargeRate = 20f;
 
     private Camera drawingCamera;
     private DrawingStroke currentStroke;
@@ -47,9 +45,7 @@ public sealed class HaruDrawingController : MonoBehaviour
     private bool cameraLock;
     private int strokeLayer;
     private float currentCrayon;
-    private float emptyWaitTime;
     private bool crayonDepleted;
-    private CrayonGaugeUI crayonGauge;
 
     public DrawingTool CurrentTool => currentTool;
     public bool CameraLock => cameraLock;
@@ -64,10 +60,7 @@ public sealed class HaruDrawingController : MonoBehaviour
     {
         drawingCamera = GetComponent<Camera>();
         if (GetComponent<HaruDrawingArm>() == null) gameObject.AddComponent<HaruDrawingArm>();
-        crayonGauge = GetComponent<CrayonGaugeUI>();
-        if (crayonGauge == null) crayonGauge = gameObject.AddComponent<CrayonGaugeUI>();
         currentCrayon = maxCrayon;
-        RefreshCrayonGauge();
         ConfigurePhysicsLayers();
         lineMaterial = CreateLineMaterial(lineMaterialTemplate);
         ApplyPenColor();
@@ -76,8 +69,6 @@ public sealed class HaruDrawingController : MonoBehaviour
 
     private void Update()
     {
-        UpdateCrayonRecharge();
-
         Keyboard keyboard = Keyboard.current;
         if (keyboard != null && keyboard.eKey.wasPressedThisFrame)
             SetTool(currentTool == DrawingTool.Pen ? DrawingTool.Eraser : DrawingTool.Pen);
@@ -103,7 +94,8 @@ public sealed class HaruDrawingController : MonoBehaviour
         CanDrawAtCurrentAim =
             hasSurfaceAim &&
             aimDistance <= maxDrawDistance &&
-            !IsDrawingBlocked(aimDistance);
+            !IsDrawingBlocked(aimDistance) &&
+            !NoDrawZone.Blocks(surface, hitPoint);
         if (hasSurfaceAim)
             SetSurfaceAim(surface, hitPoint, hitNormal);
         else
@@ -155,33 +147,7 @@ public sealed class HaruDrawingController : MonoBehaviour
         {
             currentCrayon = 0f;
             crayonDepleted = true;
-            emptyWaitTime = 0f;
         }
-        RefreshCrayonGauge();
-    }
-
-    private void UpdateCrayonRecharge()
-    {
-        if (!crayonDepleted) return;
-        if (currentCrayon <= 0f && emptyWaitTime < rechargeDelay)
-        {
-            emptyWaitTime += Time.deltaTime;
-            return;
-        }
-
-        currentCrayon = Mathf.MoveTowards(currentCrayon, maxCrayon, rechargeRate * Time.deltaTime);
-        if (currentCrayon >= maxCrayon)
-        {
-            currentCrayon = maxCrayon;
-            crayonDepleted = false;
-            emptyWaitTime = 0f;
-        }
-        RefreshCrayonGauge();
-    }
-
-    private void RefreshCrayonGauge()
-    {
-        if (crayonGauge != null) crayonGauge.SetAmount(CrayonNormalized, crayonDepleted);
     }
 
     public bool TryGetCurrentSurfaceAim(
@@ -358,8 +324,13 @@ public sealed class HaruDrawingController : MonoBehaviour
 
     private void EndStroke()
     {
-        if (currentStroke != null && currentStroke.PointCount < 2)
-            Destroy(currentStroke.gameObject);
+        if (currentStroke != null)
+        {
+            if (currentStroke.PointCount < 2)
+                Destroy(currentStroke.gameObject);
+            else
+                currentStroke.FinishDrawing();
+        }
         currentStroke = null;
         currentSurface = null;
     }
@@ -380,8 +351,6 @@ public sealed class HaruDrawingController : MonoBehaviour
     {
         maxCrayon = Mathf.Max(1f, maxCrayon);
         consumptionPerWorldUnit = Mathf.Max(0.01f, consumptionPerWorldUnit);
-        rechargeDelay = Mathf.Max(0f, rechargeDelay);
-        rechargeRate = Mathf.Max(0.01f, rechargeRate);
     }
 
     public Material CreateStrokeMaterialCopy()

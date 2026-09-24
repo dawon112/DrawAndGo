@@ -90,18 +90,18 @@ public sealed class StageCinematicController : MonoBehaviour
         RectTransform skipRect = skipObject.GetComponent<RectTransform>();
         skipRect.anchorMin = skipRect.anchorMax = skipRect.pivot = Vector2.zero;
         skipRect.anchoredPosition = new Vector2(24f, 22f);
-        skipRect.sizeDelta = new Vector2(360f, 48f);
+        skipRect.sizeDelta = new Vector2(1080f, 144f);
         skipText = skipObject.GetComponent<Text>();
         skipText.text = "Q  스킵하고 싶어요";
         skipText.font = GameFont.Bold;
-        skipText.fontSize = 24;
+        skipText.fontSize = 72;
         skipText.fontStyle = FontStyle.Normal;
         skipText.alignment = TextAnchor.MiddleLeft;
         skipText.color = Color.white;
         skipText.raycastTarget = false;
         Outline skipOutline = skipObject.GetComponent<Outline>();
         skipOutline.effectColor = Color.black;
-        skipOutline.effectDistance = new Vector2(2f, -2f);
+        skipOutline.effectDistance = new Vector2(6f, -6f);
         skipObject.SetActive(false);
     }
 

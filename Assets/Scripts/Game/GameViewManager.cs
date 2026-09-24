@@ -78,6 +78,9 @@ public sealed class GameViewManager : MonoBehaviour
 
     private void Update()
     {
+        if (CurrentCameraState != CameraState.Gameplay)
+            return;
+
         Keyboard keyboard = Keyboard.current;
         if (!splitSequenceActive && developmentViewSwitch && keyboard != null && keyboard.tabKey.wasPressedThisFrame)
             SetDuduMode(!duduMode);
@@ -120,16 +123,12 @@ public sealed class GameViewManager : MonoBehaviour
             crosshair.SetVisible(true);
             crosshair.SetSplitScreenLayout(true);
         }
-        CrayonGaugeUI gauge = haruCamera.GetComponent<CrayonGaugeUI>();
-        if (gauge != null) gauge.SetSplitScreenLayout(true);
-
         yield return new WaitForSecondsRealtime(splitScreenDuration);
 
         haruCamera.rect = haruRect;
         duduCamera.rect = duduRect;
         if (duduListener != null) duduListener.enabled = duduListenerEnabled;
         if (crosshair != null) crosshair.SetSplitScreenLayout(false);
-        if (gauge != null) gauge.SetSplitScreenLayout(false);
         splitSequenceActive = false;
         SetDuduMode(GameSession.Current != null && !GameSession.Current.IsHost);
         CornerRoomLevel level = FindAnyObjectByType<CornerRoomLevel>();
