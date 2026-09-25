@@ -68,6 +68,8 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
     private static readonly int RebirthStateId = Animator.StringToHash("Rebirth");
 
     public bool InputEnabled => inputEnabled;
+    public bool IsSlowed => slowEffectActive;
+    public bool IsControlsReversed => reverseEffectActive;
     public DuduSurface CurrentSurface => currentSurface;
     public float VisualSeamOverlap => 2f * (characterHalfSize.x + CornerSeamInset);
 

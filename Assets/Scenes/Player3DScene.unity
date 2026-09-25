@@ -546,15 +546,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4465610780552019706, guid: 22f6ab59c8596f54f91f1ed50ba73b5a, type: 3}
       propertyPath: m_LocalScale.x
-      value: 0.099999994
+      value: 0.96
       objectReference: {fileID: 0}
     - target: {fileID: 4465610780552019706, guid: 22f6ab59c8596f54f91f1ed50ba73b5a, type: 3}
       propertyPath: m_LocalScale.y
-      value: 0.099999994
+      value: 0.96
       objectReference: {fileID: 0}
     - target: {fileID: 4465610780552019706, guid: 22f6ab59c8596f54f91f1ed50ba73b5a, type: 3}
       propertyPath: m_LocalScale.z
-      value: 0.099999994
+      value: 0.96
       objectReference: {fileID: 0}
     - target: {fileID: 4465610780552019706, guid: 22f6ab59c8596f54f91f1ed50ba73b5a, type: 3}
       propertyPath: m_LocalPosition.x
@@ -1121,15 +1121,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4465610780552019706, guid: 22f6ab59c8596f54f91f1ed50ba73b5a, type: 3}
       propertyPath: m_LocalScale.x
-      value: 0.099999994
+      value: 0.96
       objectReference: {fileID: 0}
     - target: {fileID: 4465610780552019706, guid: 22f6ab59c8596f54f91f1ed50ba73b5a, type: 3}
       propertyPath: m_LocalScale.y
-      value: 0.099999994
+      value: 0.96
       objectReference: {fileID: 0}
     - target: {fileID: 4465610780552019706, guid: 22f6ab59c8596f54f91f1ed50ba73b5a, type: 3}
       propertyPath: m_LocalScale.z
-      value: 0.099999994
+      value: 0.96
       objectReference: {fileID: 0}
     - target: {fileID: 4465610780552019706, guid: 22f6ab59c8596f54f91f1ed50ba73b5a, type: 3}
       propertyPath: m_LocalPosition.x
@@ -1768,15 +1768,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4465610780552019706, guid: 22f6ab59c8596f54f91f1ed50ba73b5a, type: 3}
       propertyPath: m_LocalScale.x
-      value: 0.099999994
+      value: 0.96
       objectReference: {fileID: 0}
     - target: {fileID: 4465610780552019706, guid: 22f6ab59c8596f54f91f1ed50ba73b5a, type: 3}
       propertyPath: m_LocalScale.y
-      value: 0.099999994
+      value: 0.96
       objectReference: {fileID: 0}
     - target: {fileID: 4465610780552019706, guid: 22f6ab59c8596f54f91f1ed50ba73b5a, type: 3}
       propertyPath: m_LocalScale.z
-      value: 0.099999994
+      value: 0.96
       objectReference: {fileID: 0}
     - target: {fileID: 4465610780552019706, guid: 22f6ab59c8596f54f91f1ed50ba73b5a, type: 3}
       propertyPath: m_LocalPosition.x
@@ -5558,6 +5558,15 @@ MonoBehaviour:
   silhouetteFullDistance: 0.75
   silhouetteMaxAlpha: 0.35
   silhouetteFadeSpeed: 5
+  slowOverlayFrames:
+  - {fileID: -1161379765, guid: b064d455a1e74524dad839132479a0a2, type: 3}
+  - {fileID: 1497131079, guid: b064d455a1e74524dad839132479a0a2, type: 3}
+  - {fileID: -1693861266, guid: b064d455a1e74524dad839132479a0a2, type: 3}
+  reverseOverlayFrames:
+  - {fileID: -1514121963, guid: 84bc7d04a62d293468c434972b351c69, type: 3}
+  - {fileID: -951570885, guid: 84bc7d04a62d293468c434972b351c69, type: 3}
+  - {fileID: 1340220633, guid: 84bc7d04a62d293468c434972b351c69, type: 3}
+  overlayFrameDuration: 0.12
 --- !u!4 &2112354183
 Transform:
   m_ObjectHideFlags: 0
@@ -6245,6 +6254,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CrosshairController
   color: {r: 0, g: 0, b: 0, a: 1}
+  drawableColor: {r: 0.1, g: 0.45, b: 1, a: 1}
+  outOfRangeColor: {r: 1, g: 0.15, b: 0.15, a: 1}
   armLength: 12
   thickness: 2
 --- !u!114 &3000000003
@@ -6259,7 +6270,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7e1de668ec8d460d9f1dc4475d65bb88, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HaruDrawingController
-  maxDrawDistance: 3
+  maxDrawDistance: 6
   aimRayDistance: 100
   minPointDistance: 0.02
   lineWidth: 0.06

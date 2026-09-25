@@ -20,6 +20,9 @@ public sealed class LineMagnet : MonoBehaviour
     [SerializeField] private Renderer[] visualRenderers;
     [SerializeField, Range(0f, 1f)] private float inactiveAlpha = 0.28f;
 
+    private GameObject activeVisual;
+    private GameObject inactiveVisual;
+
     private static readonly List<LineMagnet> Instances = new List<LineMagnet>();
     private MaterialPropertyBlock propertyBlock;
     private bool isActive = true;
@@ -36,6 +39,14 @@ public sealed class LineMagnet : MonoBehaviour
     private void Awake()
     {
         propertyBlock = new MaterialPropertyBlock();
+        Transform visualRoot = transform.Find("Visual");
+        if (visualRoot != null)
+        {
+            Transform active = visualRoot.Find("activate");
+            Transform inactive = visualRoot.Find("deactivate");
+            activeVisual = active != null ? active.gameObject : null;
+            inactiveVisual = inactive != null ? inactive.gameObject : null;
+        }
         if (visualRenderers == null || visualRenderers.Length == 0)
             visualRenderers = GetComponentsInChildren<Renderer>(true);
         ResetCycle();
@@ -96,6 +107,13 @@ public sealed class LineMagnet : MonoBehaviour
 
     private void UpdateVisuals()
     {
+        if (activeVisual != null && inactiveVisual != null)
+        {
+            activeVisual.SetActive(isActive);
+            inactiveVisual.SetActive(!isActive);
+            return;
+        }
+
         if (visualRenderers == null) return;
         if (propertyBlock == null) propertyBlock = new MaterialPropertyBlock();
         float alphaMultiplier = isActive ? 1f : inactiveAlpha;

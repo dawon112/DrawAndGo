@@ -104,6 +104,7 @@ MonoBehaviour:
   eraseRadius: 0.22
   visualOffset: 0.025
   hitboxScale: 0.8
+  visualForwardAngleOffset: -90
 --- !u!212 &4340912561089243297
 SpriteRenderer:
   serializedVersion: 3

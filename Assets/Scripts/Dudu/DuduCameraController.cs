@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.UI;
 
 [RequireComponent(typeof(Camera))]
 public sealed class DuduCameraController : MonoBehaviour
@@ -18,6 +19,10 @@ public sealed class DuduCameraController : MonoBehaviour
     [SerializeField, Min(0f)] private float silhouetteFullDistance = 0.75f;
     [SerializeField, Range(0f, 1f)] private float silhouetteMaxAlpha = 0.35f;
     [SerializeField, Min(0.01f)] private float silhouetteFadeSpeed = 5f;
+    [Header("Dudu Debuff Overlay")]
+    [SerializeField] private Sprite[] slowOverlayFrames;
+    [SerializeField] private Sprite[] reverseOverlayFrames;
+    [SerializeField, Min(0.02f)] private float overlayFrameDuration = 0.12f;
 
     private readonly List<VisualProxy> visualProxies = new List<VisualProxy>();
     private Camera cameraComponent;
@@ -34,6 +39,8 @@ public sealed class DuduCameraController : MonoBehaviour
     private Material[] silhouetteMaterials;
     private float silhouetteAlpha;
     private MaterialPropertyBlock proxyPropertyBlock;
+    private DuduSurfaceMovement duduMovement;
+    private Image debuffOverlay;
 
     public void SetSurface(DuduSurface surface) => targetSurface = surface;
     public void SetTarget(Transform target) => targetDudu = target;
@@ -44,6 +51,7 @@ public sealed class DuduCameraController : MonoBehaviour
         proxyPropertyBlock = new MaterialPropertyBlock();
         cameraComponent.orthographic = true;
         cameraComponent.orthographicSize = orthographicSize;
+        CreateDebuffOverlay();
         SetWhiteBackground();
     }
 
@@ -108,6 +116,7 @@ public sealed class DuduCameraController : MonoBehaviour
 
     private void LateUpdate()
     {
+        UpdateDebuffOverlay();
         if (surfaces == null || targetDudu == null) return;
         if (targetDudu.TryGetComponent(out DuduSurfaceMovement movement) && movement.CurrentSurface != null)
             targetSurface = movement.CurrentSurface;
@@ -121,6 +130,55 @@ public sealed class DuduCameraController : MonoBehaviour
         targetX = Mathf.Clamp(targetX, -limit, limit);
         float x = Mathf.SmoothDamp(transform.position.x, targetX, ref horizontalVelocity, followSmoothTime);
         transform.SetPositionAndRotation(new Vector3(x, 0f, -cameraDistance), Quaternion.identity);
+    }
+
+    private void CreateDebuffOverlay()
+    {
+        GameObject canvasObject = new GameObject("DuduStatusCanvas", typeof(RectTransform), typeof(Canvas),
+            typeof(CanvasScaler));
+        canvasObject.transform.SetParent(transform, false);
+        Canvas canvas = canvasObject.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceCamera;
+        canvas.worldCamera = cameraComponent;
+        canvas.planeDistance = 0.5f;
+        canvas.sortingOrder = 100;
+
+        GameObject imageObject = new GameObject("DebuffFrameOverlay", typeof(RectTransform), typeof(Image),
+            typeof(AspectRatioFitter));
+        imageObject.transform.SetParent(canvasObject.transform, false);
+        RectTransform rect = imageObject.GetComponent<RectTransform>();
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        AspectRatioFitter fitter = imageObject.GetComponent<AspectRatioFitter>();
+        fitter.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
+        fitter.aspectRatio = 1f;
+        debuffOverlay = imageObject.GetComponent<Image>();
+        debuffOverlay.raycastTarget = false;
+        debuffOverlay.enabled = false;
+    }
+
+    private void UpdateDebuffOverlay()
+    {
+        if (debuffOverlay == null) return;
+        if (duduMovement == null && targetDudu != null)
+            duduMovement = targetDudu.GetComponent<DuduSurfaceMovement>();
+
+        Sprite[] frames = null;
+        if (duduMovement != null)
+            frames = duduMovement.IsControlsReversed ? reverseOverlayFrames :
+                duduMovement.IsSlowed ? slowOverlayFrames : null;
+
+        if (frames == null || frames.Length == 0)
+        {
+            debuffOverlay.enabled = false;
+            return;
+        }
+
+        int frame = Mathf.FloorToInt(Time.unscaledTime / overlayFrameDuration) % frames.Length;
+        debuffOverlay.sprite = frames[frame];
+        debuffOverlay.enabled = debuffOverlay.sprite != null;
     }
 
     private void CreateHaruSilhouette()

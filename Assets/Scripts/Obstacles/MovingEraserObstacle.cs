@@ -16,6 +16,8 @@ public sealed class MovingEraserObstacle : MonoBehaviour
     [SerializeField, Min(0.01f)] private float visualOffset = 0.025f;
     [Tooltip("Slightly smaller than the visual collider for fair near-misses.")]
     [SerializeField, Range(0.5f, 1f)] private float hitboxScale = 0.8f;
+    [Tooltip("Rotation offset that aligns the sprite's long axis with its launch direction.")]
+    [SerializeField] private float visualForwardAngleOffset = -90f;
 
     private Rigidbody body;
     private BoxCollider eraserCollider;
@@ -33,7 +35,8 @@ public sealed class MovingEraserObstacle : MonoBehaviour
         body.isKinematic = true;
         body.interpolation = RigidbodyInterpolation.Interpolate;
         body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
-        body.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationY;
+        // Rotation is driven explicitly around each surface's normal while aiming and flying.
+        body.constraints = RigidbodyConstraints.None;
         eraserCollider.isTrigger = true;
         ResolveReferencesAndPlacement();
     }
@@ -160,7 +163,7 @@ public sealed class MovingEraserObstacle : MonoBehaviour
     private Quaternion GetDirectionRotation(Vector2 direction)
     {
         float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
-        return surface.transform.rotation * Quaternion.Euler(0f, 0f, angle);
+        return surface.transform.rotation * Quaternion.Euler(0f, 0f, angle + visualForwardAngleOffset);
     }
 
     private bool IsOutsideSurface()
