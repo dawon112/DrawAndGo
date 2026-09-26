@@ -1,9 +1,12 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 [DisallowMultipleComponent]
 [RequireComponent(typeof(Collider))]
 public sealed class DuduStainObstacle : MonoBehaviour
 {
+    private readonly HashSet<DuduSurfaceMovement> occupants = new HashSet<DuduSurfaceMovement>();
+
     public enum EffectType
     {
         Slow,
@@ -37,12 +40,42 @@ public sealed class DuduStainObstacle : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        DuduSurfaceMovement dudu = other.GetComponentInParent<DuduSurfaceMovement>();
-        if (dudu == null)
-            return;
+        TrackOccupant(other);
+    }
 
+    private void OnTriggerStay(Collider other)
+    {
+        TrackOccupant(other);
+    }
+
+    private void OnTriggerExit(Collider other)
+    {
+        DuduSurfaceMovement dudu = other.GetComponentInParent<DuduSurfaceMovement>();
+        if (dudu != null)
+            occupants.Remove(dudu);
+    }
+
+    private void Update()
+    {
+        occupants.RemoveWhere(dudu => dudu == null);
+        foreach (DuduSurfaceMovement dudu in occupants)
+            ApplyEffect(dudu);
+    }
+
+    private void TrackOccupant(Collider other)
+    {
+        DuduSurfaceMovement dudu = other.GetComponentInParent<DuduSurfaceMovement>();
+        if (dudu == null) return;
+        occupants.Add(dudu);
+        ApplyEffect(dudu);
+    }
+
+    private void ApplyEffect(DuduSurfaceMovement dudu)
+    {
         dudu.ApplyStainEffect(effectType, speedMultiplier, effectDuration);
     }
+
+    private void OnDisable() => occupants.Clear();
 
     private void ApplySurfaceTransform()
     {

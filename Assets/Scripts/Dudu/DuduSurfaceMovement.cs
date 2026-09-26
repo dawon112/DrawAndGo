@@ -149,18 +149,14 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         switch (effectType)
         {
             case DuduStainObstacle.EffectType.Slow:
-                if (slowEffectActive && Time.time < slowEffectUntil)
-                    return;
                 slowEffectActive = true;
-                slowEffectUntil = effectEndTime;
+                slowEffectUntil = Mathf.Max(slowEffectUntil, effectEndTime);
                 stainSpeedMultiplier = Mathf.Clamp(speedMultiplier, 0.1f, 1f);
                 break;
 
             case DuduStainObstacle.EffectType.ReverseControls:
-                if (reverseEffectActive && Time.time < reverseEffectUntil)
-                    return;
                 reverseEffectActive = true;
-                reverseEffectUntil = effectEndTime;
+                reverseEffectUntil = Mathf.Max(reverseEffectUntil, effectEndTime);
                 break;
         }
     }

@@ -23,7 +23,8 @@ public sealed class HotZone : MonoBehaviour
     {
         zoneCollider = GetComponent<BoxCollider>();
         if (visualRenderer == null) visualRenderer = GetComponent<Renderer>();
-        if (visualRenderer != null)
+        // Preserve authored sprite colors. The tint is only for the legacy mesh visual.
+        if (visualRenderer != null && visualRenderer is not SpriteRenderer)
         {
             MaterialPropertyBlock block = new MaterialPropertyBlock();
             visualRenderer.GetPropertyBlock(block);

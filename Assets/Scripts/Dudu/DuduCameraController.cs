@@ -59,6 +59,7 @@ public sealed class DuduCameraController : MonoBehaviour
     {
         activeInstance = this;
         if (cameraComponent == null) cameraComponent = GetComponent<Camera>();
+        EnsureDebuffOverlay();
         SetWhiteBackground();
         ConfigureCameraMasks();
     }
@@ -136,6 +137,7 @@ public sealed class DuduCameraController : MonoBehaviour
     {
         GameObject canvasObject = new GameObject("DuduStatusCanvas", typeof(RectTransform), typeof(Canvas),
             typeof(CanvasScaler));
+        canvasObject.layer = UnwrappedLayer;
         canvasObject.transform.SetParent(transform, false);
         Canvas canvas = canvasObject.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceCamera;
@@ -143,24 +145,63 @@ public sealed class DuduCameraController : MonoBehaviour
         canvas.planeDistance = 0.5f;
         canvas.sortingOrder = 100;
 
-        GameObject imageObject = new GameObject("DebuffFrameOverlay", typeof(RectTransform), typeof(Image),
-            typeof(AspectRatioFitter));
+        GameObject imageObject = new GameObject("DebuffFrameOverlay", typeof(RectTransform), typeof(Image));
+        imageObject.layer = UnwrappedLayer;
         imageObject.transform.SetParent(canvasObject.transform, false);
         RectTransform rect = imageObject.GetComponent<RectTransform>();
         rect.anchorMin = Vector2.zero;
         rect.anchorMax = Vector2.one;
         rect.offsetMin = Vector2.zero;
         rect.offsetMax = Vector2.zero;
-        AspectRatioFitter fitter = imageObject.GetComponent<AspectRatioFitter>();
-        fitter.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
-        fitter.aspectRatio = 1f;
         debuffOverlay = imageObject.GetComponent<Image>();
+        debuffOverlay.preserveAspect = false;
         debuffOverlay.raycastTarget = false;
         debuffOverlay.enabled = false;
     }
 
+    private void EnsureDebuffOverlay()
+    {
+        if (debuffOverlay == null)
+        {
+            Transform existing = transform.Find("DuduStatusCanvas/DebuffFrameOverlay");
+            if (existing != null)
+                debuffOverlay = existing.GetComponent<Image>();
+            else
+            {
+                CreateDebuffOverlay();
+                return;
+            }
+        }
+
+        Canvas canvas = debuffOverlay.GetComponentInParent<Canvas>();
+        if (canvas != null)
+        {
+            canvas.gameObject.layer = UnwrappedLayer;
+            canvas.renderMode = RenderMode.ScreenSpaceCamera;
+            canvas.worldCamera = cameraComponent;
+            canvas.planeDistance = 0.5f;
+            canvas.sortingOrder = 100;
+        }
+
+        debuffOverlay.gameObject.layer = UnwrappedLayer;
+        AspectRatioFitter fitter = debuffOverlay.GetComponent<AspectRatioFitter>();
+        if (fitter != null) fitter.enabled = false;
+        RectTransform rect = debuffOverlay.rectTransform;
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = Vector2.zero;
+        rect.sizeDelta = Vector2.zero;
+        rect.localScale = Vector3.one;
+        debuffOverlay.type = Image.Type.Simple;
+        debuffOverlay.preserveAspect = false;
+        debuffOverlay.useSpriteMesh = false;
+        debuffOverlay.raycastTarget = false;
+    }
+
     private void UpdateDebuffOverlay()
     {
+        EnsureDebuffOverlay();
         if (debuffOverlay == null) return;
         if (duduMovement == null && targetDudu != null)
             duduMovement = targetDudu.GetComponent<DuduSurfaceMovement>();
@@ -244,11 +285,19 @@ public sealed class DuduCameraController : MonoBehaviour
         }
         silhouetteRoot.position = new Vector3(surfaceCenters[surfaceIndex] + local.x, local.y, -0.05f);
         silhouetteRoot.rotation = MapRotation(player3D.transform, targetSurface);
+        float clipMinX = surfaceIndex == 0
+            ? surfaceCenters[surfaceIndex] - targetSurface.Width * 0.5f
+            : (surfaceCenters[surfaceIndex - 1] + surfaceCenters[surfaceIndex]) * 0.5f;
+        float clipMaxX = surfaceIndex == surfaces.Length - 1
+            ? surfaceCenters[surfaceIndex] + targetSurface.Width * 0.5f
+            : (surfaceCenters[surfaceIndex] + surfaceCenters[surfaceIndex + 1]) * 0.5f;
         foreach (Material material in silhouetteMaterials)
         {
             Color color = new Color(0.05f, 0.06f, 0.08f, silhouetteAlpha);
             if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", color);
             if (material.HasProperty("_Color")) material.SetColor("_Color", color);
+            if (material.HasProperty("_ClipMinX")) material.SetFloat("_ClipMinX", clipMinX);
+            if (material.HasProperty("_ClipMaxX")) material.SetFloat("_ClipMaxX", clipMaxX);
         }
     }
 
