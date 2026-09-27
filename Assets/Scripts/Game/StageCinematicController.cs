@@ -33,7 +33,8 @@ public sealed class StageCinematicController : MonoBehaviour
 
     private void Update()
     {
-        if (skipText != null && skipText.gameObject.activeSelf && Keyboard.current != null &&
+        if (!SettingsPopupController.IsAnyOpen && skipText != null &&
+            skipText.gameObject.activeSelf && Keyboard.current != null &&
             Keyboard.current.qKey.wasPressedThisFrame)
         {
             skipRequested = true;

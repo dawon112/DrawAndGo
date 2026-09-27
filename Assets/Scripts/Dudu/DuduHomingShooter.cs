@@ -273,7 +273,8 @@ public sealed class DuduHomingShooter : MonoBehaviour
             audioSource.priority = 64;
             audioSource.volume = 1f;
         }
-        audioSource.PlayOneShot(fireSound != null ? fireSound : GetDefaultFireSound(), fireSoundVolume);
+        audioSource.PlayOneShot(fireSound != null ? fireSound : GetDefaultFireSound(),
+            fireSoundVolume * CoopAudioSettings.SfxVolume);
     }
 
     private static AudioClip GetDefaultFireSound()

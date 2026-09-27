@@ -78,7 +78,7 @@ public sealed class GameViewManager : MonoBehaviour
 
     private void Update()
     {
-        if (CurrentCameraState != CameraState.Gameplay)
+        if (CurrentCameraState != CameraState.Gameplay || SettingsPopupController.IsAnyOpen)
             return;
 
         Keyboard keyboard = Keyboard.current;

@@ -50,8 +50,10 @@ public sealed class Player3DMovement : MonoBehaviour
         Vector2 input = Vector2.zero;
         if (keyboard != null)
         {
-            input.x = (keyboard.dKey.isPressed ? 1f : 0f) - (keyboard.aKey.isPressed ? 1f : 0f);
-            input.y = (keyboard.wKey.isPressed ? 1f : 0f) - (keyboard.sKey.isPressed ? 1f : 0f);
+            input.x = (CoopInputSettings.IsPressed(keyboard, CoopInputAction.HaruRight) ? 1f : 0f)
+                - (CoopInputSettings.IsPressed(keyboard, CoopInputAction.HaruLeft) ? 1f : 0f);
+            input.y = (CoopInputSettings.IsPressed(keyboard, CoopInputAction.HaruForward) ? 1f : 0f)
+                - (CoopInputSettings.IsPressed(keyboard, CoopInputAction.HaruBackward) ? 1f : 0f);
         }
 
         input = Vector2.ClampMagnitude(input, 1f);
@@ -62,7 +64,7 @@ public sealed class Player3DMovement : MonoBehaviour
             if (verticalVelocity < 0f)
                 verticalVelocity = -2f;
 
-            if (keyboard != null && keyboard.spaceKey.wasPressedThisFrame)
+            if (CoopInputSettings.WasPressed(keyboard, CoopInputAction.HaruJump))
                 verticalVelocity = Mathf.Sqrt(jumpHeight * 2f * gravity);
         }
         else

@@ -69,10 +69,17 @@ public sealed class HaruDrawingController : MonoBehaviour
 
     private void Update()
     {
+        if (SettingsPopupController.IsAnyOpen)
+        {
+            EndStroke();
+            ClearSurfaceAim();
+            return;
+        }
+
         Keyboard keyboard = Keyboard.current;
-        if (keyboard != null && keyboard.eKey.wasPressedThisFrame)
+        if (CoopInputSettings.WasPressed(keyboard, CoopInputAction.HaruToolSwitch))
             SetTool(currentTool == DrawingTool.Pen ? DrawingTool.Eraser : DrawingTool.Pen);
-        if (keyboard != null && keyboard.yKey.wasPressedThisFrame)
+        if (CoopInputSettings.WasPressed(keyboard, CoopInputAction.HaruCameraLock))
             SetCameraLock(!cameraLock);
 
         Mouse mouse = Mouse.current;

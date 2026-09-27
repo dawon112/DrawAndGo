@@ -277,12 +277,13 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         Keyboard keyboard = Keyboard.current;
         if (inputEnabled && keyboard != null)
         {
-            bool right = keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed;
-            bool left = keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed;
+            bool right = CoopInputSettings.IsPressed(keyboard, CoopInputAction.DuduRight);
+            bool left = CoopInputSettings.IsPressed(keyboard, CoopInputAction.DuduLeft);
             horizontalInput = (right ? 1f : 0f) - (left ? 1f : 0f);
             if (reverseEffectActive)
                 horizontalInput = -horizontalInput;
-            if (keyboard.spaceKey.wasPressedThisFrame && Time.time - lastGroundedTime < 0.15f)
+            if (CoopInputSettings.WasPressed(keyboard, CoopInputAction.DuduJump) &&
+                Time.time - lastGroundedTime < 0.15f)
                 jumpRequested = true;
         }
 
