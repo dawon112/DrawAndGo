@@ -45,7 +45,6 @@ public sealed class HaruDrawingController : MonoBehaviour
     private bool cameraLock;
     private int strokeLayer;
     private float currentCrayon;
-    private bool crayonDepleted;
 
     public DrawingTool CurrentTool => currentTool;
     public bool CameraLock => cameraLock;
@@ -53,8 +52,10 @@ public sealed class HaruDrawingController : MonoBehaviour
     public Vector3 CurrentSurfaceAimPosition { get; private set; }
     public bool CanDrawAtCurrentAim { get; private set; }
     public bool IsDrawing => isActiveAndEnabled && currentStroke != null && CanDrawAtCurrentAim;
-    public float CrayonNormalized => maxCrayon > 0f ? Mathf.Clamp01(currentCrayon / maxCrayon) : 0f;
-    public bool CanUseCrayon => !crayonDepleted && currentCrayon > 0f;
+    // Crayon is unlimited. Keep these public values full as well so the arm,
+    // gauges and any other external consumers never display depletion.
+    public float CrayonNormalized => 1f;
+    public bool CanUseCrayon => true;
 
     private void Awake()
     {
@@ -129,7 +130,7 @@ public sealed class HaruDrawingController : MonoBehaviour
         else if (Vector3.Distance(lastPoint, point) >= minPointDistance)
         {
             float distance = Vector3.Distance(lastPoint, point);
-            float drawableDistance = Mathf.Min(distance, currentCrayon / consumptionPerWorldUnit);
+            float drawableDistance = distance;
             if (drawableDistance > 0f)
             {
                 Vector3 consumedPoint = Vector3.Lerp(lastPoint, point, drawableDistance / distance);
@@ -143,13 +144,7 @@ public sealed class HaruDrawingController : MonoBehaviour
 
     private void ConsumeCrayon(float amount)
     {
-        if (crayonDepleted || amount <= 0f) return;
-        currentCrayon = Mathf.Max(0f, currentCrayon - amount);
-        if (currentCrayon <= 0f)
-        {
-            currentCrayon = 0f;
-            crayonDepleted = true;
-        }
+        currentCrayon = maxCrayon;
     }
 
     public bool TryGetCurrentSurfaceAim(

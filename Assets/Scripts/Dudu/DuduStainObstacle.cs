@@ -16,6 +16,7 @@ public sealed class DuduStainObstacle : MonoBehaviour
     [Header("Placement")]
     [SerializeField] private DuduSurface surface;
     [SerializeField] private Vector2 surfacePosition = new Vector2(-3f, -2.2f);
+    [SerializeField] private float surfaceNormalOffset;
 
     [Header("Player Effect")]
     [SerializeField] private EffectType effectType;
@@ -29,6 +30,12 @@ public sealed class DuduStainObstacle : MonoBehaviour
         surface = targetSurface;
         surfacePosition = position;
         effectType = type;
+        ApplySurfaceTransform();
+    }
+
+    public void SetSurfaceNormalOffset(float offset)
+    {
+        surfaceNormalOffset = offset;
         ApplySurfaceTransform();
     }
 
@@ -83,7 +90,7 @@ public sealed class DuduStainObstacle : MonoBehaviour
             return;
 
         transform.SetPositionAndRotation(
-            surface.SurfaceToWorld(surfacePosition),
+            surface.SurfaceToWorld(surfacePosition) + surface.Normal.normalized * surfaceNormalOffset,
             surface.transform.rotation);
     }
 

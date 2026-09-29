@@ -13,6 +13,9 @@ public sealed class DrawingSurface : MonoBehaviour
 
     private void Awake()
     {
+        int drawingLayer = LayerMask.NameToLayer("DrawingSurface");
+        if (drawingLayer >= 0)
+            gameObject.layer = drawingLayer;
         duduSurface = GetComponent<DuduSurface>();
     }
 

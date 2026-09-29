@@ -83,6 +83,11 @@ public sealed class DuduCameraController : MonoBehaviour
     {
         CornerRoomLevel level = FindAnyObjectByType<CornerRoomLevel>();
         surfaces = level != null ? level.surfaces : null;
+        if (surfaces == null || surfaces.Length == 0)
+        {
+            TutorialRoomLevel tutorialLevel = FindAnyObjectByType<TutorialRoomLevel>();
+            surfaces = tutorialLevel != null ? tutorialLevel.Sections : null;
+        }
         if (surfaces == null || surfaces.Length == 0) return;
 
         surfaceCenters = new float[surfaces.Length];

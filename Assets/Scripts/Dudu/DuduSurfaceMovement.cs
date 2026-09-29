@@ -45,6 +45,7 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
     private float surfaceDepth;
     private bool inputEnabled;
     private bool jumpRequested;
+    private bool jumpConsumedUntilLanding;
     private float lastGroundedTime = float.NegativeInfinity;
     private float bounceHorizontalSpeed;
     private float bounceControlUntil = float.NegativeInfinity;
@@ -127,6 +128,7 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
 
         body.linearVelocity = right * bounceHorizontalSpeed + up * verticalSpeed;
         jumpRequested = false;
+        jumpConsumedUntilLanding = true;
         lastGroundedTime = float.NegativeInfinity;
     }
 
@@ -208,8 +210,14 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
             horizontalInput = (right ? 1f : 0f) - (left ? 1f : 0f);
             if (reverseEffectActive)
                 horizontalInput = -horizontalInput;
-            if (keyboard.spaceKey.wasPressedThisFrame && Time.time - lastGroundedTime < 0.15f)
+            if (keyboard.spaceKey.wasPressedThisFrame && !jumpConsumedUntilLanding &&
+                Time.time - lastGroundedTime < 0.15f)
+            {
                 jumpRequested = true;
+                // Lock immediately in Update. Ground contacts can linger for one physics
+                // tick after takeoff, so time-since-grounded alone can allow a second jump.
+                jumpConsumedUntilLanding = true;
+            }
         }
 
         if (spriteRenderer != null && horizontalInput != 0f)
@@ -310,6 +318,7 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
             // Stay on the verified support without repeated height corrections
             // or gravity-induced sliding while the player is not walking.
             verticalSpeed = 0f;
+            jumpConsumedUntilLanding = false;
             lastGroundedTime = Time.time;
             return true;
         }
@@ -358,6 +367,7 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         if (step > 0.0001f)
             body.position += lift;
         verticalSpeed = (rise - step) / Time.fixedDeltaTime;
+        jumpConsumedUntilLanding = false;
         lastGroundedTime = Time.time;
         return true;
     }
@@ -483,6 +493,7 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         body.linearVelocity = Vector3.zero;
         body.angularVelocity = Vector3.zero;
         jumpRequested = false;
+        jumpConsumedUntilLanding = false;
         lastGroundedTime = float.NegativeInfinity;
         bounceHorizontalSpeed = 0f;
         wasFollowingDrawnLine = false;
@@ -499,10 +510,10 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         if (spriteRenderer == null || currentSurface == null)
             return;
 
-        // The final doorway pieces extend in front of the surface plane.
-        // Move only the sprite toward the visible side; physics stays on the original plane.
+        // Keep the sprite in front of the wall's inner face in Haru's 3D view.
+        // Physics remains on the authored surface plane.
         Vector3 localPosition = spriteRenderer.transform.localPosition;
-        localPosition.z = currentSurface.nextSurface == null ? -FinalSurfaceVisualOffset : 0f;
+        localPosition.z = -FinalSurfaceVisualOffset;
         spriteRenderer.transform.localPosition = localPosition;
     }
 
@@ -512,6 +523,7 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
             return;
 
         Vector3 up = currentSurface.Up.normalized;
+        float upwardSpeed = body != null ? Vector3.Dot(body.linearVelocity, up) : 0f;
         float minimumGroundDot = collision.collider.GetComponentInParent<DrawingStroke>() != null
             ? Mathf.Cos(maxWalkableSlopeAngle * Mathf.Deg2Rad)
             : 0.35f;
@@ -519,6 +531,10 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         {
             if (Vector3.Dot(contact.normal, up) >= minimumGroundDot)
             {
+                // Do not treat the lingering takeoff contact as a new landing.
+                if (jumpConsumedUntilLanding && upwardSpeed > 0.05f)
+                    continue;
+                jumpConsumedUntilLanding = false;
                 lastGroundedTime = Time.time;
                 break;
             }

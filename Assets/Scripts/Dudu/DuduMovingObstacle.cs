@@ -23,6 +23,7 @@ public sealed class DuduMovingObstacle : MonoBehaviour
     [SerializeField, Min(0.1f)] private float roundTripDuration = 3f;
     [Tooltip("Delay before the obstacle starts moving.")]
     [SerializeField, Min(0f)] private float startDelay;
+    [SerializeField] private float surfaceNormalOffset;
 
     [Header("Dudu Bounce")]
     [Tooltip("Horizontal speed applied to Dudu when hit.")]
@@ -49,6 +50,12 @@ public sealed class DuduMovingObstacle : MonoBehaviour
         travelDistance = Mathf.Max(0f, distance);
         roundTripDuration = Mathf.Max(0.1f, duration);
         startDelay = Mathf.Max(0f, delay);
+        ApplyPosition(GetPositionAtProgress(0f));
+    }
+
+    public void SetSurfaceNormalOffset(float offset)
+    {
+        surfaceNormalOffset = offset;
         ApplyPosition(GetPositionAtProgress(0f));
     }
 
@@ -92,7 +99,8 @@ public sealed class DuduMovingObstacle : MonoBehaviour
         float movementTime = Mathf.Max(0f, elapsedTime - startDelay);
         float halfTripDuration = roundTripDuration * 0.5f;
         float progress = Mathf.PingPong(movementTime / halfTripDuration, 1f);
-        Vector3 targetPosition = surface.SurfaceToWorld(GetPositionAtProgress(progress));
+        Vector3 targetPosition = surface.SurfaceToWorld(GetPositionAtProgress(progress)) +
+            surface.Normal.normalized * surfaceNormalOffset;
 
         body.MovePosition(targetPosition);
         body.MoveRotation(surface.transform.rotation);
@@ -124,7 +132,7 @@ public sealed class DuduMovingObstacle : MonoBehaviour
             return;
 
         transform.SetPositionAndRotation(
-            surface.SurfaceToWorld(position),
+            surface.SurfaceToWorld(position) + surface.Normal.normalized * surfaceNormalOffset,
             surface.transform.rotation);
     }
 

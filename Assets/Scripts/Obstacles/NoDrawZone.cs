@@ -5,6 +5,7 @@ using UnityEngine;
 [RequireComponent(typeof(BoxCollider))]
 public sealed class NoDrawZone : MonoBehaviour
 {
+    private const float VisibleSurfaceOffset = 0.08f;
     [SerializeField] private DuduSurface surface;
     private BoxCollider zoneCollider;
     private static readonly List<NoDrawZone> ActiveZones = new List<NoDrawZone>();
@@ -78,7 +79,7 @@ public sealed class NoDrawZone : MonoBehaviour
         {
             Vector2 position = surface.WorldToSurface(placedPosition);
             transform.SetPositionAndRotation(
-                surface.SurfaceToWorld(position) + surface.Normal.normalized * 0.012f,
+                surface.SurfaceToWorld(position) + surface.Normal.normalized * VisibleSurfaceOffset,
                 surface.transform.rotation);
         }
     }

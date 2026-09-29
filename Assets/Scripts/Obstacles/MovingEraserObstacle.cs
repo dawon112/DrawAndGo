@@ -13,7 +13,7 @@ public sealed class MovingEraserObstacle : MonoBehaviour
     [SerializeField, Min(0f)] private float attackRange = 7f;
     [SerializeField, Min(0.1f)] private float moveSpeed = 5f;
     [SerializeField, Min(0.01f)] private float eraseRadius = 0.22f;
-    [SerializeField, Min(0.01f)] private float visualOffset = 0.025f;
+    [SerializeField] private float visualOffset = 0.025f;
     [Tooltip("Slightly smaller than the visual collider for fair near-misses.")]
     [SerializeField, Range(0.5f, 1f)] private float hitboxScale = 0.8f;
     [Tooltip("Rotation offset that aligns the sprite's long axis with its launch direction.")]
@@ -26,6 +26,13 @@ public sealed class MovingEraserObstacle : MonoBehaviour
     private Vector2 launchDirection = Vector2.right;
     private float aimElapsed;
     private bool launched;
+
+    public void SetSurfaceNormalOffset(float offset)
+    {
+        visualOffset = offset;
+        if (surface != null)
+            transform.position = SurfaceToWorld(surfacePosition);
+    }
 
     private void Awake()
     {
@@ -179,7 +186,6 @@ public sealed class MovingEraserObstacle : MonoBehaviour
         attackRange = Mathf.Max(0f, attackRange);
         moveSpeed = Mathf.Max(0.1f, moveSpeed);
         eraseRadius = Mathf.Max(0.01f, eraseRadius);
-        visualOffset = Mathf.Max(0.01f, visualOffset);
         hitboxScale = Mathf.Clamp(hitboxScale, 0.5f, 1f);
     }
 }

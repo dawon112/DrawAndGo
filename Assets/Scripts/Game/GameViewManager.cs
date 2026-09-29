@@ -21,6 +21,7 @@ public sealed class GameViewManager : MonoBehaviour
     private bool splitSequenceActive;
     private Canvas exitInstructionCanvas;
     private StageCinematicController stageCinematic;
+    private TutorialRoomLevel tutorialClearLevel;
     public CameraState CurrentCameraState { get; private set; }
 
     private void Awake()
@@ -78,6 +79,14 @@ public sealed class GameViewManager : MonoBehaviour
         StartCoroutine(PlaySplitScreenSequence());
     }
 
+    public void PlayAllStarsCollectedSequence(TutorialRoomLevel level)
+    {
+        if (splitSequencePlayed || level == null) return;
+        tutorialClearLevel = level;
+        splitSequencePlayed = true;
+        StartCoroutine(PlaySplitScreenSequence());
+    }
+
     public void HideExitInstruction()
     {
         if (exitInstructionCanvas != null) exitInstructionCanvas.enabled = false;
@@ -117,7 +126,8 @@ public sealed class GameViewManager : MonoBehaviour
         splitSequenceActive = false;
         SetDuduMode(false);
         CornerRoomLevel level = FindAnyObjectByType<CornerRoomLevel>();
-        if (level != null) stageCinematic.PlayClear(level);
+        if (tutorialClearLevel != null) stageCinematic.PlayTutorialDoorOpen(tutorialClearLevel);
+        else if (level != null) stageCinematic.PlayClear(level);
         else
         {
             CurrentCameraState = CameraState.Gameplay;
@@ -140,6 +150,12 @@ public sealed class GameViewManager : MonoBehaviour
     }
 
     public void FinishIntro()
+    {
+        CurrentCameraState = CameraState.Gameplay;
+        SetDuduMode(false);
+    }
+
+    public void FinishTutorialDoorSequence()
     {
         CurrentCameraState = CameraState.Gameplay;
         SetDuduMode(false);

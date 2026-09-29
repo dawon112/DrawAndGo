@@ -57,6 +57,11 @@ public sealed class StageCinematicController : MonoBehaviour
         if (!clearPlaying && level != null) StartCoroutine(ClearRoutine(level));
     }
 
+    public void PlayTutorialDoorOpen(TutorialRoomLevel level)
+    {
+        if (!clearPlaying && level != null) StartCoroutine(TutorialDoorRoutine(level));
+    }
+
     private void BuildCameraAndFade()
     {
         Transform existing = transform.Find("StageCinematicCamera");
@@ -201,6 +206,53 @@ public sealed class StageCinematicController : MonoBehaviour
         Debug.Log("Stage Clear Complete", level);
     }
 
+    private IEnumerator TutorialDoorRoutine(TutorialRoomLevel level)
+    {
+        clearPlaying = true;
+        BeginSkippableCinematic();
+        manager.EnterCinematic(GameViewManager.CameraState.ClearCinematic);
+        manager.ShowHaruCameraWithoutInput();
+        ActivateCinematic();
+        cinematicCamera.transform.SetPositionAndRotation(haruCamera.transform.position, haruCamera.transform.rotation);
+        Vector3 center = DoorCenter(level.Door);
+        Transform focus = CreateLookPoint(transform, "TutorialDoorCameraPoint", center,
+            DoorFrontPosition(center, level.FinalSurface, 6f));
+        GameObject whiteBeyond = BuildWhiteBeyondDoor(center, focus.position);
+        yield return MoveCamera(focus.position, focus.rotation, 58f, introBlendDuration);
+        if (skipRequested) { FinishTutorialDoorImmediately(level, whiteBeyond); yield break; }
+        yield return WaitOrSkip(doorFocusTime);
+        if (skipRequested) { FinishTutorialDoorImmediately(level, whiteBeyond); yield break; }
+
+        Vector3 zoomPosition = Vector3.Lerp(focus.position, center, 0.38f);
+        float elapsed = 0f;
+        bool opened = false;
+        Vector3 startPosition = cinematicCamera.transform.position;
+        Quaternion startRotation = cinematicCamera.transform.rotation;
+        while (elapsed < doorZoomDuration)
+        {
+            if (skipRequested) { FinishTutorialDoorImmediately(level, whiteBeyond); yield break; }
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / doorZoomDuration));
+            cinematicCamera.transform.position = Vector3.Lerp(startPosition, zoomPosition, t);
+            cinematicCamera.transform.rotation = Quaternion.Slerp(startRotation, focus.rotation, t);
+            cinematicCamera.fieldOfView = Mathf.Lerp(58f, 42f, t);
+            if (!opened && elapsed >= doorOpenTiming)
+            {
+                opened = true;
+                whiteBeyond.SetActive(true);
+                level.OpenDoorForCinematic();
+            }
+            yield return null;
+        }
+        if (!opened)
+        {
+            whiteBeyond.SetActive(true);
+            level.OpenDoorForCinematic();
+        }
+        yield return WaitOrSkip(openedDoorHoldTime);
+        FinishTutorialDoorImmediately(level, whiteBeyond);
+    }
+
     private IEnumerator MoveIntoDoorAndFade(Vector3 doorCenter, Quaternion doorRotation)
     {
         Vector3 start = cinematicCamera.transform.position;
@@ -262,6 +314,17 @@ public sealed class StageCinematicController : MonoBehaviour
         Debug.Log("Stage Clear Complete (cinematic skipped)", level);
     }
 
+    private void FinishTutorialDoorImmediately(TutorialRoomLevel level, GameObject whiteBeyond)
+    {
+        if (whiteBeyond != null) whiteBeyond.SetActive(true);
+        level.OpenDoorForCinematic();
+        if (whiteBeyond != null) Destroy(whiteBeyond);
+        cinematicCamera.gameObject.SetActive(false);
+        EndSkippableCinematic();
+        manager.FinishTutorialDoorSequence();
+        clearPlaying = false;
+    }
+
     private void ActivateCinematic()
     {
         if (haruCamera != null) haruCamera.gameObject.SetActive(false);
@@ -299,6 +362,12 @@ public sealed class StageCinematicController : MonoBehaviour
         return renderer != null ? renderer.bounds.center : level.door.transform.position;
     }
 
+    private static Vector3 DoorCenter(GameObject door)
+    {
+        Renderer renderer = door != null ? door.GetComponent<Renderer>() : null;
+        return renderer != null ? renderer.bounds.center : door.transform.position;
+    }
+
     private Vector3 DoorViewPosition(CornerRoomLevel level, float distance)
     {
         Vector3 center = DoorCenter(level);
@@ -311,6 +380,13 @@ public sealed class StageCinematicController : MonoBehaviour
     {
         Vector3 center = DoorCenter(level);
         Vector3 normal = level.surfaces[4].Normal.normalized;
+        if (Vector3.Dot(haruMovement.transform.position - center, normal) < 0f) normal = -normal;
+        return center + normal * distance;
+    }
+
+    private Vector3 DoorFrontPosition(Vector3 center, DuduSurface surface, float distance)
+    {
+        Vector3 normal = surface != null ? surface.Normal.normalized : Vector3.forward;
         if (Vector3.Dot(haruMovement.transform.position - center, normal) < 0f) normal = -normal;
         return center + normal * distance;
     }

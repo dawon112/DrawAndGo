@@ -16,13 +16,8 @@ public sealed class CrayonGaugeUI : MonoBehaviour
     public void SetAmount(float normalizedAmount, bool recharging)
     {
         Build();
-        float amount = Mathf.Clamp01(normalizedAmount);
-        fill.sizeDelta = new Vector2(254f * amount, 22f);
-        label.text = recharging && amount <= 0f
-            ? "CRAYON 0%  EMPTY"
-            : recharging && amount < 1f
-                ? $"CRAYON {Mathf.RoundToInt(amount * 100f)}%  RECHARGING"
-                : $"CRAYON {Mathf.RoundToInt(amount * 100f)}%";
+        fill.sizeDelta = new Vector2(254f, 22f);
+        label.text = "CRAYON ∞";
     }
 
     public void SetSplitScreenLayout(bool split)
