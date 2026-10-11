@@ -22,6 +22,7 @@ public sealed class GameViewManager : MonoBehaviour
     private Canvas exitInstructionCanvas;
     private StageCinematicController stageCinematic;
     public CameraState CurrentCameraState { get; private set; }
+    public bool IsHaruGameplayView => CurrentCameraState == CameraState.Gameplay && !duduMode;
 
     private void Awake()
     {
@@ -32,6 +33,7 @@ public sealed class GameViewManager : MonoBehaviour
         if (stageCinematic == null) stageCinematic = gameObject.AddComponent<StageCinematicController>();
         stageCinematic.Configure(this, haruCamera, haruMovement, haruLook, duduCamera,
             duduMovement, haruDrawing, crosshair);
+        ConfigureDuduPositionIndicator();
     }
 
     private static void EnsureAudioListener(Camera targetCamera)
@@ -52,6 +54,14 @@ public sealed class GameViewManager : MonoBehaviour
         haruLook = newHaruLook;
         duduCamera = newDuduCamera;
         duduMovement = newDuduMovement;
+        ConfigureDuduPositionIndicator();
+    }
+
+    private void ConfigureDuduPositionIndicator()
+    {
+        DuduPositionIndicator indicator = GetComponent<DuduPositionIndicator>();
+        if (indicator == null) indicator = gameObject.AddComponent<DuduPositionIndicator>();
+        indicator.Configure(this, haruCamera, duduMovement);
     }
 
     private void Start()
