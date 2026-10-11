@@ -1,7 +1,6 @@
 using System;
 using System.Threading.Tasks;
 using Unity.Services.Multiplayer;
-using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -13,30 +12,6 @@ public sealed class GameSession : MonoBehaviour
     public bool IsHost { get; private set; }
 
     private ISession session;
-    private bool leaving;
-
-    public void LeaveToTitle()
-    {
-        if (!leaving) _ = LeaveToTitleAsync();
-    }
-
-    private async Task LeaveToTitleAsync()
-    {
-        leaving = true;
-        ISession closing = session;
-        session = null;
-        if (closing != null)
-        {
-            closing.Deleted -= OnSessionEnded;
-            closing.RemovedFromSession -= OnSessionEnded;
-            await CloseAsync(closing);
-        }
-
-        if (NetworkManager.Singleton != null) NetworkManager.Singleton.Shutdown();
-        SceneManager.LoadScene("TitleScene");
-        Destroy(gameObject);
-    }
-
     public static void Keep(ISession activeSession)
     {
         GameObject holder = new GameObject("Game Session");

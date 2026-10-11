@@ -28,6 +28,7 @@ public sealed class SettingsPopupController : MonoBehaviour
     private bool waitingForKey;
     private CoopInputAction waitingAction;
     private TMP_Text waitingLabel;
+    private TMP_Text microphoneLabel;
 
     private void Awake()
     {
@@ -98,6 +99,7 @@ public sealed class SettingsPopupController : MonoBehaviour
         TMP_Text micLabel = micButton != null ? micButton.GetComponentInChildren<TMP_Text>(true) : null;
         if (micButton != null && micLabel != null)
         {
+            microphoneLabel = micLabel;
             micLabel.text = CoopAudioSettings.MicEnabled ? "ON" : "OFF";
             micButton.onClick.AddListener(() =>
             {
@@ -144,6 +146,9 @@ public sealed class SettingsPopupController : MonoBehaviour
 
     private void Update()
     {
+        if (microphoneLabel != null)
+            microphoneLabel.text = CoopAudioSettings.MicEnabled ? "ON" : "OFF";
+
         Keyboard keyboard = Keyboard.current;
         if (keyboard == null) return;
 
@@ -203,7 +208,10 @@ public sealed class SettingsPopupController : MonoBehaviour
     private void HookPage(Page page, UnityAction left, UnityAction right)
     {
         Transform pageTransform = pages[(int)page].transform;
-        HookButton(pageTransform, "CloseButton", Close);
+        if (page == Page.HaruControls || page == Page.DuduControls)
+            HookButton(pageTransform, "CloseButton", () => ShowPage(Page.ControlSelect));
+        else
+            HookButton(pageTransform, "CloseButton", Close);
         HookButton(pageTransform, "LeftArrowButton", left);
         HookButton(pageTransform, "RightArrowButton", right);
     }

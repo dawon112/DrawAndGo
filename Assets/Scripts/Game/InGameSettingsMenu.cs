@@ -1,5 +1,4 @@
 using TMPro;
-using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -11,6 +10,8 @@ using UnityEngine.UI;
 public sealed class InGameSettingsMenu : MonoBehaviour
 {
     private SettingsPopupController popup;
+    private RawImage microphoneIndicator;
+    private TMP_Text microphoneStatusText;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Initialize()
@@ -53,8 +54,7 @@ public sealed class InGameSettingsMenu : MonoBehaviour
             return;
         }
 
-        GameObject instance = Instantiate(prefab, transform, false);
-        popup = instance.GetComponent<SettingsPopupController>();
+        popup = Instantiate(prefab, transform, false).GetComponent<SettingsPopupController>();
         if (popup == null)
         {
             Debug.LogError("SettingsPopupController is missing from the prefab.", this);
@@ -62,18 +62,13 @@ public sealed class InGameSettingsMenu : MonoBehaviour
             return;
         }
 
-        foreach (string pageName in new[]
-        {
-            "SoundPage", "DisplayPage", "ControlSelectPage", "HaruControlsPage", "DuduControlsPage"
-        })
-        {
-            Transform page = instance.transform.Find(pageName);
-            if (page != null) AddLeaveButton(page);
-        }
+        CreateMicrophoneIndicator();
     }
 
     private void LateUpdate()
     {
+        UpdateMicrophoneIndicator();
+
         Keyboard keyboard = Keyboard.current;
         if (popup == null || popup.gameObject.activeSelf || keyboard == null ||
             !keyboard.escapeKey.wasPressedThisFrame ||
@@ -84,49 +79,66 @@ public sealed class InGameSettingsMenu : MonoBehaviour
         Cursor.visible = true;
     }
 
-    private void AddLeaveButton(Transform page)
+    private void CreateMicrophoneIndicator()
     {
-        GameObject holder = new GameObject("LeaveRoomButton", typeof(RectTransform),
-            typeof(Image), typeof(Button));
-        holder.transform.SetParent(page, false);
+        GameObject holder = new GameObject("Microphone Status", typeof(RectTransform), typeof(RawImage));
+        holder.transform.SetParent(transform, false);
         RectTransform rect = holder.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0.5f, 0.5f);
-        rect.anchorMax = new Vector2(0.5f, 0.5f);
-        rect.anchoredPosition = new Vector2(0f, -275f);
-        rect.sizeDelta = new Vector2(240f, 58f);
+        rect.anchorMin = rect.anchorMax = new Vector2(1f, 1f);
+        rect.pivot = new Vector2(1f, 1f);
+        rect.anchoredPosition = new Vector2(-20f, -20f);
+        rect.sizeDelta = new Vector2(140f, 38f);
+        RawImage background = holder.GetComponent<RawImage>();
+        background.texture = Texture2D.whiteTexture;
+        background.color = new Color(0.12f, 0.12f, 0.12f, 0.75f);
+        background.raycastTarget = false;
 
-        Image image = holder.GetComponent<Image>();
-        image.color = Color.clear;
-        Button button = holder.GetComponent<Button>();
-        button.transition = Selectable.Transition.None;
-        button.onClick.AddListener(LeaveRoom);
+        GameObject dot = new GameObject("Recording Light", typeof(RectTransform), typeof(RawImage));
+        dot.transform.SetParent(holder.transform, false);
+        RectTransform dotRect = dot.GetComponent<RectTransform>();
+        dotRect.anchorMin = dotRect.anchorMax = new Vector2(0f, 0.5f);
+        dotRect.pivot = new Vector2(0f, 0.5f);
+        dotRect.anchoredPosition = new Vector2(11f, 0f);
+        dotRect.sizeDelta = new Vector2(15f, 15f);
+        microphoneIndicator = dot.GetComponent<RawImage>();
+        microphoneIndicator.texture = Texture2D.whiteTexture;
+        microphoneIndicator.raycastTarget = false;
 
-        GameObject textObject = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
-        textObject.transform.SetParent(holder.transform, false);
-        RectTransform textRect = textObject.GetComponent<RectTransform>();
-        textRect.anchorMin = Vector2.zero;
-        textRect.anchorMax = Vector2.one;
-        textRect.offsetMin = Vector2.zero;
-        textRect.offsetMax = Vector2.zero;
-        TextMeshProUGUI label = textObject.GetComponent<TextMeshProUGUI>();
-        TMP_Text reference = page.GetComponentInChildren<TMP_Text>(true);
-        if (reference != null) label.font = reference.font;
-        label.text = "방 나가기";
-        label.fontSize = 30f;
-        label.alignment = TextAlignmentOptions.Center;
-        label.color = new Color(0.76f, 0.40f, 0.18f);
-        label.raycastTarget = false;
+        GameObject label = new GameObject("MIC Status", typeof(RectTransform), typeof(TextMeshProUGUI));
+        label.transform.SetParent(holder.transform, false);
+        RectTransform labelRect = label.GetComponent<RectTransform>();
+        labelRect.anchorMin = Vector2.zero;
+        labelRect.anchorMax = Vector2.one;
+        labelRect.offsetMin = new Vector2(34f, 0f);
+        labelRect.offsetMax = Vector2.zero;
+        microphoneStatusText = label.GetComponent<TMP_Text>();
+        Transform micButton = popup.transform.Find("SoundPage/MicRow/MicOnButton");
+        TMP_Text existingLabel = micButton != null ? micButton.GetComponentInChildren<TMP_Text>(true) : null;
+        if (existingLabel != null) microphoneStatusText.font = existingLabel.font;
+        microphoneStatusText.fontSize = 19f;
+        microphoneStatusText.alignment = TextAlignmentOptions.MidlineLeft;
+        microphoneStatusText.color = Color.white;
+        microphoneStatusText.raycastTarget = false;
     }
 
-    private void LeaveRoom()
+    private void UpdateMicrophoneIndicator()
     {
-        if (GameSession.Current != null)
+        if (microphoneIndicator == null) return;
+        if (CoopVoiceChat.IsMicrophoneRecording)
         {
-            GameSession.Current.LeaveToTitle();
-            return;
+            microphoneIndicator.color = new Color(0.24f, 0.83f, 0.35f);
+            microphoneStatusText.text = "MIC ON";
         }
-
-        if (NetworkManager.Singleton != null) NetworkManager.Singleton.Shutdown();
-        SceneManager.LoadScene("TitleScene");
+        else if (CoopAudioSettings.MicEnabled)
+        {
+            microphoneIndicator.color = new Color(1f, 0.72f, 0.25f);
+            microphoneStatusText.text = "MIC WAIT";
+        }
+        else
+        {
+            microphoneIndicator.color = new Color(0.55f, 0.55f, 0.55f);
+            microphoneStatusText.text = "MIC OFF";
+        }
     }
+
 }
