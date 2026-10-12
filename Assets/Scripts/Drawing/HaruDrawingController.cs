@@ -47,6 +47,7 @@ public sealed class HaruDrawingController : MonoBehaviour
     private float currentCrayon;
 
     public DrawingTool CurrentTool => currentTool;
+    public event System.Action<int> StrokeErased;
     public bool CameraLock => cameraLock;
     public bool HasValidSurfaceAim { get; private set; }
     public Vector3 CurrentSurfaceAimPosition { get; private set; }
@@ -257,8 +258,9 @@ public sealed class HaruDrawingController : MonoBehaviour
         DrawingStroke[] strokes = root.GetComponentsInChildren<DrawingStroke>(false);
         foreach (DrawingStroke stroke in strokes)
         {
-            if (stroke != null && stroke.TryGetSqrDistance(point, eraserRadius, out _))
-                stroke.Erase(point, eraserRadius);
+            if (stroke != null && stroke.TryGetSqrDistance(point, eraserRadius, out _) &&
+                stroke.Erase(point, eraserRadius))
+                StrokeErased?.Invoke(stroke.SourceStrokeId);
         }
     }
 

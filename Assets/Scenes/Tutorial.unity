@@ -4238,7 +4238,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TutorialRoomLevel
   sections:
-  - {fileID: 0}
+  - {fileID: 2023662545}
   - {fileID: 1224434321}
   - {fileID: 572013454}
   - {fileID: 1663880138}
@@ -4645,7 +4645,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9f7aeb6a844e9cc4a91af85f2ff2ea49, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DuduSurfaceMovement
-  currentSurface: {fileID: 0}
+  currentSurface: {fileID: 2023662545}
   characterHalfSize: {x: 0.4, y: 0.75}
   surfacePosition: {x: -9, y: -1.65}
   moveSpeed: 4
@@ -4800,7 +4800,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 72f933b0620d8d94da756b8799ae4db6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DuduCameraController
-  targetSurface: {fileID: 0}
+  targetSurface: {fileID: 2023662545}
   targetDudu: {fileID: 2047065432}
   cameraDistance: 10
   orthographicSize: 3.5
@@ -5152,6 +5152,57 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!1 &3100000001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 3100000002}
+  - component: {fileID: 3100000003}
+  m_Layer: 0
+  m_Name: TutorialManager
+  m_TagString: Untagged
+  m_IsActive: 1
+--- !u!4 &3100000002
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3100000001}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 0}
+--- !u!114 &3100000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3100000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 12cb5ce3e6de4484b5d58f5470a07d01, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialSequenceController
+  haru: {fileID: 820480126}
+  haruLook: {fileID: 1100589744}
+  haruCamera: {fileID: 1100589745}
+  dudu: {fileID: 2047065434}
+  surface: {fileID: 2023662545}
+  drawingRoot: {fileID: 3000000005}
+  originalStartLine: {fileID: 1028374874}
+  requiredMoveDistance: 2
+  requiredMouseDelta: 180
+  gapLeft: -3
+  gapRight: 2.2
+  groundSurfaceY: -2.33
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -5161,3 +5212,4 @@ SceneRoots:
   - {fileID: 911315875}
   - {fileID: 3000000005}
   - {fileID: 1678319094}
+  - {fileID: 3100000002}

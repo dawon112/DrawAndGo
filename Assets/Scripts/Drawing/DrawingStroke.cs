@@ -21,9 +21,13 @@ public sealed class DrawingStroke : MonoBehaviour
     private Color fadeStartColor;
     private Color fadeEndColor;
     private static int splitNumber;
+    private static int nextSourceStrokeId;
     private readonly List<BoxCollider> colliderSegments = new List<BoxCollider>();
 
     public int PointCount => lineRenderer != null ? lineRenderer.positionCount : 0;
+    public bool IsFinished => isFinished;
+    // Erased fragments retain their source identity for scene-local objectives.
+    public int SourceStrokeId { get; private set; }
 
     public void Initialize(
         Material material,
@@ -57,6 +61,7 @@ public sealed class DrawingStroke : MonoBehaviour
         int newStrokeLayer)
     {
         lineRenderer = GetComponent<LineRenderer>();
+        SourceStrokeId = ++nextSourceStrokeId;
         strokeMaterial = material;
         strokeWidth = width;
         strokeColor = color;
@@ -254,6 +259,7 @@ public sealed class DrawingStroke : MonoBehaviour
                 surfaceNormal,
                 strokeLayer);
             part.FinishDrawing();
+            part.SourceStrokeId = SourceStrokeId;
         }
 
         Destroy(gameObject);
