@@ -4241,11 +4241,13 @@ MonoBehaviour:
   - {fileID: 2023662545}
   - {fileID: 1224434321}
   - {fileID: 572013454}
+  - {fileID: 1937930047}
   - {fileID: 1663880138}
   - {fileID: 573113355}
+  - {fileID: 822351890}
   stars: []
-  lockedDoor: {fileID: 0}
-  dudu: {fileID: 0}
+  lockedDoor: {fileID: 9196311}
+  dudu: {fileID: 2047065434}
 --- !u!1 &1931553496
 GameObject:
   m_ObjectHideFlags: 0
@@ -5203,6 +5205,14 @@ MonoBehaviour:
   gapLeft: -3
   gapRight: 2.2
   groundSurfaceY: -2.33
+  tutorialRoom: {fileID: 1678319095}
+  lastSurface: {fileID: 822351890}
+  secondRouteLine: {fileID: 1531181261}
+  finalTestRouteLine: {fileID: 664233415}
+  starPrefab: {fileID: 7055341935932436929, guid: 076aac55cf4f6a84caa8132dccb80c40, type: 3}
+  knockbackPrefab: {fileID: 184948602, guid: b33e0cd768f3482eb6fdccddf0eb934b, type: 3}
+  slowPrefab: {fileID: 922511671, guid: 132f8c025d1043039fea0acc9c5d66c9, type: 3}
+  windPrefab: {fileID: 5202116702491237219, guid: c6eb9ee828ed8e04f9017350c08ea014, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

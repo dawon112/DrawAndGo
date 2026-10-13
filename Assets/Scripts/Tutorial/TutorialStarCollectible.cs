@@ -44,8 +44,11 @@ public sealed class TutorialStarCollectible : MonoBehaviour
         if (level == null)
             return;
 
+        TutorialSequenceController sequence = FindAnyObjectByType<TutorialSequenceController>();
+        if (sequence != null && !sequence.CanCollectStar(this))
+            return;
+        if (!level.CollectStar(this)) return;
         collected = true;
-        level.CollectStar(this);
         gameObject.SetActive(false);
     }
 }

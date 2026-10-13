@@ -54,6 +54,7 @@ public sealed partial class TutorialSequenceController
             eraseHighlight.SetActive(false);
             replacementHighlight.SetActive(false);
             eraseSuccessTrigger.SetActive(false);
+            BeginObstacleTutorial();
             return;
         }
         if (CurrentErasePhase != ErasePhase.WaitingForArea) return;

@@ -39,6 +39,11 @@ public sealed class DuduStainObstacle : MonoBehaviour
         ApplySurfaceTransform();
     }
 
+    public void SetEffectDuration(float duration)
+    {
+        effectDuration = Mathf.Max(0f, duration);
+    }
+
     private void Awake()
     {
         GetComponent<Collider>().isTrigger = true;
@@ -64,7 +69,7 @@ public sealed class DuduStainObstacle : MonoBehaviour
 
     private void Update()
     {
-        occupants.RemoveWhere(dudu => dudu == null);
+        occupants.RemoveWhere(dudu => dudu == null || dudu.CurrentSurface != surface);
         foreach (DuduSurfaceMovement dudu in occupants)
             ApplyEffect(dudu);
     }
@@ -72,7 +77,7 @@ public sealed class DuduStainObstacle : MonoBehaviour
     private void TrackOccupant(Collider other)
     {
         DuduSurfaceMovement dudu = other.GetComponentInParent<DuduSurfaceMovement>();
-        if (dudu == null) return;
+        if (dudu == null || dudu.CurrentSurface != surface) return;
         occupants.Add(dudu);
         ApplyEffect(dudu);
     }

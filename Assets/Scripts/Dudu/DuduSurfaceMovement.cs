@@ -523,12 +523,21 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
             return;
 
         Vector3 up = currentSurface.Up.normalized;
+        Vector3 right = currentSurface.Right.normalized;
         float upwardSpeed = body != null ? Vector3.Dot(body.linearVelocity, up) : 0f;
         float minimumGroundDot = collision.collider.GetComponentInParent<DrawingStroke>() != null
             ? Mathf.Cos(maxWalkableSlopeAngle * Mathf.Deg2Rad)
             : 0.35f;
         foreach (ContactPoint contact in collision.contacts)
         {
+            if (Time.time < bounceControlUntil &&
+                Vector3.Dot(contact.normal, right) * bounceHorizontalSpeed < -0.3f)
+            {
+                // A wall has stopped the knockback. Release forced movement so
+                // it cannot drive Dudu into the same collider every physics tick.
+                bounceHorizontalSpeed = 0f;
+                bounceControlUntil = Time.time;
+            }
             if (Vector3.Dot(contact.normal, up) >= minimumGroundDot)
             {
                 // Do not treat the lingering takeoff contact as a new landing.

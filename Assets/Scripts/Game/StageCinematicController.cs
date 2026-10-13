@@ -219,9 +219,9 @@ public sealed class StageCinematicController : MonoBehaviour
             DoorFrontPosition(center, level.FinalSurface, 6f));
         GameObject whiteBeyond = BuildWhiteBeyondDoor(center, focus.position);
         yield return MoveCamera(focus.position, focus.rotation, 58f, introBlendDuration);
-        if (skipRequested) { FinishTutorialDoorImmediately(level, whiteBeyond); yield break; }
+        if (skipRequested) { FinishTutorialClearImmediately(level, whiteBeyond); yield break; }
         yield return WaitOrSkip(doorFocusTime);
-        if (skipRequested) { FinishTutorialDoorImmediately(level, whiteBeyond); yield break; }
+        if (skipRequested) { FinishTutorialClearImmediately(level, whiteBeyond); yield break; }
 
         Vector3 zoomPosition = Vector3.Lerp(focus.position, center, 0.38f);
         float elapsed = 0f;
@@ -230,7 +230,7 @@ public sealed class StageCinematicController : MonoBehaviour
         Quaternion startRotation = cinematicCamera.transform.rotation;
         while (elapsed < doorZoomDuration)
         {
-            if (skipRequested) { FinishTutorialDoorImmediately(level, whiteBeyond); yield break; }
+            if (skipRequested) { FinishTutorialClearImmediately(level, whiteBeyond); yield break; }
             elapsed += Time.unscaledDeltaTime;
             float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / doorZoomDuration));
             cinematicCamera.transform.position = Vector3.Lerp(startPosition, zoomPosition, t);
@@ -250,7 +250,9 @@ public sealed class StageCinematicController : MonoBehaviour
             level.OpenDoorForCinematic();
         }
         yield return WaitOrSkip(openedDoorHoldTime);
-        FinishTutorialDoorImmediately(level, whiteBeyond);
+        yield return MoveIntoDoorAndFade(center, focus.rotation);
+        EndSkippableCinematic();
+        Debug.Log("Tutorial Clear Complete", level);
     }
 
     private IEnumerator MoveIntoDoorAndFade(Vector3 doorCenter, Quaternion doorRotation)
@@ -314,15 +316,14 @@ public sealed class StageCinematicController : MonoBehaviour
         Debug.Log("Stage Clear Complete (cinematic skipped)", level);
     }
 
-    private void FinishTutorialDoorImmediately(TutorialRoomLevel level, GameObject whiteBeyond)
+    private void FinishTutorialClearImmediately(TutorialRoomLevel level, GameObject whiteBeyond)
     {
         if (whiteBeyond != null) whiteBeyond.SetActive(true);
         level.OpenDoorForCinematic();
-        if (whiteBeyond != null) Destroy(whiteBeyond);
-        cinematicCamera.gameObject.SetActive(false);
+        fadeGroup.alpha = 1f;
+        fadeGroup.blocksRaycasts = true;
         EndSkippableCinematic();
-        manager.FinishTutorialDoorSequence();
-        clearPlaying = false;
+        Debug.Log("Tutorial Clear Complete (cinematic skipped)", level);
     }
 
     private void ActivateCinematic()

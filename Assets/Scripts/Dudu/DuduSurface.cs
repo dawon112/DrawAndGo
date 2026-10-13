@@ -63,6 +63,12 @@ public sealed class DuduSurface : MonoBehaviour
         rightBoundary = maximumCenterX;
     }
 
+    public void ConfigureDimensions(float newWidth, float newHeight)
+    {
+        width = Mathf.Max(0.1f, newWidth);
+        height = Mathf.Max(0.1f, newHeight);
+    }
+
     private void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.cyan;

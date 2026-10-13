@@ -6,7 +6,7 @@ using UnityEngine.UI;
 [DefaultExecutionOrder(100)]
 public sealed partial class TutorialSequenceController : MonoBehaviour
 {
-    public enum TutorialStep { Tutorial_01_Move, Tutorial_02_Draw, Tutorial_02_DrawCompleted, Tutorial_03_Erase, Tutorial_03_EraseCompleted }
+    public enum TutorialStep { Tutorial_01_Move, Tutorial_02_Draw, Tutorial_02_DrawCompleted, Tutorial_03_Erase, Tutorial_03_EraseCompleted, Tutorial_04_Obstacle, Tutorial_05_Star, Tutorial_06_FinalTest, Tutorial_07_Door, Tutorial_Clear }
     [SerializeField] private Player3DMovement haru;
     [SerializeField] private Player3DLook haruLook;
     [SerializeField] private Camera haruCamera;
@@ -31,6 +31,7 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
     private DrawingStroke validBridge;
     private GameObject highlight, startTrigger, successTrigger, instructionPanel, dialoguePanel;
     private RectTransform haruViewport;
+    private Camera duduCamera;
     private Text instruction, speaker, dialogue;
     private string[] speakers, lines;
     private int dialogueIndex;
@@ -47,7 +48,10 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
         initialPosition = haru.transform.position;
         BuildCourse();
         BuildUI();
+        DuduCameraController duduView = FindAnyObjectByType<DuduCameraController>(FindObjectsInactive.Include);
+        duduCamera = duduView != null ? duduView.GetComponent<Camera>() : null;
         InitializeErase();
+        InitializeLateTutorial();
         TutorialRoomLevel room = FindAnyObjectByType<TutorialRoomLevel>();
         Transform starCounter = room != null ? room.transform.Find("Star Counter Canvas") : null;
         if (starCounter != null) starCounter.gameObject.SetActive(false);
@@ -61,6 +65,7 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
     {
         if (!built) return;
         UpdateErase();
+        UpdateLateTutorial();
         if (CurrentStep == TutorialStep.Tutorial_01_Move)
         {
             Vector3 displacement = haru.transform.position - initialPosition;
@@ -98,11 +103,19 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
     private void LateUpdate()
     {
         if (!built) return;
-        Rect view = haruCamera.rect;
+        // Obstacle hints belong to Dudu's view; the earlier drawing hints stay with Haru.
+        Camera instructionCamera = CurrentStep == TutorialStep.Tutorial_04_Obstacle ||
+            CurrentStep == TutorialStep.Tutorial_05_Star ? duduCamera : haruCamera;
+        if (instructionCamera == null)
+        {
+            haruViewport.gameObject.SetActive(false);
+            return;
+        }
+        Rect view = instructionCamera.rect;
         haruViewport.anchorMin = view.min;
         haruViewport.anchorMax = view.max;
         haruViewport.offsetMin = haruViewport.offsetMax = Vector2.zero;
-        haruViewport.gameObject.SetActive(haruCamera.isActiveAndEnabled);
+        haruViewport.gameObject.SetActive(instructionCamera.isActiveAndEnabled);
     }
 
     private void FixedUpdate()
@@ -232,6 +245,11 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
             FinishEraseDialogue();
             return;
         }
+        if (CurrentStep == TutorialStep.Tutorial_05_Star || CurrentStep == TutorialStep.Tutorial_07_Door)
+        {
+            FinishLateDialogue();
+            return;
+        }
         if (successDialogue)
         {
             instructionPanel.SetActive(false);
@@ -278,6 +296,7 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
             surface.SurfaceToWorld(new Vector2(gapLeft - 0.3f, groundSurfaceY + 0.35f)) + surface.Normal * 0.06f });
         highlight.SetActive(false);
         BuildEraseCourse(root, triggers);
+        BuildLateCourse(root, triggers);
     }
 
     private void BuildGround(Transform root, string objectName, float from, float to)
@@ -350,6 +369,7 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
     private void OnDestroy()
     {
         DisposeErase();
+        DisposeLateTutorial();
         if (highlightMaterial != null) Destroy(highlightMaterial);
         if (originalStartLine != null) originalStartLine.SetActive(true);
     }

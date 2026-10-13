@@ -1,9 +1,11 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
 // Scene-local tutorial progression. It deliberately does not touch the prototype coin flow.
 public sealed class TutorialRoomLevel : MonoBehaviour
 {
+    private const int RequiredStars = 3;
     private const float DeathLineSurfaceY = -2.4f;
     [SerializeField] private DuduSurface[] sections;
     [SerializeField] private TutorialStarCollectible[] stars;
@@ -14,6 +16,7 @@ public sealed class TutorialRoomLevel : MonoBehaviour
     private int collectedStars;
     private bool doorOpened;
     private bool doorSequenceStarted;
+    public event System.Action<int> StarCollected;
 
     public int CollectedStars => collectedStars;
     public bool DoorOpened => doorOpened;
@@ -31,6 +34,10 @@ public sealed class TutorialRoomLevel : MonoBehaviour
         stars = tutorialStars;
         lockedDoor = door;
         dudu = player;
+        collectedStars = 0;
+        doorOpened = false;
+        doorSequenceStarted = false;
+        UpdateStarCounter();
     }
 
     private void Awake()
@@ -67,15 +74,19 @@ public sealed class TutorialRoomLevel : MonoBehaviour
             dudu.Die();
     }
 
-    public void CollectStar(TutorialStarCollectible star)
+    public bool CollectStar(TutorialStarCollectible star)
     {
-        if (star == null || doorOpened || doorSequenceStarted)
-            return;
+        if (star == null || doorOpened || doorSequenceStarted || stars == null ||
+            stars.Length != RequiredStars || System.Array.IndexOf(stars, star) < 0)
+            return false;
 
-        collectedStars = Mathf.Min(stars != null ? stars.Length : 3, collectedStars + 1);
+        collectedStars = Mathf.Min(RequiredStars, collectedStars + 1);
+        Debug.Log($"Tutorial: {star.name} collected ({collectedStars}/{RequiredStars}).", star);
         UpdateStarCounter();
-        if (collectedStars >= 3)
+        if (collectedStars >= RequiredStars)
             BeginDoorOpeningSequence();
+        StarCollected?.Invoke(collectedStars);
+        return true;
     }
 
     private void BeginDoorOpeningSequence()
@@ -84,11 +95,7 @@ public sealed class TutorialRoomLevel : MonoBehaviour
             return;
 
         doorSequenceStarted = true;
-        GameViewManager viewManager = FindAnyObjectByType<GameViewManager>();
-        if (viewManager != null)
-            viewManager.PlayAllStarsCollectedSequence(this);
-        else
-            OpenDoorForCinematic();
+        OpenDoorForCinematic();
     }
 
     public void OpenDoorForCinematic()
@@ -98,8 +105,24 @@ public sealed class TutorialRoomLevel : MonoBehaviour
 
         doorOpened = true;
         if (lockedDoor != null)
-            lockedDoor.SetActive(false);
+        {
+            Collider doorCollider = lockedDoor.GetComponent<Collider>();
+            if (doorCollider != null) doorCollider.enabled = false;
+            StartCoroutine(SwingDoorOpen(lockedDoor.transform));
+        }
         Debug.Log("Tutorial: all 3 stars collected; door opened once.", this);
+    }
+
+    private IEnumerator SwingDoorOpen(Transform door)
+    {
+        Quaternion closed = door.rotation;
+        Quaternion opened = Quaternion.AngleAxis(70f, Vector3.up) * closed;
+        for (float elapsed = 0f; elapsed < 0.8f; elapsed += Time.deltaTime)
+        {
+            door.rotation = Quaternion.Slerp(closed, opened, Mathf.SmoothStep(0f, 1f, elapsed / 0.8f));
+            yield return null;
+        }
+        door.rotation = opened;
     }
 
     private void BuildStarCounter()
@@ -138,5 +161,28 @@ public sealed class TutorialRoomLevel : MonoBehaviour
     {
         if (starCounter != null)
             starCounter.text = $"★ {collectedStars} / 3";
+    }
+
+    public void ShowStarCounter(bool visible)
+    {
+        if (starCounter != null) starCounter.transform.parent.gameObject.SetActive(visible);
+    }
+
+    public void PulseStarCounter()
+    {
+        if (starCounter != null) StartCoroutine(PulseCounter());
+    }
+
+    private System.Collections.IEnumerator PulseCounter()
+    {
+        RectTransform rect = starCounter.GetComponent<RectTransform>();
+        float elapsed = 0f;
+        while (elapsed < 0.35f)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            rect.localScale = Vector3.one * (1f + 0.2f * Mathf.Sin(Mathf.PI * Mathf.Clamp01(elapsed / 0.35f)));
+            yield return null;
+        }
+        rect.localScale = Vector3.one;
     }
 }
