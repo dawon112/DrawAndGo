@@ -47,6 +47,7 @@ public sealed class HaruDrawingController : MonoBehaviour
     private float currentCrayon;
 
     public DrawingTool CurrentTool => currentTool;
+    public System.Func<DrawingSurface, Vector3, bool> PenPointAllowed { get; set; }
     public event System.Action<int> StrokeErased;
     public bool CameraLock => cameraLock;
     public bool HasValidSurfaceAim { get; private set; }
@@ -97,9 +98,10 @@ public sealed class HaruDrawingController : MonoBehaviour
             hasSurfaceAim &&
             aimDistance <= maxDrawDistance &&
             !IsDrawingBlocked(aimDistance) &&
-            !NoDrawZone.Blocks(surface, hitPoint);
+            !NoDrawZone.Blocks(surface, hitPoint) &&
+            (currentTool != DrawingTool.Pen || PenPointAllowed == null || PenPointAllowed(surface, hitPoint));
         if (crosshair != null)
-            crosshair.SetDrawAvailability(hasSurfaceAim && aimDistance <= maxDrawDistance);
+            crosshair.SetDrawAvailability(CanDrawAtCurrentAim);
         if (hasSurfaceAim)
             SetSurfaceAim(surface, hitPoint, hitNormal);
         else

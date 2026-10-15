@@ -6,7 +6,8 @@ using UnityEngine.UI;
 public sealed class TutorialRoomLevel : MonoBehaviour
 {
     private const int RequiredStars = 3;
-    private const float DeathLineSurfaceY = -2.4f;
+    // The authored 3D floor can catch Dudu just above the surface bottom.
+    private const float DeathLineSurfaceY = -2.1f;
     [SerializeField] private DuduSurface[] sections;
     [SerializeField] private TutorialStarCollectible[] stars;
     [SerializeField] private GameObject lockedDoor;
@@ -108,21 +109,12 @@ public sealed class TutorialRoomLevel : MonoBehaviour
         {
             Collider doorCollider = lockedDoor.GetComponent<Collider>();
             if (doorCollider != null) doorCollider.enabled = false;
-            StartCoroutine(SwingDoorOpen(lockedDoor.transform));
+            Transform visual = lockedDoor.transform.Find("Free Wood Door - Door 1 Brown");
+            Transform leaf = visual != null ? visual.Find("Door") : null;
+            if (leaf != null) leaf.gameObject.SetActive(false);
+            else Debug.LogWarning("Tutorial: door leaf was not found under the authored door prefab.", lockedDoor);
         }
         Debug.Log("Tutorial: all 3 stars collected; door opened once.", this);
-    }
-
-    private IEnumerator SwingDoorOpen(Transform door)
-    {
-        Quaternion closed = door.rotation;
-        Quaternion opened = Quaternion.AngleAxis(70f, Vector3.up) * closed;
-        for (float elapsed = 0f; elapsed < 0.8f; elapsed += Time.deltaTime)
-        {
-            door.rotation = Quaternion.Slerp(closed, opened, Mathf.SmoothStep(0f, 1f, elapsed / 0.8f));
-            yield return null;
-        }
-        door.rotation = opened;
     }
 
     private void BuildStarCounter()

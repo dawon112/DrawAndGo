@@ -4,6 +4,7 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(CharacterController))]
 public sealed class Player3DMovement : MonoBehaviour
 {
+    private const float SprintMultiplier = 1.5f;
     [SerializeField, Min(0f)] private float moveSpeed = 5f;
     [SerializeField, Min(0f)] private float gravity = 20f;
     [SerializeField, Min(0f)] private float jumpHeight = 1.2f;
@@ -55,7 +56,10 @@ public sealed class Player3DMovement : MonoBehaviour
         }
 
         input = Vector2.ClampMagnitude(input, 1f);
-        Vector3 horizontalMotion = (transform.right * input.x + transform.forward * input.y) * moveSpeed;
+        bool sprinting = keyboard != null &&
+            (keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed);
+        Vector3 horizontalMotion = (transform.right * input.x + transform.forward * input.y) *
+            (moveSpeed * (sprinting ? SprintMultiplier : 1f));
 
         if (controller.isGrounded)
         {

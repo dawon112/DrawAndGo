@@ -190,7 +190,7 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
             crossed = true;
         if (!dialoguePanel.activeSelf && candidate != null)
         {
-            instruction.text = "Tab으로 두두를 조작해 그린 선을 밟고 건너가세요!";
+            instruction.text = "두두를 움직여 하루가 그린 선을 밟고 건너가세요!";
         }
     }
 
@@ -226,6 +226,7 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
     private void ShowDialogue(string[] names, string[] text)
     {
         speakers = names; lines = text; dialogueIndex = 0;
+        dudu.SetDialogueInputLocked(true);
         instructionPanel.SetActive(false);
         dialoguePanel.SetActive(true);
         speaker.text = speakers[0]; dialogue.text = lines[0];
@@ -240,6 +241,7 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
             return;
         }
         dialoguePanel.SetActive(false);
+        dudu.SetDialogueInputLocked(false);
         if (CurrentStep == TutorialStep.Tutorial_03_Erase)
         {
             FinishEraseDialogue();
@@ -262,7 +264,7 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
             return;
         }
         instruction.text = drawStarted
-            ? "마우스 왼쪽 버튼을 누른 채 드래그해서\n선을 그려보세요!\n<Size=21>Tab: 두두 / 하루 전환 · 두두: ← → 이동, Space 점프</Size>"
+            ? "마우스 왼쪽 버튼을 누른 채 드래그해서\n선을 그려보세요!\n<Size=21>두두: ← → 이동, Space 점프</Size>"
             : "[ W ][ A ][ S ][ D ] 키를 눌러 이동해보세요!\n마우스를 움직여 주변을 둘러보세요!";
         instructionPanel.SetActive(true);
     }
@@ -338,8 +340,6 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
         speaker.color = new Color(1f, 0.8f, 0.35f);
         dialogue = Label("DialogueText", dialoguePanel.transform, new Vector2(0.035f, 0.22f), new Vector2(0.95f, 0.67f), 32, TextAnchor.MiddleLeft);
         Label("ContinueHint", dialoguePanel.transform, new Vector2(0.03f, 0.02f), new Vector2(0.96f, 0.24f), 20, TextAnchor.MiddleRight).text = "Enter  다음";
-        // Persistent hint is available in both views while using the existing Tab switching system.
-        Label("ViewSwitchHint", canvasObject.transform, new Vector2(0.02f, 0.94f), new Vector2(0.98f, 0.99f), 22, TextAnchor.MiddleCenter).text = "Tab: 하루 / 두두 전환    |    두두: ← → 이동 · Space 점프";
     }
 
     private static GameObject Panel(string name, Transform parent, Vector2 min, Vector2 max)
@@ -368,6 +368,7 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (dudu != null) dudu.SetDialogueInputLocked(false);
         DisposeErase();
         DisposeLateTutorial();
         if (highlightMaterial != null) Destroy(highlightMaterial);

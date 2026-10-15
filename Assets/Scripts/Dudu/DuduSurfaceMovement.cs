@@ -44,6 +44,7 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
     private float horizontalInput;
     private float surfaceDepth;
     private bool inputEnabled;
+    private bool dialogueInputLocked;
     private bool jumpRequested;
     private bool jumpConsumedUntilLanding;
     private float lastGroundedTime = float.NegativeInfinity;
@@ -103,6 +104,16 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
             horizontalInput = 0f;
             jumpRequested = false;
         }
+    }
+
+    public void SetDialogueInputLocked(bool locked)
+    {
+        dialogueInputLocked = locked;
+        if (!locked) return;
+        horizontalInput = 0f;
+        jumpRequested = false;
+        if (body != null && currentSurface != null)
+            body.linearVelocity = Vector3.Project(body.linearVelocity, currentSurface.Up);
     }
 
     public void BounceAwayFrom(
@@ -203,7 +214,7 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
 
         horizontalInput = 0f;
         Keyboard keyboard = Keyboard.current;
-        if (inputEnabled && keyboard != null)
+        if (inputEnabled && !dialogueInputLocked && keyboard != null)
         {
             bool right = keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed;
             bool left = keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed;
@@ -265,7 +276,7 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         if (constraintCorrection.sqrMagnitude > 0.00000001f)
             body.position += constraintCorrection;
 
-        float horizontalSpeed = Time.time < bounceControlUntil
+        float horizontalSpeed = dialogueInputLocked ? 0f : Time.time < bounceControlUntil
             ? bounceHorizontalSpeed
             : horizontalInput * moveSpeed * stainSpeedMultiplier;
         Vector2 windVelocity = WindZone.GetSurfaceVelocity(currentSurface, body.position);
@@ -413,7 +424,7 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
     {
         Vector2 position = currentSurface.WorldToSurface(body.position);
         float speed = Time.time < bounceControlUntil ? bounceHorizontalSpeed : horizontalInput * moveSpeed * stainSpeedMultiplier;
-        int direction = speed > 0f ? 1 : speed < 0f ? -1 : 0;
+        int direction = dialogueInputLocked ? 0 : speed > 0f ? 1 : speed < 0f ? -1 : 0;
         float boundary = direction > 0
             ? currentSurface.GetMaximumX(characterHalfSize.x)
             : -currentSurface.GetMinimumX(characterHalfSize.x);

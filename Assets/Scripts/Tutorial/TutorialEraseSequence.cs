@@ -33,6 +33,24 @@ public sealed partial class TutorialSequenceController
         }
         previousTool = tutorialDrawing.CurrentTool;
         tutorialDrawing.StrokeErased += OnTutorialStrokeErased;
+        tutorialDrawing.PenPointAllowed = IsTutorialPenPointAllowed;
+    }
+
+    private bool IsTutorialPenPointAllowed(DrawingSurface target, Vector3 point)
+    {
+        bool firstBridge = CurrentStep == TutorialStep.Tutorial_02_Draw && drawStarted && !successDialogue;
+        bool replacementBridge = CurrentStep == TutorialStep.Tutorial_03_Erase &&
+            CurrentErasePhase == ErasePhase.Redraw;
+        if (!firstBridge && !replacementBridge)
+            return true;
+        if (target == null || target.gameObject != surface.gameObject)
+            return false;
+        Vector2 p = surface.WorldToSurface(point);
+        float left = replacementBridge ? eraseGapLeft - 0.2f : gapLeft - 0.3f;
+        float right = replacementBridge ? eraseGapRight + 0.2f : gapRight + 0.3f;
+        const float strokeMargin = 0.02f;
+        return p.x >= left + strokeMargin && p.x <= right - strokeMargin &&
+            p.y >= groundSurfaceY - 0.35f + strokeMargin && p.y <= groundSurfaceY + 0.35f - strokeMargin;
     }
 
     private void OnTutorialStrokeErased(int sourceId)
@@ -112,7 +130,7 @@ public sealed partial class TutorialSequenceController
             {
                 HasWalkedOnReplacement = false;
                 SetEraseInstruction(candidate != null
-                    ? "길이 이어졌어요! Tab으로 두두를 조작해 건너가세요.\n<size=21>선의 시작점이 높으면 Space로 올라가세요.</size>"
+                    ? "길이 이어졌어요! 두두를 움직여 건너가세요.\n<size=21>선의 시작점이 높으면 Space로 올라가세요.</size>"
                     : "새로운 길을 그려 두두가 지나갈 수 있게 해보세요!");
             }
             replacementLine = candidate;
@@ -213,7 +231,11 @@ public sealed partial class TutorialSequenceController
 
     private void DisposeErase()
     {
-        if (tutorialDrawing != null) tutorialDrawing.StrokeErased -= OnTutorialStrokeErased;
+        if (tutorialDrawing != null)
+        {
+            tutorialDrawing.StrokeErased -= OnTutorialStrokeErased;
+            tutorialDrawing.PenPointAllowed = null;
+        }
         if (blockingLineMaterial != null) Destroy(blockingLineMaterial);
     }
 }

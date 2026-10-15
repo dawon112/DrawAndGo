@@ -9,7 +9,6 @@ using UnityEngine.SceneManagement;
 [InitializeOnLoad]
 public static class Player3DSceneBuilder
 {
-    private const string TwoDScenePath = "Assets/Scenes/SideScrollerPrototype.unity";
     private const string ThreeDScenePath = "Assets/Scenes/Player3DScene.unity";
 
     static Player3DSceneBuilder()
@@ -45,7 +44,6 @@ public static class Player3DSceneBuilder
             CreatePlayer();
             CreateLighting();
             EditorSceneManager.SaveScene(scene, ThreeDScenePath);
-            EnsureBuildSettings();
         }
         finally
         {
@@ -104,13 +102,5 @@ public static class Player3DSceneBuilder
         light.intensity = 1f;
     }
 
-    private static void EnsureBuildSettings()
-    {
-        EditorBuildSettings.scenes = new[]
-        {
-            new EditorBuildSettingsScene(ThreeDScenePath, true),
-            new EditorBuildSettingsScene(TwoDScenePath, false)
-        };
-    }
 }
 #endif

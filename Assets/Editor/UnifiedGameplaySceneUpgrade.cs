@@ -31,7 +31,6 @@ public static class UnifiedGameplaySceneUpgrade
 
         UpgradeMainScene();
         RemoveLegacySceneSwitcher();
-        ConfigureBuildSettings();
         AssetDatabase.SaveAssets();
     }
 
@@ -319,15 +318,6 @@ public static class UnifiedGameplaySceneUpgrade
             if (closeAfter && scene.IsValid() && scene.isLoaded)
                 EditorSceneManager.CloseScene(scene, true);
         }
-    }
-
-    private static void ConfigureBuildSettings()
-    {
-        EditorBuildSettings.scenes = new[]
-        {
-            new EditorBuildSettingsScene(MainScenePath, true),
-            new EditorBuildSettingsScene(Legacy2DScenePath, false)
-        };
     }
 
     private static Scene OpenSceneForUpdate(string path, out bool closeAfter)

@@ -60,12 +60,14 @@ public sealed partial class TutorialSequenceController
         lateSections = tutorialRoom.Sections;
         DuduSurface second = lateSections[1], third = lateSections[2], corner = lateSections[3],
             fourth = lateSections[4], fifth = lateSections[5];
-        third.nextSurface = corner;
-        corner.previousSurface = third;
-        corner.nextSurface = fourth;
-        fourth.previousSurface = corner;
-        fifth.nextSurface = lastSurface;
-        lastSurface.previousSurface = fifth;
+        // The authored route has several one-way links. Set every seam in both
+        // directions so Dudu can return around a corner after crossing it.
+        for (int i = 0; i < lateSections.Length - 1; i++)
+        {
+            lateSections[i].nextSurface = lateSections[i + 1];
+            lateSections[i + 1].previousSurface = lateSections[i];
+        }
+        lateSections[0].previousSurface = null;
         lastSurface.nextSurface = null;
 
         // Only the authored 2D route lines are substituted during play.
@@ -74,7 +76,9 @@ public sealed partial class TutorialSequenceController
         BuildLateGround(root, second, "ObstacleGround", -second.Width * 0.5f, second.Width * 0.5f);
         BuildLateGround(root, third, "ObstacleTurnGround", -third.Width * 0.5f, third.Width * 0.5f);
         BuildLateGround(root, corner, "StarApproachGround", -corner.Width * 0.5f, corner.Width * 0.5f);
-        BuildLateGround(root, fifth, "FinalGapLeft", -fifth.Width * 0.5f, -2.3f);
+        // Leave clearance at the Wall5/Wall8 inside corner. The old floor end
+        // faced an approaching Dudu like a low invisible wall until he jumped.
+        BuildLateGround(root, fifth, "FinalGapLeft", -fifth.Width * 0.5f + 0.45f, -2.3f);
         BuildLateGround(root, fifth, "FinalGapRight", 2.3f, fifth.Width * 0.5f);
         BuildLateGround(root, lastSurface, "DoorApproachGround", -lastSurface.Width * 0.5f, lastSurface.Width * 0.5f);
 

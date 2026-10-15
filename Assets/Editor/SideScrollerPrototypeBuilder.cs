@@ -71,7 +71,6 @@ public static class SideScrollerPrototypeBuilder
             CreateCamera(player.transform);
 
             EditorSceneManager.SaveScene(scene, ScenePath);
-            AddSceneToBuildSettings();
             AssetDatabase.SaveAssets();
         }
         catch (Exception exception)
@@ -373,17 +372,6 @@ public static class SideScrollerPrototypeBuilder
 
         CameraFollow2D follow = cameraObject.AddComponent<CameraFollow2D>();
         follow.SetTarget(target);
-    }
-
-    private static void AddSceneToBuildSettings()
-    {
-        EditorBuildSettingsScene[] scenes = EditorBuildSettings.scenes;
-        if (scenes.Any(scene => scene.path == ScenePath))
-            return;
-
-        EditorBuildSettings.scenes = scenes
-            .Concat(new[] { new EditorBuildSettingsScene(ScenePath, true) })
-            .ToArray();
     }
 
     private static int ParseFrameIndex(string spriteName)
