@@ -532,6 +532,17 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         RespawnAtStageStart();
     }
 
+    // Later deaths return here instead of the stage start. A stage restart reloads
+    // the scene, which clears it again.
+    public bool SetCheckpoint()
+    {
+        if (currentSurface == null || body == null || isRespawning)
+            return false;
+        startSurface = currentSurface;
+        startSurfacePosition = currentSurface.WorldToSurface(body.position);
+        return true;
+    }
+
     private IEnumerator DeathAndRespawnRoutine()
     {
         isRespawning = true;

@@ -122,6 +122,27 @@ public sealed class StageCinematicController : MonoBehaviour
         skipObject.SetActive(false);
     }
 
+    // Writes on the top-most canvas, over the white fade a clear cinematic ends on.
+    public bool ShowCenterMessage(string message)
+    {
+        if (fadeGroup == null) return false;
+        fadeGroup.alpha = 1f;
+        GameObject label = new GameObject("Center Message", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+        RectTransform rect = label.GetComponent<RectTransform>();
+        rect.SetParent(fadeGroup.transform.parent, false);
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = rect.offsetMax = Vector2.zero;
+        Text text = label.GetComponent<Text>();
+        text.font = GameFont.Bold;
+        text.fontSize = 64;
+        text.alignment = TextAnchor.MiddleCenter;
+        text.color = new Color(0.12f, 0.16f, 0.22f);
+        text.raycastTarget = false;
+        text.text = message;
+        return true;
+    }
+
     private IEnumerator IntroRoutine(CornerRoomLevel level)
     {
         introPlayed = true;

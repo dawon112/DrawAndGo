@@ -16,6 +16,8 @@ public sealed class StageFlow : MonoBehaviour
 
     private const string LoadMessage = "FlowLoadV1";
     private const string VoteMessage = "FlowVoteV1";
+    private const string FinishMessage = "FlowFinishV1";
+    private const float ResultDuration = 6f;
     private const float VoteTimeout = 20f;
     private const Key SkipTutorialKey = Key.K;
     private const Key RestartStageKey = Key.R;
@@ -29,7 +31,9 @@ public sealed class StageFlow : MonoBehaviour
     private readonly bool[] remoteVotes = new bool[VoteCount];
     private readonly float[] localVoteTime = new float[VoteCount];
     private bool loading;
+    private float runStartTime = -1f;
     private GameObject panel;
+    private GameObject resultPanel;
     private Text panelText;
 
     private bool IsNetworked => GameSession.Current != null && manager != null && manager.IsConnectedClient;
@@ -51,6 +55,8 @@ public sealed class StageFlow : MonoBehaviour
     {
         Instance = this;
         sequence = StageSequence.Load();
+        // Created after the first scene loaded, so its sceneLoaded event was missed.
+        if (InStage) runStartTime = Time.unscaledTime;
         BuildUi();
         SceneManager.sceneLoaded += OnSceneLoaded;
         RefreshUi();
@@ -67,6 +73,10 @@ public sealed class StageFlow : MonoBehaviour
     {
         loading = false;
         ClearVotes();
+        if (resultPanel != null) Destroy(resultPanel);
+        // Play time runs from the first stage until the players are back at the title.
+        if (!sequence.IsStage(scene.name)) runStartTime = -1f;
+        else if (runStartTime < 0f) runStartTime = Time.unscaledTime;
     }
 
     // Called when a stage's clear cinematic has finished on this machine.
@@ -89,10 +99,68 @@ public sealed class StageFlow : MonoBehaviour
         action();
     }
 
+    // Host or offline: show the result on both screens, then close the room.
     private void FinishGame()
     {
+        if (IsNetworked)
+        {
+            using var writer = new FastBufferWriter(1, Allocator.Temp);
+            writer.WriteValueSafe((byte)1);
+            foreach (ulong clientId in manager.ConnectedClientsIds)
+                if (clientId != manager.LocalClientId)
+                    manager.CustomMessagingManager.SendNamedMessage(
+                        FinishMessage, clientId, writer, NetworkDelivery.ReliableSequenced);
+        }
+        StartCoroutine(ShowResultThenLeave(true));
+    }
+
+    private void OnFinish(ulong sender, FastBufferReader reader)
+    {
+        if (manager.IsHost || sender != NetworkManager.ServerClientId || loading) return;
+        StartCoroutine(ShowResultThenLeave(false));
+    }
+
+    private IEnumerator ShowResultThenLeave(bool closesRoom)
+    {
+        loading = true;
+        ClearVotes();
+        if (GameSession.Current != null) GameSession.Current.ExpectEnd();
+        float seconds = runStartTime >= 0f ? Time.unscaledTime - runStartTime : 0f;
+        int total = (int)seconds;
+        string message = "모든 스테이지 클리어!\n\n" +
+            $"<size=40>함께한 시간  {total / 60:00}:{total % 60:00}</size>\n" +
+            "<size=30>잠시 후 처음 화면으로 돌아갑니다</size>";
+        StageCinematicController cinematic = FindAnyObjectByType<StageCinematicController>();
+        if (cinematic == null || !cinematic.ShowCenterMessage(message)) ShowOwnResult(message);
+        yield return new WaitForSecondsRealtime(ResultDuration);
+        // The client normally leaves when the host closes the room; this is a fallback.
+        if (!closesRoom) yield return new WaitForSecondsRealtime(ResultDuration);
         if (GameSession.Current != null) GameSession.Current.ReturnToTitle();
         else SceneManager.LoadSceneAsync(sequence.titleScene);
+    }
+
+    private void ShowOwnResult(string message)
+    {
+        GameObject panelObject = new GameObject("Result", typeof(RectTransform), typeof(Image));
+        RectTransform rect = panelObject.GetComponent<RectTransform>();
+        rect.SetParent(transform, false);
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = rect.offsetMax = Vector2.zero;
+        panelObject.GetComponent<Image>().color = Color.white;
+        GameObject label = new GameObject("Text", typeof(RectTransform), typeof(Text));
+        RectTransform labelRect = label.GetComponent<RectTransform>();
+        labelRect.SetParent(rect, false);
+        labelRect.anchorMin = Vector2.zero;
+        labelRect.anchorMax = Vector2.one;
+        labelRect.offsetMin = labelRect.offsetMax = Vector2.zero;
+        Text text = label.GetComponent<Text>();
+        text.font = GameFont.Bold;
+        text.fontSize = 64;
+        text.alignment = TextAnchor.MiddleCenter;
+        text.color = new Color(0.12f, 0.16f, 0.22f);
+        text.text = message;
+        resultPanel = panelObject;
     }
 
     private void LoadStage(string sceneName)
@@ -219,6 +287,7 @@ public sealed class StageFlow : MonoBehaviour
         if (manager == null) return;
         manager.CustomMessagingManager.RegisterNamedMessageHandler(LoadMessage, OnLoad);
         manager.CustomMessagingManager.RegisterNamedMessageHandler(VoteMessage, OnVote);
+        manager.CustomMessagingManager.RegisterNamedMessageHandler(FinishMessage, OnFinish);
     }
 
     private void UnregisterNetwork()
@@ -227,6 +296,7 @@ public sealed class StageFlow : MonoBehaviour
         {
             manager.CustomMessagingManager.UnregisterNamedMessageHandler(LoadMessage);
             manager.CustomMessagingManager.UnregisterNamedMessageHandler(VoteMessage);
+            manager.CustomMessagingManager.UnregisterNamedMessageHandler(FinishMessage);
         }
         manager = null;
     }
