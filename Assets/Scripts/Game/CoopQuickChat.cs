@@ -12,16 +12,17 @@ public sealed class CoopQuickChat : MonoBehaviour
     private const float MessageDuration = 3.5f;
     private const float SendCooldown = 0.75f;
 
+    // The nine planned phrases. No emoji: the legacy UI font cannot draw them.
     private static readonly string[] Phrases =
     {
-        "👋 이쪽이야!", "⚠️ 조심해!", "✏️ 여기에 그려줘!", "⏳ 잠깐만!",
-        "▶️ 지금이야!", "👍 준비됐어!", "🙏 고마워!", "😵 미안!"
+        "이쪽이야!", "조심해!", "여기에 그려줘!", "잠깐만!", "지금이야!",
+        "준비됐어!", "저거 먹자!", "고마워!", "미안!"
     };
 
     private static readonly Key[] ChoiceKeys =
     {
-        Key.Digit1, Key.Digit2, Key.Digit3, Key.Digit4,
-        Key.Digit5, Key.Digit6, Key.Digit7, Key.Digit8
+        Key.Digit1, Key.Digit2, Key.Digit3, Key.Digit4, Key.Digit5,
+        Key.Digit6, Key.Digit7, Key.Digit8, Key.Digit9
     };
 
     private NetworkManager manager;
@@ -159,7 +160,7 @@ public sealed class CoopQuickChat : MonoBehaviour
         panelRect.anchorMin = panelRect.anchorMax = new Vector2(1f, 0f);
         panelRect.pivot = new Vector2(1f, 0f);
         panelRect.anchoredPosition = new Vector2(-35f, 35f);
-        panelRect.sizeDelta = new Vector2(510f, 460f);
+        panelRect.sizeDelta = new Vector2(510f, 500f);
         RawImage background = panel.GetComponent<RawImage>();
         background.texture = Texture2D.whiteTexture;
         background.color = new Color(1f, 0.97f, 0.88f, 0.94f);
@@ -172,11 +173,9 @@ public sealed class CoopQuickChat : MonoBehaviour
         choicesRect.offsetMin = new Vector2(25f, 15f);
         choicesRect.offsetMax = new Vector2(-15f, -15f);
         choices.color = new Color(0.69f, 0.34f, 0.14f);
-        choices.text = "퀵채팅  C 닫기\n\n" +
-            "1  " + Phrases[0] + "\n2  " + Phrases[1] + "\n" +
-            "3  " + Phrases[2] + "\n4  " + Phrases[3] + "\n" +
-            "5  " + Phrases[4] + "\n6  " + Phrases[5] + "\n" +
-            "7  " + Phrases[6] + "\n8  " + Phrases[7];
+        string list = "퀵채팅  C 닫기\n";
+        for (int i = 0; i < Phrases.Length; i++) list += $"\n{i + 1}  {Phrases[i]}";
+        choices.text = list;
         menu = panel;
         menu.SetActive(false);
 
