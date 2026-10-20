@@ -1,13 +1,14 @@
 using System;
 using System.Threading.Tasks;
+using Unity.Netcode;
 using Unity.Services.Multiplayer;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-// Keeps the room alive while the title scene is replaced by the game scene.
+// Keeps the room alive while the title scene is replaced by the stage scenes.
 public sealed class GameSession : MonoBehaviour
 {
-    public const string MapSceneName = "Player3DScene";
+    public static string FirstSceneName => StageSequence.Load().FirstStage;
     public static GameSession Current { get; private set; }
     public bool IsHost { get; private set; }
 
@@ -28,13 +29,21 @@ public sealed class GameSession : MonoBehaviour
         Current = this;
     }
 
+    // Ends the room for both players. The peer is sent to the title by OnSessionEnded.
+    public void ReturnToTitle()
+    {
+        SceneManager.LoadSceneAsync(StageSequence.Load().titleScene);
+        Destroy(gameObject);
+    }
+
     private void OnSessionEnded()
     {
         if (session == null) return;
         session.Deleted -= OnSessionEnded;
         session.RemovedFromSession -= OnSessionEnded;
         session = null;
-        SceneManager.LoadSceneAsync("TitleScene");
+        ShutdownNetwork();
+        SceneManager.LoadSceneAsync(StageSequence.Load().titleScene);
         Destroy(gameObject);
     }
 
@@ -62,5 +71,17 @@ public sealed class GameSession : MonoBehaviour
         {
             Debug.LogException(e);
         }
+        finally
+        {
+            ShutdownNetwork();
+        }
+    }
+
+    // A rematch must start from a stopped NetworkManager, never a half-closed one.
+    private static void ShutdownNetwork()
+    {
+        NetworkManager manager = NetworkManager.Singleton;
+        if (manager != null && manager.IsListening)
+            manager.Shutdown();
     }
 }

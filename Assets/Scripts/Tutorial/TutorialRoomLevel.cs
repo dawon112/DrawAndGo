@@ -21,6 +21,7 @@ public sealed class TutorialRoomLevel : MonoBehaviour
 
     public int CollectedStars => collectedStars;
     public bool DoorOpened => doorOpened;
+    public bool IsStarCounterVisible => starCounter != null && starCounter.transform.parent.gameObject.activeSelf;
     public DuduSurface[] Sections => sections;
     public GameObject Door => lockedDoor;
     public DuduSurface FinalSurface => sections != null && sections.Length > 0 ? sections[sections.Length - 1] : null;
@@ -88,6 +89,28 @@ public sealed class TutorialRoomLevel : MonoBehaviour
             BeginDoorOpeningSequence();
         StarCollected?.Invoke(collectedStars);
         return true;
+    }
+
+    // Online client: the host decides pickups. Stars are collected in course order,
+    // so the host's count is enough to hide the same stars here.
+    public void ApplyNetworkStars(int count, bool doorIsOpen)
+    {
+        if (stars == null) return;
+        count = Mathf.Clamp(count, 0, stars.Length);
+        if (count != collectedStars)
+        {
+            bool gained = count > collectedStars;
+            collectedStars = count;
+            for (int i = 0; i < stars.Length; i++)
+                if (stars[i] != null) stars[i].gameObject.SetActive(i >= count);
+            UpdateStarCounter();
+            if (gained) StarCollected?.Invoke(collectedStars);
+        }
+        if (doorIsOpen && !doorOpened)
+        {
+            doorSequenceStarted = true;
+            OpenDoorForCinematic();
+        }
     }
 
     private void BeginDoorOpeningSequence()

@@ -5,6 +5,6 @@ public class TitleMenu : MonoBehaviour
 {
     public void StartGame()
     {
-        SceneManager.LoadScene("Player3DScene");
+        SceneManager.LoadScene(StageSequence.Load().FirstStage);
     }
 }

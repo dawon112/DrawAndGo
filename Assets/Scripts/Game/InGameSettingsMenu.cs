@@ -28,7 +28,7 @@ public sealed class InGameSettingsMenu : MonoBehaviour
 
     private static void Setup(Scene scene)
     {
-        if (scene.name != GameSession.MapSceneName || FindFirstObjectByType<InGameSettingsMenu>() != null)
+        if (!StageSequence.Load().IsStage(scene.name) || FindFirstObjectByType<InGameSettingsMenu>() != null)
             return;
 
         GameObject root = new GameObject("In-Game Settings", typeof(RectTransform),

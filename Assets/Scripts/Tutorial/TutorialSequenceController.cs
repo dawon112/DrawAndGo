@@ -56,6 +56,7 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
         Transform starCounter = room != null ? room.transform.Find("Star Counter Canvas") : null;
         if (starCounter != null) starCounter.gameObject.SetActive(false);
         dudu.gameObject.AddComponent<TutorialBridgeContact>().Owner = this;
+        InitializeNetwork();
         built = true;
         CurrentStep = TutorialStep.Tutorial_01_Move;
         ShowDialogue(new[] { "두두", "하루" }, new[] { "하루! 나 여기 있어!", "두두! 잠깐만, 그쪽으로 갈게!" });
@@ -64,6 +65,12 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
     private void Update()
     {
         if (!built) return;
+        if (!IsAuthority)
+        {
+            UpdateTutorialClient();
+            return;
+        }
+        SendTutorialState();
         UpdateErase();
         UpdateLateTutorial();
         if (CurrentStep == TutorialStep.Tutorial_01_Move)
@@ -104,7 +111,9 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
     {
         if (!built) return;
         // Obstacle hints belong to Dudu's view; the earlier drawing hints stay with Haru.
-        Camera instructionCamera = CurrentStep == TutorialStep.Tutorial_04_Obstacle ||
+        // Online, each player has one view, so every hint shows on the local camera.
+        Camera instructionCamera = IsNetworked ? (IsAuthority ? haruCamera : duduCamera) :
+            CurrentStep == TutorialStep.Tutorial_04_Obstacle ||
             CurrentStep == TutorialStep.Tutorial_05_Star ? duduCamera : haruCamera;
         if (instructionCamera == null)
         {
@@ -120,7 +129,7 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
 
     private void FixedUpdate()
     {
-        if (!built || dudu.CurrentSurface != surface) return;
+        if (!built || !IsAuthority || dudu.CurrentSurface != surface) return;
         // The player's drawn-line walker can maintain a small skin gap, without OnCollisionStay.
         // Probe the same physical foot area so that supported walking is still observed.
         BoxCollider body = dudu.GetComponent<BoxCollider>();
@@ -135,7 +144,8 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
 
     public void EnterRegion(bool isExit, DuduSurfaceMovement player)
     {
-        if (player != dudu || player.CurrentSurface != surface || CurrentStep != TutorialStep.Tutorial_02_Draw) return;
+        if (!IsAuthority || player != dudu || player.CurrentSurface != surface ||
+            CurrentStep != TutorialStep.Tutorial_02_Draw) return;
         if (isExit)
         {
             if (HasValidBridge && HasWalkedOnBridge &&
@@ -152,6 +162,7 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
 
     public void RecordBridgeContact(Collision collision)
     {
+        if (!IsAuthority) return;
         foreach (ContactPoint contact in collision.contacts)
             if (Vector3.Dot(contact.normal, surface.Up) > 0.5f)
                 RecordSupportedStroke(collision.collider.GetComponentInParent<DrawingStroke>());
@@ -226,6 +237,7 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
     private void ShowDialogue(string[] names, string[] text)
     {
         speakers = names; lines = text; dialogueIndex = 0;
+        dialogueSerial++;
         dudu.SetDialogueInputLocked(true);
         instructionPanel.SetActive(false);
         dialoguePanel.SetActive(true);
@@ -234,6 +246,7 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
 
     private void AdvanceDialogue()
     {
+        dialogueSerial++;
         dialogueIndex++;
         if (dialogueIndex < lines.Length)
         {
@@ -369,6 +382,7 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
     private void OnDestroy()
     {
         if (dudu != null) dudu.SetDialogueInputLocked(false);
+        DisposeNetwork();
         DisposeErase();
         DisposeLateTutorial();
         if (highlightMaterial != null) Destroy(highlightMaterial);

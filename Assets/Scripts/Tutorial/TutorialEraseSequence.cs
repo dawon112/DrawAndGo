@@ -60,7 +60,8 @@ public sealed partial class TutorialSequenceController
 
     public void EnterEraseRegion(bool isExit, DuduSurfaceMovement player)
     {
-        if (player != dudu || player.CurrentSurface != surface || CurrentStep != TutorialStep.Tutorial_03_Erase) return;
+        if (!IsAuthority || player != dudu || player.CurrentSurface != surface ||
+            CurrentStep != TutorialStep.Tutorial_03_Erase) return;
         if (isExit)
         {
             if (CurrentErasePhase != ErasePhase.Redraw || !TargetLineRemoved ||
@@ -88,7 +89,7 @@ public sealed partial class TutorialSequenceController
         if (tutorialDrawing == null) return;
         DrawingTool tool = tutorialDrawing.CurrentTool;
         bool toggled = tutorialDrawing.isActiveAndEnabled && Keyboard.current != null &&
-            Keyboard.current.eKey.wasPressedThisFrame && previousTool != tool;
+            CoopInputSettings.WasPressed(Keyboard.current, CoopInputAction.HaruToolSwitch) && previousTool != tool;
         previousTool = tool;
         if (CurrentStep != TutorialStep.Tutorial_03_Erase || dialoguePanel.activeSelf) return;
 
@@ -196,6 +197,14 @@ public sealed partial class TutorialSequenceController
         eraseSuccessTrigger.GetComponent<TutorialRegionTrigger>().Configure(this, true, true);
         eraseStartTrigger.SetActive(false); eraseSuccessTrigger.SetActive(false);
 
+        eraseHighlight = MakeEraseOutline(root, "EraseTargetHighlight", eraseGapLeft - 0.3f, eraseGapLeft + 0.2f,
+            groundSurfaceY - 0.2f, groundSurfaceY + 1.6f);
+        replacementHighlight = MakeEraseOutline(root, "ReplacementDrawHighlight", eraseGapLeft - 0.2f, eraseGapRight + 0.2f,
+            groundSurfaceY - 0.35f, groundSurfaceY + 0.35f);
+        // Online, strokes belong to the host and reach the client through stroke sync,
+        // so only the host creates the blocking line (else the client keeps its own copy).
+        if (!IsAuthority) return;
+
         // The player's first bridge remains in place. Its endpoints cannot block this later gap,
         // so use the permitted fallback: a real, erasable DrawingStroke, never a cube obstacle.
         GameObject blocker = new GameObject("Tutorial_BlockingDrawnLine", typeof(LineRenderer), typeof(DrawingStroke));
@@ -208,10 +217,6 @@ public sealed partial class TutorialSequenceController
             0.08f, 0.18f, surface.Normal, LayerMask.NameToLayer("DrawnStroke"));
         stroke.AddPoint(high); stroke.FinishDrawing();
         targetStrokeId = stroke.SourceStrokeId;
-        eraseHighlight = MakeEraseOutline(root, "EraseTargetHighlight", eraseGapLeft - 0.3f, eraseGapLeft + 0.2f,
-            groundSurfaceY - 0.2f, groundSurfaceY + 1.6f);
-        replacementHighlight = MakeEraseOutline(root, "ReplacementDrawHighlight", eraseGapLeft - 0.2f, eraseGapRight + 0.2f,
-            groundSurfaceY - 0.35f, groundSurfaceY + 0.35f);
     }
 
     private GameObject MakeEraseOutline(Transform root, string name, float left, float right, float bottom, float top)

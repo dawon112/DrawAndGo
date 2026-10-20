@@ -232,7 +232,7 @@ public class RoomSessionUI : MonoBehaviour
             if (!rolePanel.activeSelf) rolePanel.SetActive(true);
             hostRoomPanel.SetActive(false);
             joinRoomPanel.SetActive(false);
-            if (!Application.CanStreamedLevelBeLoaded(GameSession.MapSceneName))
+            if (!Application.CanStreamedLevelBeLoaded(GameSession.FirstSceneName))
                 connectionText.text = "맵 씬이 빌드 목록에 없어요";
             else if (!NetworkReady())
                 connectionText.text = "게임 연결 중이에요...";
@@ -280,7 +280,7 @@ public class RoomSessionUI : MonoBehaviour
         ISession activeSession = session;
         DetachSession();
         GameSession.Keep(activeSession);
-        SceneManager.LoadSceneAsync(GameSession.MapSceneName);
+        SceneManager.LoadSceneAsync(GameSession.FirstSceneName);
     }
 
     private void StopMapCountdown()

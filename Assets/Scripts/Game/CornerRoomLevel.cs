@@ -1,6 +1,6 @@
 using UnityEngine;
 
-// Owns only the prototype's three coins, door and finish state.
+// Owns the stage's coins, door and finish state.
 public sealed class CornerRoomLevel : MonoBehaviour
 {
     private const float CoinVisualScale = 0.07f;
@@ -8,6 +8,8 @@ public sealed class CornerRoomLevel : MonoBehaviour
 
     public DuduSurface[] surfaces;
     public GameObject[] coins;
+    [Tooltip("Coins needed to open the door. 0 means every coin in the list.")]
+    [Min(0)] public int requiredCoins;
     public GameObject door;
     public DuduSurfaceMovement player;
     public Player3DMovement player3D;
@@ -17,6 +19,8 @@ public sealed class CornerRoomLevel : MonoBehaviour
     public bool IsDoorVisuallyOpen { get; private set; }
     public bool IsClear { get; private set; }
     public int CollectedCount { get; private set; }
+    public int RequiredCoins => requiredCoins > 0 && coins != null
+        ? Mathf.Min(requiredCoins, coins.Length) : coins != null ? coins.Length : 0;
 
     private void Awake()
     {
@@ -215,21 +219,22 @@ public sealed class CornerRoomLevel : MonoBehaviour
 
     private void Update()
     {
-        if (coins == null || coins.Length != 3 || surfaces == null || surfaces.Length != 5)
+        if (coins == null || coins.Length == 0)
             return;
+        int required = RequiredCoins;
         CollectedCount = 0;
         foreach (GameObject coin in coins)
             if (coin == null || !coin.activeSelf) CollectedCount++;
         if (!IsOpen && goalLabel != null)
-            goalLabel.text = $"COINS {CollectedCount} / 3";
-        if (!IsOpen && CollectedCount == 3)
+            goalLabel.text = $"COINS {CollectedCount} / {required}";
+        if (!IsOpen && CollectedCount >= required)
         {
             IsOpen = true;
             if (goalLabel != null)
                 goalLabel.text = "ALL COINS!\nRETURN TO 3D";
             GameViewManager viewManager = FindAnyObjectByType<GameViewManager>();
             if (viewManager != null) viewManager.PlayAllCoinsCollectedSequence();
-            Debug.Log("All 3 coins collected: door unlocked.", this);
+            Debug.Log($"{CollectedCount}/{required} coins collected: door unlocked.", this);
         }
     }
 

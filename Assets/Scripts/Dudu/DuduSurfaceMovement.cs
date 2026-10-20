@@ -113,7 +113,8 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         if (!locked) return;
         horizontalInput = 0f;
         jumpRequested = false;
-        if (body != null && currentSurface != null)
+        // The host's copy of Dudu is kinematic and only follows the client's pose.
+        if (body != null && !body.isKinematic && currentSurface != null)
             body.linearVelocity = Vector3.Project(body.linearVelocity, currentSurface.Up);
     }
 

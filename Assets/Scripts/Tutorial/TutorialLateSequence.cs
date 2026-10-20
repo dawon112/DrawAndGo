@@ -214,6 +214,8 @@ public sealed partial class TutorialSequenceController
 
     public bool CanCollectStar(TutorialStarCollectible star)
     {
+        // Online, the host collects from Dudu's synced pose and the client follows.
+        if (!IsAuthority) return false;
         if (courseStars[0] == star) return CurrentStep == TutorialStep.Tutorial_05_Star &&
             lateDialoguePhase == 2 && dudu.CurrentSurface == lateSections[4];
         if (courseStars[1] == star) return CurrentStep == TutorialStep.Tutorial_06_FinalTest &&
@@ -227,6 +229,7 @@ public sealed partial class TutorialSequenceController
     {
         tutorialRoom.ShowStarCounter(true);
         tutorialRoom.PulseStarCounter();
+        if (!IsAuthority) return;
         if (count == 1 && CurrentStep == TutorialStep.Tutorial_05_Star)
         {
             lateDialoguePhase = 3;
@@ -275,7 +278,7 @@ public sealed partial class TutorialSequenceController
 
     public void TryCompleteAtDoor(Player3DMovement player)
     {
-        if (player != haru || CurrentStep != TutorialStep.Tutorial_07_Door ||
+        if (!IsAuthority || player != haru || CurrentStep != TutorialStep.Tutorial_07_Door ||
             tutorialRoom == null || !tutorialRoom.DoorOpened || tutorialRoom.CollectedStars != 3) return;
         CurrentStep = TutorialStep.Tutorial_Clear;
         instructionPanel.SetActive(false);

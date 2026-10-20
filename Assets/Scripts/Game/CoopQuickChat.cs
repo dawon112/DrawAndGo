@@ -42,7 +42,7 @@ public sealed class CoopQuickChat : MonoBehaviour
 
     private static void Setup(Scene scene)
     {
-        if (scene.name != GameSession.MapSceneName || FindFirstObjectByType<CoopQuickChat>() != null)
+        if (GameSession.Current == null || !StageSequence.Load().IsStage(scene.name) || FindFirstObjectByType<CoopQuickChat>() != null)
             return;
 
         GameObject root = new GameObject("Quick Chat", typeof(RectTransform),

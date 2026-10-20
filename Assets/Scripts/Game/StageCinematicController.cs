@@ -220,6 +220,7 @@ public sealed class StageCinematicController : MonoBehaviour
         yield return MoveIntoDoorAndFade(center, focus.rotation);
         level.TryCompleteThreeDimensionalGoal(haruMovement);
         EndSkippableCinematic();
+        StageFlow.Instance?.CompleteCurrentStage();
         clearPlaying = false;
         Debug.Log("Stage Clear Complete", level);
     }
@@ -270,6 +271,7 @@ public sealed class StageCinematicController : MonoBehaviour
         yield return WaitOrSkip(openedDoorHoldTime);
         yield return MoveIntoDoorAndFade(center, focus.rotation);
         EndSkippableCinematic();
+        StageFlow.Instance?.CompleteCurrentStage();
         Debug.Log("Tutorial Clear Complete", level);
     }
 
@@ -331,6 +333,7 @@ public sealed class StageCinematicController : MonoBehaviour
         fadeGroup.blocksRaycasts = true;
         level.TryCompleteThreeDimensionalGoal(haruMovement);
         EndSkippableCinematic();
+        StageFlow.Instance?.CompleteCurrentStage();
         clearPlaying = false;
         Debug.Log("Stage Clear Complete (cinematic skipped)", level);
     }
@@ -342,6 +345,7 @@ public sealed class StageCinematicController : MonoBehaviour
         fadeGroup.alpha = 1f;
         fadeGroup.blocksRaycasts = true;
         EndSkippableCinematic();
+        StageFlow.Instance?.CompleteCurrentStage();
         Debug.Log("Tutorial Clear Complete (cinematic skipped)", level);
     }
 

@@ -1,8 +1,10 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 // Haru owns drawing. Dudu owns pickups and hazards so collisions use local physics.
 // The host still owns the Relay session. This is a cooperative prototype, not anti-cheat.
@@ -13,9 +15,14 @@ public sealed class StageStateSync : MonoBehaviour
     private const string StrokeMessage = "StageStrokeV1";
     private const string WorldMessage = "StageWorldV1";
     private const string SkipMessage = "StageClearSkipV1";
+    private const string EraseMessage = "StageEraseV1";
     private const int ChunkPoints = 16;
+    private const float MaxRequestedEraseRadius = 1f;
+
+    public static StageStateSync Active { get; private set; }
     private NetworkManager network;
     private CornerRoomLevel level;
+    private DuduSurfaceMovement dudu;
     private DuduMovingObstacle[] movers;
     private MovingEraserObstacle[] erasers;
     private DuduHomingShooter[] shooters;
@@ -26,6 +33,8 @@ public sealed class StageStateSync : MonoBehaviour
     private Material remoteMaterial;
     private readonly Dictionary<int, int> sentPoints = new();
     private readonly Dictionary<int, DrawingStroke> remoteStrokes = new();
+    private readonly Dictionary<int, Vector3> sentTranslation = new();
+    private readonly Dictionary<int, Vector3> remoteTranslation = new();
 
     [Serializable]
     private sealed class StrokeDelta
@@ -33,7 +42,7 @@ public sealed class StageStateSync : MonoBehaviour
         public int id, offset;
         public float width, thickness, depth;
         public Color color;
-        public Vector3 normal;
+        public Vector3 normal, translation;
         public Vector3[] points;
     }
 
@@ -56,20 +65,26 @@ public sealed class StageStateSync : MonoBehaviour
         public bool doorOpen, clear;
     }
 
-    private void Start()
+    private IEnumerator Start()
     {
         network = NetworkManager.Singleton;
+        if (network == null || !network.IsConnectedClient)
+        { enabled = false; yield break; }
+        // Stage scripts (the tutorial) spawn hazards in their own Start. Wait one
+        // frame so both peers index the same complete set of objects.
+        yield return null;
+        // CornerRoomLevel owns coins and the door; other stages (the tutorial) have none.
         level = FindAnyObjectByType<CornerRoomLevel>();
-        if (network == null || !network.IsConnectedClient || level == null)
-        { enabled = false; return; }
+        dudu = FindAnyObjectByType<DuduSurfaceMovement>(FindObjectsInactive.Include);
         movers = FindObjectsByType<DuduMovingObstacle>();
         erasers = FindObjectsByType<MovingEraserObstacle>();
         shooters = FindObjectsByType<DuduHomingShooter>();
         Array.Sort(movers, (a, b) => string.CompareOrdinal(Path(a.transform), Path(b.transform)));
         Array.Sort(erasers, (a, b) => string.CompareOrdinal(Path(a.transform), Path(b.transform)));
         Array.Sort(shooters, (a, b) => string.CompareOrdinal(Path(a.transform), Path(b.transform)));
-        layout = "stage-v1";
-        foreach (var coin in level.coins) layout += "|coin:" + (coin != null ? Path(coin.transform) : "null");
+        layout = "stage-v2|" + SceneManager.GetActiveScene().name;
+        if (level != null)
+            foreach (var coin in level.coins) layout += "|coin:" + (coin != null ? Path(coin.transform) : "null");
         foreach (var mover in movers) layout += "|move:" + Path(mover.transform);
         foreach (var eraser in erasers) layout += "|eraser:" + Path(eraser.transform);
         foreach (var shooter in shooters) layout += "|shoot:" + Path(shooter.transform);
@@ -77,20 +92,64 @@ public sealed class StageStateSync : MonoBehaviour
         network.CustomMessagingManager.RegisterNamedMessageHandler(StrokeMessage, OnStroke);
         network.CustomMessagingManager.RegisterNamedMessageHandler(WorldMessage, OnWorld);
         network.CustomMessagingManager.RegisterNamedMessageHandler(SkipMessage, OnCinematicSkip);
+        network.CustomMessagingManager.RegisterNamedMessageHandler(EraseMessage, OnEraseRequest);
         if (!network.IsHost)
         {
             var drawing = FindAnyObjectByType<HaruDrawingController>(FindObjectsInactive.Include);
-            if (drawing == null) { Debug.LogError("Stage sync cannot find Haru drawing.", this); enabled = false; return; }
+            if (drawing == null) { Debug.LogError("Stage sync cannot find Haru drawing.", this); enabled = false; yield break; }
             remoteMaterial = drawing.CreateStrokeMaterialCopy();
         }
+        Active = this;
+    }
+
+    // Client side: hazards simulated here ask the host to erase, which owns strokes.
+    public void RequestErase(Vector3 start, Vector3 end, float radius)
+    {
+        if (network == null || network.IsHost || !ready || !network.IsConnectedClient) return;
+        using var writer = new FastBufferWriter(sizeof(float) * 7, Allocator.Temp);
+        writer.WriteValueSafe(start);
+        writer.WriteValueSafe(end);
+        writer.WriteValueSafe(radius);
+        network.CustomMessagingManager.SendNamedMessage(
+            EraseMessage, NetworkManager.ServerClientId, writer, NetworkDelivery.ReliableSequenced);
+    }
+
+    private void OnEraseRequest(ulong sender, FastBufferReader reader)
+    {
+        if (!network.IsHost || !ready || !ValidSender(sender) ||
+            !reader.TryBeginRead(sizeof(float) * 7)) return;
+        reader.ReadValueSafe(out Vector3 start);
+        reader.ReadValueSafe(out Vector3 end);
+        reader.ReadValueSafe(out float radius);
+        radius = Mathf.Clamp(radius, 0.01f, MaxRequestedEraseRadius);
+        // Push the result at once so the hole follows the eraser without a tick of delay.
+        if (DrawingStroke.EraseAlongSegment(start, end, radius)) SendStrokes();
     }
 
     private static string Path(Transform target) => target.parent == null
         ? target.name : Path(target.parent) + "/" + target.name;
 
+    // Coins are only ever collected (a restart reloads the scene), so OR-ing masks
+    // from either side converges on one count without double-counting a coin.
+    private int CollectedMask()
+    {
+        int mask = 0;
+        if (level == null || level.coins == null) return mask;
+        for (int i = 0; i < level.coins.Length && i < 31; i++)
+            if (level.coins[i] == null || !level.coins[i].activeSelf) mask |= 1 << i;
+        return mask;
+    }
+
+    private void ApplyCollectedMask(int mask)
+    {
+        if (level == null || level.coins == null) return;
+        for (int i = 0; i < level.coins.Length && i < 31; i++)
+            if ((mask & (1 << i)) != 0 && level.coins[i] != null) level.coins[i].SetActive(false);
+    }
+
     private void LateUpdate()
     {
-        if (network == null || !network.IsConnectedClient || Time.unscaledTime < nextSend) return;
+        if (layout == null || network == null || !network.IsConnectedClient || Time.unscaledTime < nextSend) return;
         nextSend = Time.unscaledTime + 0.1f;
         if (!ready)
         {
@@ -100,8 +159,9 @@ public sealed class StageStateSync : MonoBehaviour
         if (network.IsHost)
         {
             SendStrokes();
-            Send(WorldMessage, peer, JsonUtility.ToJson(new WorldState
-            { doorOpen = level.IsDoorVisuallyOpen, clear = level.IsClear }));
+            // The host's coin mask is the shared truth; the client hides any it missed.
+            Send(WorldMessage, peer, JsonUtility.ToJson(level == null ? new WorldState() : new WorldState
+            { collected = CollectedMask(), doorOpen = level.IsDoorVisuallyOpen, clear = level.IsClear }));
         }
         else
         {
@@ -111,9 +171,8 @@ public sealed class StageStateSync : MonoBehaviour
                 erasers = new Pose[erasers.Length],
                 projectiles = new Pose[shooters.Length]
             };
-            if (level.player != null) state.duduVisual = level.player.CaptureNetworkVisual();
-            for (int i = 0; i < level.coins.Length; i++)
-                if (level.coins[i] == null || !level.coins[i].activeSelf) state.collected |= 1 << i;
+            if (dudu != null) state.duduVisual = dudu.CaptureNetworkVisual();
+            state.collected = CollectedMask();
             for (int i = 0; i < movers.Length; i++) state.movers[i] = Pose.Capture(movers[i].transform);
             for (int i = 0; i < erasers.Length; i++) state.erasers[i] = Pose.Capture(erasers[i] != null ? erasers[i].transform : null);
             for (int i = 0; i < shooters.Length; i++) state.projectiles[i] = Pose.Capture(shooters[i].ActiveProjectile);
@@ -148,7 +207,9 @@ public sealed class StageStateSync : MonoBehaviour
 
     private void SendStrokes()
     {
-        var strokes = FindObjectsByType<DrawingStroke>();
+        var strokes = new List<DrawingStroke>();
+        foreach (var stroke in FindObjectsByType<DrawingStroke>())
+            if (!stroke.IsErased && !stroke.IsNetworkMirror) strokes.Add(stroke);
         var alive = new HashSet<int>();
         foreach (var stroke in strokes) alive.Add(stroke.NetworkStrokeId);
         foreach (int id in new List<int>(sentPoints.Keys))
@@ -156,26 +217,34 @@ public sealed class StageStateSync : MonoBehaviour
             if (alive.Contains(id)) continue;
             Send(StrokeMessage, peer, JsonUtility.ToJson(new StrokeDelta { id = id, offset = -1 }));
             sentPoints.Remove(id);
+            sentTranslation.Remove(id);
         }
         foreach (var stroke in strokes)
         {
             int id = stroke.NetworkStrokeId;
-            sentPoints.TryGetValue(id, out int offset);
+            bool known = sentPoints.TryGetValue(id, out int offset);
+            sentTranslation.TryGetValue(id, out Vector3 lastTranslation);
+            // Wind moves finished strokes on the host only. Send the running total so
+            // the mirror replays the same rigid move, even when no point was added.
+            bool moved = known && (stroke.TotalTranslation - lastTranslation).sqrMagnitude > 0.00000001f;
             var line = stroke.GetComponent<LineRenderer>();
-            while (offset < stroke.PointCount)
+            while (offset < stroke.PointCount || moved)
             {
                 int count = Mathf.Min(ChunkPoints, stroke.PointCount - offset);
                 var delta = new StrokeDelta
                 {
                     id = id, offset = offset, width = line.startWidth, color = line.startColor,
                     thickness = stroke.ColliderThickness, depth = stroke.ColliderDepth,
-                    normal = stroke.SurfaceNormal, points = new Vector3[count]
+                    normal = stroke.SurfaceNormal, translation = stroke.TotalTranslation,
+                    points = new Vector3[count]
                 };
                 for (int i = 0; i < count; i++) delta.points[i] = line.GetPosition(offset + i);
                 Send(StrokeMessage, peer, JsonUtility.ToJson(delta));
                 offset += count;
+                moved = false;
             }
             sentPoints[id] = offset;
+            sentTranslation[id] = stroke.TotalTranslation;
         }
     }
 
@@ -187,23 +256,30 @@ public sealed class StageStateSync : MonoBehaviour
         if (delta == null) return;
         if (delta.offset == -1)
         {
+            remoteTranslation.Remove(delta.id);
             if (remoteStrokes.Remove(delta.id, out var removed) && removed != null)
             { removed.gameObject.SetActive(false); Destroy(removed.gameObject); }
             return;
         }
-        if (delta.points == null || delta.points.Length == 0 || delta.points.Length > ChunkPoints) return;
-        if (!remoteStrokes.TryGetValue(delta.id, out var stroke))
+        if (delta.points == null || delta.points.Length > ChunkPoints) return;
+        if (!remoteStrokes.TryGetValue(delta.id, out var stroke) || stroke == null)
         {
-            if (delta.offset != 0) return;
+            if (delta.offset != 0 || delta.points.Length == 0) return;
             var holder = new GameObject("Remote Drawing Stroke");
             holder.transform.SetParent(transform, false);
             stroke = holder.AddComponent<DrawingStroke>();
+            stroke.MarkAsNetworkMirror();
             int layer = LayerMask.NameToLayer("DrawnStroke");
             stroke.Initialize(remoteMaterial, delta.width, delta.color, delta.points[0],
                 delta.thickness, delta.depth, delta.normal, layer >= 0 ? layer : 0);
-            remoteStrokes.Add(delta.id, stroke);
+            remoteStrokes[delta.id] = stroke;
+            // Points arrive in the host's current (already moved) space.
+            remoteTranslation[delta.id] = delta.translation;
             DuduCameraController.RegisterRuntimeRenderer(stroke.GetComponent<LineRenderer>());
         }
+        remoteTranslation.TryGetValue(delta.id, out Vector3 applied);
+        stroke.Translate(delta.translation - applied);
+        remoteTranslation[delta.id] = delta.translation;
         // Reliable ordered deltas append only new points; existing colliders remain intact.
         if (delta.offset > stroke.PointCount) return;
         for (int i = Mathf.Max(0, stroke.PointCount - delta.offset); i < delta.points.Length; i++)
@@ -218,6 +294,8 @@ public sealed class StageStateSync : MonoBehaviour
         if (state == null) return;
         if (!network.IsHost)
         {
+            if (level == null) return;
+            ApplyCollectedMask(state.collected);
             if (state.doorOpen) level.OpenDoorForCinematic();
             if (state.clear) level.ApplyRemoteClear();
             return;
@@ -225,9 +303,8 @@ public sealed class StageStateSync : MonoBehaviour
         if (state.movers == null || state.movers.Length != movers.Length ||
             state.erasers == null || state.erasers.Length != erasers.Length ||
             state.projectiles == null || state.projectiles.Length != shooters.Length) return;
-        if (level.player != null) level.player.ApplyNetworkVisual(state.duduVisual);
-        for (int i = 0; i < level.coins.Length; i++)
-            if ((state.collected & (1 << i)) != 0 && level.coins[i] != null) level.coins[i].SetActive(false);
+        if (dudu != null) dudu.ApplyNetworkVisual(state.duduVisual);
+        ApplyCollectedMask(state.collected);
         for (int i = 0; i < movers.Length; i++)
             movers[i].ApplyRemotePose(state.movers[i].position, state.movers[i].rotation);
         for (int i = 0; i < erasers.Length; i++)
@@ -288,7 +365,9 @@ public sealed class StageStateSync : MonoBehaviour
             network.CustomMessagingManager.UnregisterNamedMessageHandler(StrokeMessage);
             network.CustomMessagingManager.UnregisterNamedMessageHandler(WorldMessage);
             network.CustomMessagingManager.UnregisterNamedMessageHandler(SkipMessage);
+            network.CustomMessagingManager.UnregisterNamedMessageHandler(EraseMessage);
         }
+        if (Active == this) Active = null;
         if (remoteMaterial != null) Destroy(remoteMaterial);
     }
 }

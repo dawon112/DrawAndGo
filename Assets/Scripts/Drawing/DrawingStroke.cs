@@ -26,13 +26,25 @@ public sealed class DrawingStroke : MonoBehaviour
     public int NetworkStrokeId { get; private set; }
     private readonly List<BoxCollider> colliderSegments = new List<BoxCollider>();
 
+    private bool isErased;
+
     public int PointCount => lineRenderer != null ? lineRenderer.positionCount : 0;
     public bool IsFinished => isFinished;
+    // Destroy is deferred to the end of the frame. Once erased, a stroke must be
+    // ignored by every later query in the same frame or it would be split again.
+    public bool IsErased => isErased;
     public float ColliderThickness => colliderThickness;
     public float ColliderDepth => colliderDepth;
     public Vector3 SurfaceNormal => surfaceNormal;
+    // Sum of every rigid move (wind) since creation, so peers can replay it.
+    public Vector3 TotalTranslation { get; private set; }
+    // A copy of a stroke owned by the host. It never simulates or destroys itself;
+    // the host's stroke messages are its only source of change.
+    public bool IsNetworkMirror { get; private set; }
     // Erased fragments retain their source identity for scene-local objectives.
     public int SourceStrokeId { get; private set; }
+
+    public void MarkAsNetworkMirror() => IsNetworkMirror = true;
 
     public void Initialize(
         Material material,
@@ -124,7 +136,8 @@ public sealed class DrawingStroke : MonoBehaviour
         end.a *= 1f - progress;
         lineRenderer.startColor = start;
         lineRenderer.endColor = end;
-        if (progress >= 1f) Destroy(gameObject);
+        // A mirror only shows the fade; the host's delete message removes its colliders.
+        if (progress >= 1f && !IsNetworkMirror) Destroy(gameObject);
     }
 
     private void FixedUpdate()
@@ -143,7 +156,7 @@ public sealed class DrawingStroke : MonoBehaviour
             }
         }
 
-        if (!isFinished)
+        if (!isFinished || IsNetworkMirror)
             return;
 
         Vector3 windVelocity = Vector3.zero;
@@ -165,12 +178,21 @@ public sealed class DrawingStroke : MonoBehaviour
 
         // Translate the entire stroke rigidly. Moving only the points inside the
         // zone pins them at its boundary and destroys the shape of the drawing.
-        Vector3 displacement = windVelocity * Time.fixedDeltaTime;
+        Translate(windVelocity * Time.fixedDeltaTime);
+    }
+
+    public void Translate(Vector3 displacement)
+    {
+        if (lineRenderer == null || displacement.sqrMagnitude <= Mathf.Epsilon)
+            return;
+
         for (int i = 0; i < lineRenderer.positionCount; i++)
             lineRenderer.SetPosition(i, lineRenderer.GetPosition(i) + displacement);
-
-        for (int i = 1; i < lineRenderer.positionCount; i++)
-            CreateColliderSegment(GetPhysicsPoint(i - 1), GetPhysicsPoint(i), i - 1);
+        // Physics points are translation invariant, so the segments can move as-is.
+        foreach (BoxCollider segment in colliderSegments)
+            if (segment != null)
+                segment.transform.position += displacement;
+        TotalTranslation += displacement;
     }
 
     private bool TryStartHotZoneFade(Vector3 firstPoint)
@@ -207,7 +229,7 @@ public sealed class DrawingStroke : MonoBehaviour
     public bool TryGetSqrDistance(Vector3 point, float radius, out float sqrDistance)
     {
         sqrDistance = float.PositiveInfinity;
-        if (lineRenderer == null || lineRenderer.positionCount == 0)
+        if (isErased || lineRenderer == null || lineRenderer.positionCount == 0)
             return false;
 
         if (lineRenderer.positionCount == 1)
@@ -228,14 +250,44 @@ public sealed class DrawingStroke : MonoBehaviour
         return sqrDistance <= radius * radius;
     }
 
-    public bool Erase(Vector3 center, float radius)
+    // Erases every stroke touched by a circle swept from start to end. Strokes and
+    // fragments are tracked in one list so each piece is split at most once per point.
+    public static bool EraseAlongSegment(Vector3 start, Vector3 end, float radius)
     {
-        if (lineRenderer == null || lineRenderer.positionCount == 0)
+        var strokes = new List<DrawingStroke>(FindObjectsByType<DrawingStroke>());
+        var created = new List<DrawingStroke>();
+        float distance = Vector3.Distance(start, end);
+        int steps = Mathf.Max(1, Mathf.CeilToInt(distance / Mathf.Max(0.02f, radius * 0.5f)));
+        bool erasedAny = false;
+        for (int step = 0; step <= steps; step++)
+        {
+            Vector3 point = Vector3.Lerp(start, end, step / (float)steps);
+            created.Clear();
+            for (int i = strokes.Count - 1; i >= 0; i--)
+            {
+                DrawingStroke stroke = strokes[i];
+                if (stroke == null || stroke.isErased || stroke.IsNetworkMirror)
+                    strokes.RemoveAt(i);
+                else if (stroke.Erase(point, radius, created))
+                {
+                    erasedAny = true;
+                    strokes.RemoveAt(i);
+                }
+            }
+            strokes.AddRange(created);
+        }
+        return erasedAny;
+    }
+
+    public bool Erase(Vector3 center, float radius, List<DrawingStroke> createdParts = null)
+    {
+        if (isErased || lineRenderer == null || lineRenderer.positionCount == 0)
             return false;
         if (lineRenderer.positionCount == 1)
         {
             if ((lineRenderer.GetPosition(0) - center).sqrMagnitude > radius * radius)
                 return false;
+            isErased = true;
             Destroy(gameObject);
             return true;
         }
@@ -266,8 +318,10 @@ public sealed class DrawingStroke : MonoBehaviour
                 strokeLayer);
             part.FinishDrawing();
             part.SourceStrokeId = SourceStrokeId;
+            createdParts?.Add(part);
         }
 
+        isErased = true;
         Destroy(gameObject);
         return true;
     }

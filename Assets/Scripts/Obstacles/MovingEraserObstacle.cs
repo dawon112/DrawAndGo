@@ -110,14 +110,15 @@ public sealed class MovingEraserObstacle : MonoBehaviour
 
     private void EraseAlongMove(Vector3 start, Vector3 end)
     {
-        float distance = Vector3.Distance(start, end);
-        int steps = Mathf.Max(1, Mathf.CeilToInt(distance / Mathf.Max(0.02f, eraseRadius * 0.5f)));
-        for (int step = 0; step <= steps; step++)
+        // Only the host edits strokes. Dudu's client owns this hazard's motion, so it
+        // asks the host to erase; the result returns through the normal stroke sync.
+        if (GameSession.Current != null && !GameSession.Current.IsHost)
         {
-            Vector3 point = Vector3.Lerp(start, end, step / (float)steps);
-            foreach (DrawingStroke stroke in FindObjectsByType<DrawingStroke>())
-                if (stroke != null) stroke.Erase(point, eraseRadius);
+            if (StageStateSync.Active != null)
+                StageStateSync.Active.RequestErase(start, end, eraseRadius);
+            return;
         }
+        DrawingStroke.EraseAlongSegment(start, end, eraseRadius);
     }
 
     private bool TouchesDuduAlongMove(Vector3 displacement)
