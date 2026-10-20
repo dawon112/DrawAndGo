@@ -29,12 +29,24 @@ public sealed class StageCinematicController : MonoBehaviour
     private Text skipText;
     private bool introPlayed, clearPlaying;
     private bool skipRequested;
+    private bool networkClearSkipPending;
 
     private void Update()
     {
-        if (skipText != null && skipText.gameObject.activeSelf && Keyboard.current != null &&
+        if (!SettingsPopupController.IsAnyOpen && skipText != null &&
+            skipText.gameObject.activeSelf && Keyboard.current != null &&
             Keyboard.current.qKey.wasPressedThisFrame)
+        {
             skipRequested = true;
+            if (clearPlaying)
+                FindAnyObjectByType<StageStateSync>()?.BroadcastCinematicSkip();
+        }
+    }
+
+    public void RequestNetworkClearSkip()
+    {
+        if (clearPlaying) skipRequested = true;
+        else networkClearSkipPending = true;
     }
 
     public void Configure(GameViewManager owner, Camera playerCamera, Player3DMovement movement,
@@ -161,6 +173,11 @@ public sealed class StageCinematicController : MonoBehaviour
     {
         clearPlaying = true;
         BeginSkippableCinematic();
+        if (networkClearSkipPending)
+        {
+            networkClearSkipPending = false;
+            skipRequested = true;
+        }
         manager.EnterCinematic(GameViewManager.CameraState.ClearCinematic);
         manager.ShowHaruCameraWithoutInput();
         ActivateCinematic();
@@ -203,6 +220,7 @@ public sealed class StageCinematicController : MonoBehaviour
         yield return MoveIntoDoorAndFade(center, focus.rotation);
         level.TryCompleteThreeDimensionalGoal(haruMovement);
         EndSkippableCinematic();
+        clearPlaying = false;
         Debug.Log("Stage Clear Complete", level);
     }
 
@@ -313,6 +331,7 @@ public sealed class StageCinematicController : MonoBehaviour
         fadeGroup.blocksRaycasts = true;
         level.TryCompleteThreeDimensionalGoal(haruMovement);
         EndSkippableCinematic();
+        clearPlaying = false;
         Debug.Log("Stage Clear Complete (cinematic skipped)", level);
     }
 

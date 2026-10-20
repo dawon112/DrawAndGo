@@ -72,10 +72,17 @@ public sealed class HaruDrawingController : MonoBehaviour
 
     private void Update()
     {
+        if (SettingsPopupController.IsAnyOpen)
+        {
+            EndStroke();
+            ClearSurfaceAim();
+            return;
+        }
+
         Keyboard keyboard = Keyboard.current;
-        if (keyboard != null && keyboard.eKey.wasPressedThisFrame)
+        if (CoopInputSettings.WasPressed(keyboard, CoopInputAction.HaruToolSwitch))
             SetTool(currentTool == DrawingTool.Pen ? DrawingTool.Eraser : DrawingTool.Pen);
-        if (keyboard != null && keyboard.yKey.wasPressedThisFrame)
+        if (CoopInputSettings.WasPressed(keyboard, CoopInputAction.HaruCameraLock))
             SetCameraLock(!cameraLock);
 
         Mouse mouse = Mouse.current;
@@ -354,6 +361,13 @@ public sealed class HaruDrawingController : MonoBehaviour
     {
         maxCrayon = Mathf.Max(1f, maxCrayon);
         consumptionPerWorldUnit = Mathf.Max(0.01f, consumptionPerWorldUnit);
+    }
+
+    public Material CreateStrokeMaterialCopy()
+    {
+        Material copy = CreateLineMaterial(lineMaterialTemplate);
+        copy.color = penColor;
+        return copy;
     }
 
     private static Material CreateLineMaterial(Material template)

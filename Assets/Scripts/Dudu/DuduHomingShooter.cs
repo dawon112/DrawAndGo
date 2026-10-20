@@ -42,6 +42,7 @@ public sealed class DuduHomingShooter : MonoBehaviour
     private float nextShotTime;
     private AudioSource audioSource;
     private DuduHomingProjectile activeProjectile;
+    public Transform ActiveProjectile => activeProjectile != null ? activeProjectile.transform : null;
     private static AudioClip defaultFireSound;
     private static Sprite projectileSprite;
 
@@ -66,6 +67,7 @@ public sealed class DuduHomingShooter : MonoBehaviour
 
     private void Update()
     {
+        if (GameSession.Current != null && GameSession.Current.IsHost) return;
         // Temporary 3D testing gate: reuse the view manager's existing input state.
         bool targetIsActive = surface != null && target != null && target.InputEnabled;
         if (!targetIsActive)
@@ -89,6 +91,25 @@ public sealed class DuduHomingShooter : MonoBehaviour
         nextShotTime = Time.time + fireInterval;
         if (CanRecognizeTarget())
             FireProjectile();
+    }
+
+    public void ApplyRemoteProjectile(bool active, Vector3 position, Quaternion rotation)
+    {
+        if (!active)
+        {
+            if (activeProjectile != null)
+            { activeProjectile.gameObject.SetActive(false); Destroy(activeProjectile.gameObject); }
+            activeProjectile = null;
+            return;
+        }
+        if (activeProjectile == null)
+        {
+            FireProjectile();
+            if (activeProjectile == null) return;
+            activeProjectile.enabled = false;
+            foreach (var collider in activeProjectile.GetComponentsInChildren<Collider>()) collider.enabled = false;
+        }
+        activeProjectile.transform.SetPositionAndRotation(position, rotation);
     }
 
     private bool CanRecognizeTarget()
@@ -252,7 +273,8 @@ public sealed class DuduHomingShooter : MonoBehaviour
             audioSource.priority = 64;
             audioSource.volume = 1f;
         }
-        audioSource.PlayOneShot(fireSound != null ? fireSound : GetDefaultFireSound(), fireSoundVolume);
+        audioSource.PlayOneShot(fireSound != null ? fireSound : GetDefaultFireSound(),
+            fireSoundVolume * CoopAudioSettings.SfxVolume);
     }
 
     private static AudioClip GetDefaultFireSound()

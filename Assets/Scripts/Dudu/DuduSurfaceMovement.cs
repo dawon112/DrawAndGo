@@ -73,6 +73,7 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
     public bool IsSlowed => slowEffectActive;
     public bool IsControlsReversed => reverseEffectActive;
     public DuduSurface CurrentSurface => currentSurface;
+    public bool FacingLeft => spriteRenderer != null && spriteRenderer.flipX;
     public float VisualSeamOverlap => 2f * (characterHalfSize.x + CornerSeamInset);
 
     public void SetSurface(DuduSurface surface)
@@ -116,12 +117,82 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
             body.linearVelocity = Vector3.Project(body.linearVelocity, currentSurface.Up);
     }
 
+    [System.Serializable]
+    public struct NetworkVisualState
+    {
+        public int animation;
+        public float normalizedTime;
+        public float speed;
+        public bool grounded;
+        public Color color;
+    }
+
+    public NetworkVisualState CaptureNetworkVisual()
+    {
+        var state = new NetworkVisualState { color = spriteRenderer != null ? spriteRenderer.color : Color.white };
+        if (animator != null && animator.runtimeAnimatorController != null)
+        {
+            var animation = animator.IsInTransition(0)
+                ? animator.GetNextAnimatorStateInfo(0) : animator.GetCurrentAnimatorStateInfo(0);
+            state.animation = animation.shortNameHash;
+            state.normalizedTime = animation.normalizedTime;
+            state.speed = animator.GetFloat(SpeedId);
+            state.grounded = animator.GetBool(GroundedId);
+        }
+        return state;
+    }
+
+    public void ApplyNetworkVisual(NetworkVisualState state)
+    {
+        if (GameSession.Current == null || !GameSession.Current.IsHost) return;
+        if (spriteRenderer != null) spriteRenderer.color = state.color;
+        if (animator != null && animator.runtimeAnimatorController != null)
+        {
+            // Let the remote Animator perform its own transitions. Replaying the
+            // received state every packet can keep Dudu permanently in Jump.
+            animator.speed = 1f;
+            animator.SetFloat(SpeedId, state.speed);
+            animator.SetBool(GroundedId, state.grounded);
+            int current = animator.GetCurrentAnimatorStateInfo(0).shortNameHash;
+            if ((state.animation == DieStateId || state.animation == RebirthStateId) &&
+                current != state.animation && animator.HasState(0, state.animation))
+                animator.Play(state.animation, 0, Mathf.Clamp01(state.normalizedTime));
+        }
+    }
+
+    public void SetRemoteControlled()
+    {
+        SetInputEnabled(false);
+        enabled = false;
+        if (body == null) return;
+        body.linearVelocity = Vector3.zero;
+        body.isKinematic = true;
+    }
+
+    public void ApplyRemotePose(DuduSurface surface, Vector3 position, Quaternion rotation, bool facingLeft)
+    {
+        if (surface != null && currentSurface != surface)
+        {
+            currentSurface = surface;
+            UpdateVisualSurfaceOffset();
+        }
+
+        if (body != null)
+        {
+            body.position = position;
+            body.rotation = rotation;
+        }
+        transform.SetPositionAndRotation(position, rotation);
+        if (spriteRenderer != null) spriteRenderer.flipX = facingLeft;
+    }
+
     public void BounceAwayFrom(
         Vector3 sourcePosition,
         float horizontalSpeed,
         float upwardSpeed,
         float controlDuration)
     {
+        if (GameSession.Current != null && GameSession.Current.IsHost) return;
         if (currentSurface == null || body == null)
             return;
 
@@ -158,6 +229,7 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         float speedMultiplier,
         float duration)
     {
+        if (GameSession.Current != null && GameSession.Current.IsHost) return;
         float effectEndTime = Time.time + Mathf.Max(0f, duration);
         switch (effectType)
         {
@@ -216,12 +288,12 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         Keyboard keyboard = Keyboard.current;
         if (inputEnabled && !dialogueInputLocked && keyboard != null)
         {
-            bool right = keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed;
-            bool left = keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed;
+            bool right = CoopInputSettings.IsPressed(keyboard, CoopInputAction.DuduRight);
+            bool left = CoopInputSettings.IsPressed(keyboard, CoopInputAction.DuduLeft);
             horizontalInput = (right ? 1f : 0f) - (left ? 1f : 0f);
             if (reverseEffectActive)
                 horizontalInput = -horizontalInput;
-            if (keyboard.spaceKey.wasPressedThisFrame && !jumpConsumedUntilLanding &&
+            if (CoopInputSettings.WasPressed(keyboard, CoopInputAction.DuduJump) && !jumpConsumedUntilLanding &&
                 Time.time - lastGroundedTime < 0.15f)
             {
                 jumpRequested = true;
@@ -448,6 +520,7 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
     }
     public void Die()
     {
+        if (GameSession.Current != null && GameSession.Current.IsHost) return;
         if (isRespawning || Time.time < respawnProtectedUntil)
             return;
         StartCoroutine(DeathAndRespawnRoutine());

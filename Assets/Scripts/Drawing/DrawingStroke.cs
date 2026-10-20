@@ -22,10 +22,15 @@ public sealed class DrawingStroke : MonoBehaviour
     private Color fadeEndColor;
     private static int splitNumber;
     private static int nextSourceStrokeId;
+    private static int nextNetworkId;
+    public int NetworkStrokeId { get; private set; }
     private readonly List<BoxCollider> colliderSegments = new List<BoxCollider>();
 
     public int PointCount => lineRenderer != null ? lineRenderer.positionCount : 0;
     public bool IsFinished => isFinished;
+    public float ColliderThickness => colliderThickness;
+    public float ColliderDepth => colliderDepth;
+    public Vector3 SurfaceNormal => surfaceNormal;
     // Erased fragments retain their source identity for scene-local objectives.
     public int SourceStrokeId { get; private set; }
 
@@ -62,6 +67,7 @@ public sealed class DrawingStroke : MonoBehaviour
     {
         lineRenderer = GetComponent<LineRenderer>();
         SourceStrokeId = ++nextSourceStrokeId;
+        if (NetworkStrokeId == 0) NetworkStrokeId = ++nextNetworkId;
         strokeMaterial = material;
         strokeWidth = width;
         strokeColor = color;

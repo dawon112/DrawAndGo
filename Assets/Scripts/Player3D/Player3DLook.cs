@@ -27,6 +27,13 @@ public sealed class Player3DLook : MonoBehaviour
 
     private void Update()
     {
+        if (SettingsPopupController.IsAnyOpen)
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+            return;
+        }
+
         Keyboard keyboard = Keyboard.current;
         if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
         {
@@ -41,7 +48,7 @@ public sealed class Player3DLook : MonoBehaviour
         if (mouse == null || Cursor.lockState != CursorLockMode.Locked || playerBody == null)
             return;
 
-        Vector2 lookDelta = mouse.delta.ReadValue() * mouseSensitivity;
+        Vector2 lookDelta = mouse.delta.ReadValue() * mouseSensitivity * CoopInputSettings.LookSensitivityMultiplier;
         pitch = Mathf.Clamp(pitch - lookDelta.y, -verticalLookLimit, verticalLookLimit);
         transform.localRotation = Quaternion.Euler(pitch, 0f, 0f);
         playerBody.Rotate(Vector3.up, lookDelta.x, Space.World);

@@ -36,11 +36,11 @@ public sealed class PlayerController2D : MonoBehaviour
             return;
         }
 
-        bool left = keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed;
-        bool right = keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed;
+        bool left = CoopInputSettings.IsPressed(keyboard, CoopInputAction.DuduLeft);
+        bool right = CoopInputSettings.IsPressed(keyboard, CoopInputAction.DuduRight);
         moveInput = (right ? 1f : 0f) - (left ? 1f : 0f);
 
-        if (keyboard.spaceKey.wasPressedThisFrame)
+        if (CoopInputSettings.WasPressed(keyboard, CoopInputAction.DuduJump))
             jumpRequested = true;
 
         if (moveInput != 0f)

@@ -23,6 +23,7 @@ public sealed class GameViewManager : MonoBehaviour
     private StageCinematicController stageCinematic;
     private TutorialRoomLevel tutorialClearLevel;
     public CameraState CurrentCameraState { get; private set; }
+    public bool IsHaruGameplayView => CurrentCameraState == CameraState.Gameplay && !duduMode;
 
     private void Awake()
     {
@@ -33,6 +34,7 @@ public sealed class GameViewManager : MonoBehaviour
         if (stageCinematic == null) stageCinematic = gameObject.AddComponent<StageCinematicController>();
         stageCinematic.Configure(this, haruCamera, haruMovement, haruLook, duduCamera,
             duduMovement, haruDrawing, crosshair);
+        ConfigureDuduPositionIndicator();
     }
 
     private static void EnsureAudioListener(Camera targetCamera)
@@ -53,10 +55,33 @@ public sealed class GameViewManager : MonoBehaviour
         haruLook = newHaruLook;
         duduCamera = newDuduCamera;
         duduMovement = newDuduMovement;
+        ConfigureDuduPositionIndicator();
+    }
+
+    private void ConfigureDuduPositionIndicator()
+    {
+        DuduPositionIndicator indicator = GetComponent<DuduPositionIndicator>();
+        if (indicator == null) indicator = gameObject.AddComponent<DuduPositionIndicator>();
+        indicator.Configure(this, haruCamera, duduMovement);
     }
 
     private void Start()
     {
+        GameSession activeSession = GameSession.Current;
+        if (activeSession != null)
+        {
+            developmentViewSwitch = false;
+            SetDuduMode(!activeSession.IsHost);
+            if (activeSession.IsHost && duduMovement != null)
+                duduMovement.SetRemoteControlled();
+            CornerRoomLevel multiplayerLevel = FindAnyObjectByType<CornerRoomLevel>();
+            gameObject.AddComponent<StageStateSync>();
+            PlayerPoseSync poseSync = gameObject.AddComponent<PlayerPoseSync>();
+            poseSync.Configure(haruMovement != null ? haruMovement.transform : null,
+                duduMovement, multiplayerLevel != null ? multiplayerLevel.surfaces : null);
+            return;
+        }
+
         SetDuduMode(false);
         CornerRoomLevel level = FindAnyObjectByType<CornerRoomLevel>();
         if (level != null) stageCinematic.PlayIntro(level);
@@ -64,7 +89,7 @@ public sealed class GameViewManager : MonoBehaviour
 
     private void Update()
     {
-        if (CurrentCameraState != CameraState.Gameplay)
+        if (CurrentCameraState != CameraState.Gameplay || SettingsPopupController.IsAnyOpen)
             return;
 
         Keyboard keyboard = Keyboard.current;
@@ -124,7 +149,7 @@ public sealed class GameViewManager : MonoBehaviour
         if (duduListener != null) duduListener.enabled = duduListenerEnabled;
         if (crosshair != null) crosshair.SetSplitScreenLayout(false);
         splitSequenceActive = false;
-        SetDuduMode(false);
+        SetDuduMode(GameSession.Current != null && !GameSession.Current.IsHost);
         CornerRoomLevel level = FindAnyObjectByType<CornerRoomLevel>();
         if (tutorialClearLevel != null) stageCinematic.PlayTutorialDoorOpen(tutorialClearLevel);
         else if (level != null) stageCinematic.PlayClear(level);
@@ -152,7 +177,7 @@ public sealed class GameViewManager : MonoBehaviour
     public void FinishIntro()
     {
         CurrentCameraState = CameraState.Gameplay;
-        SetDuduMode(false);
+        SetDuduMode(GameSession.Current != null && !GameSession.Current.IsHost);
     }
 
     public void FinishTutorialDoorSequence()

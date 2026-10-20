@@ -8,6 +8,9 @@
 /[Oo]bj/
 /[Bb]uild/
 /[Bb]uilds/
+/BuildTest/
+/BuildTest.zip
+/.codex-video-tools/
 /[Ll]ogs/
 /[Uu]ser[Ss]ettings/
 *.log
@@ -73,3 +76,9 @@ crashlytics-build.properties
 # Temporary auto-generated Android Assets
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# Local player builds and archives (never commit build output)
+/TTT/
+/TTT.zip
+/[Bb]uilds/
+*.zip
