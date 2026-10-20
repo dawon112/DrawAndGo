@@ -5091,6 +5091,7 @@ MonoBehaviour:
   - {fileID: 678716448}
   - {fileID: 351621863}
   - {fileID: 202082173}
+  requiredCoins: 0
   door: {fileID: 1455323704}
   player: {fileID: 1973135219}
   player3D: {fileID: 820480126}
