@@ -521,6 +521,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4593784540543685946}
+  - component: {fileID: 4274158092486463880}
+  - component: {fileID: 2269701508232506}
+  - component: {fileID: 3290023399790911221}
   m_Layer: 0
   m_Name: HaruWithCrayon
   m_TagString: Untagged
@@ -545,6 +548,92 @@ Transform:
   - {fileID: 1834577519077533479}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!95 &4274158092486463880
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2700868248009816716}
+  m_Enabled: 1
+  m_Avatar: {fileID: 9000000, guid: 79d7a0565cea8f043aaad8260432f4c1, type: 3}
+  m_Controller: {fileID: 9100000, guid: 52ac3585cbc7365429b09043bec1b15f, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &2269701508232506
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2700868248009816716}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 13ffb1cfb9ec25243bd4afd98838dfcd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HaruLocomotionAnimator
+  walkClipSpeed: 1.6
+  maxWalkPlayback: 2.2
+  groundProbeDistance: 0.2
+  speedSmoothing: 12
+--- !u!114 &3290023399790911221
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2700868248009816716}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0c1cd2977e4489644aad4a43c316b024, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HaruArmHoldPose
+  armRootBone: R_Upperarm
+  weight: 1
+  boneNames:
+  - R_Upperarm
+  - R_Forearm
+  - R_ForearmTwist01
+  - R_ForearmTwist02
+  - R_Hand
+  - R_Index01
+  - R_Index02
+  - R_Middle01
+  - R_Middle02
+  - R_Pinky01
+  - R_Pinky02
+  - R_Thumb01
+  - R_Thumb02
+  - Crayon Grip
+  - R_UpperarmTwist01
+  - R_UpperarmTwist02
+  localRotations:
+  - {x: 0.33562347, y: -0.30032593, z: -0.5784059, w: 0.6801528}
+  - {x: 0.454058, y: -0.072072305, z: -0.08209074, w: 0.8842499}
+  - {x: 0.000000009921096, y: 0.00000009736873, z: -0.00000005215407, w: 1}
+  - {x: -0.000000016828352, y: 0.000000068138355, z: -0.00000034505496, w: 1}
+  - {x: 0.035092406, y: 0.35186818, z: 0.3606415, w: 0.863073}
+  - {x: 0.0043527074, y: -0.061982572, z: 0.36573365, w: 0.92864317}
+  - {x: 0.040013436, y: -0.015176867, z: 0.5090167, w: 0.8596922}
+  - {x: -0.0038612152, y: 0.001883301, z: 0.3628324, w: 0.93184453}
+  - {x: 0.033204272, y: -0.019951085, z: 0.4567383, w: 0.88875735}
+  - {x: 0.023980474, y: -0.0063154297, z: 0.34346867, w: 0.9388367}
+  - {x: -0.022483114, y: 0.015989095, z: 0.514565, w: 0.85700744}
+  - {x: -0.03573732, y: -0.0772268, z: 0.49036717, w: 0.86735165}
+  - {x: -0.0343377, y: -0.011823444, z: -0.41527063, w: 0.90897274}
+  - {x: -0.050676405, y: 0.091422655, z: -0.48215377, w: 0.86982846}
+  - {x: 0.000000033437708, y: -0.000000039460144, z: 0.0000005066395, w: 1}
+  - {x: -0.00000009143368, y: -0.0000002766256, z: -0.00000094459403, w: 1}
 --- !u!1 &2897228574085851408
 GameObject:
   m_ObjectHideFlags: 0
@@ -846,7 +935,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4037604166329588683}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.004352707, y: -0.061982572, z: 0.36573362, w: 0.92864317}
+  m_LocalRotation: {x: 0.0043527074, y: -0.061982572, z: 0.36573365, w: 0.92864317}
   m_LocalPosition: {x: -0.0003884873, y: 0.00055857905, z: -0.000029858564}
   m_LocalScale: {x: 0.99999994, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -941,7 +1030,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4221562675348526780}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.9968977, y: -0.060271014, z: -0.004074524, w: -0.05045589}
+  m_LocalRotation: {x: 0.9968977, y: -0.060271017, z: -0.004074524, w: -0.050455894}
   m_LocalPosition: {x: -0.00070303894, y: -0.000015853408, z: 0.000030365956}
   m_LocalScale: {x: 1.0000049, y: 1.0000001, z: 1.0000032}
   m_ConstrainProportionsScale: 0

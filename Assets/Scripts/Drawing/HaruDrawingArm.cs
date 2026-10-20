@@ -66,6 +66,9 @@ public sealed class HaruDrawingArm : MonoBehaviour
         rigRoot.localRotation = Quaternion.identity;
         SetLayerRecursively(rigRoot, 0);
         foreach (Animator animator in rigRoot.GetComponentsInChildren<Animator>(true)) animator.enabled = false;
+        // The world Haru may already be animating; start from the model's own arm pose.
+        HaruArmHoldPose heldArm = haruVisual.GetComponent<HaruArmHoldPose>();
+        if (heldArm != null) heldArm.ApplyRestPose(rigRoot);
 
         Transform[] bones = rigRoot.GetComponentsInChildren<Transform>(true);
         upperArm = bones.FirstOrDefault(item => item.name == "R_Upperarm");
