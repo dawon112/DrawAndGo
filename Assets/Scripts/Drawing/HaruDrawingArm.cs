@@ -7,21 +7,33 @@ using UnityEngine.Rendering;
 [DefaultExecutionOrder(100)]
 public sealed class HaruDrawingArm : MonoBehaviour
 {
-    private static readonly Vector2 RestShoulder = new Vector2(1.04f, 0.16f);
-    private static readonly Vector2 RestHand = new Vector2(0.83f, 0.38f);
+    [Tooltip("Screen point (0-1) where the shoulder sits; below the screen makes the arm rise from the bottom.")]
+    [SerializeField] private Vector2 restShoulder = new Vector2(0.99f, -0.26f);
+    [Tooltip("Screen point (0-1) where the hand holding the crayon rests.")]
+    [SerializeField] private Vector2 restHand = new Vector2(0.82f, 0.2f);
+    [Tooltip("Turns the hand around the forearm (degrees) so the gripping fingers face the camera.")]
+    [SerializeField, Range(-180f, 180f)] private float handRoll = 180f;
+    [Tooltip("Bends the hand at the wrist, in the screen plane (degrees), so the hand's edge runs on into the forearm.")]
+    [SerializeField, Range(-60f, 60f)] private float wristStraighten;
 
     private HaruDrawingController drawing;
     private Camera view;
     private Transform armRoot, rigRoot, upperArm, forearm, hand, crayon;
     private Renderer[] crayonRenderers;
     private float crayonSourceLength = 1f;
+    private bool crayonFollowsHand;
+    private HaruHeldTool heldTool;
+    // Shoulder rotation the first-person grip was tuned with (upper arm and forearm: identity).
+    private static readonly Quaternion FirstPersonClavicle = new Quaternion(0f, -0.07280299f, 0f, 0.99734634f);
     private Quaternion upperRest, forearmRest, handRest;
+    private Transform forearmTwist01, forearmTwist02;
+    private Quaternion twist01Rest, twist02Rest;
     private Renderer[] worldRenderers, armRenderers;
     private readonly Dictionary<Renderer, bool> worldRendererStates = new Dictionary<Renderer, bool>();
     private readonly List<Material> runtimeMaterials = new List<Material>();
     private readonly List<Mesh> runtimeMeshes = new List<Mesh>();
     private float visibility;
-    private Vector2 smoothedHandViewport = RestHand;
+    private Vector2 smoothedHandViewport;
     private Vector2 handVelocity;
     private bool cameraRendering;
 
@@ -52,6 +64,7 @@ public sealed class HaruDrawingArm : MonoBehaviour
             return;
         }
         view.nearClipPlane = 0.08f;
+        smoothedHandViewport = restHand;
     }
 
     private bool CreateRiggedFirstPersonArm(Transform haruVisual)
@@ -75,6 +88,17 @@ public sealed class HaruDrawingArm : MonoBehaviour
         forearm = bones.FirstOrDefault(item => item.name == "R_Forearm");
         hand = bones.FirstOrDefault(item => item.name == "R_Hand");
         if (upperArm == null || forearm == null || hand == null) return false;
+        // The prefab's shoulder/upper-arm/forearm hold the world (third-person) pose and may
+        // change freely; this view keeps its own so the tuned grip angle never shifts.
+        // Only the hand and fingers below it come from the prefab.
+        Transform clavicle = bones.FirstOrDefault(item => item.name == "R_Clavicle");
+        if (clavicle != null) clavicle.localRotation = FirstPersonClavicle;
+        upperArm.localRotation = Quaternion.identity;
+        forearm.localRotation = Quaternion.identity;
+        forearmTwist01 = bones.FirstOrDefault(item => item.name == "R_ForearmTwist01");
+        forearmTwist02 = bones.FirstOrDefault(item => item.name == "R_ForearmTwist02");
+        if (forearmTwist01 != null) twist01Rest = forearmTwist01.localRotation;
+        if (forearmTwist02 != null) twist02Rest = forearmTwist02.localRotation;
 
         List<Renderer> visibleRenderers = ExtractRightArmMeshes();
         if (visibleRenderers.Count == 0) return false;
@@ -83,8 +107,8 @@ public sealed class HaruDrawingArm : MonoBehaviour
         forearmRest = forearm.localRotation;
         handRest = hand.localRotation;
 
-        Vector3 desiredShoulder = ViewportPoint(RestShoulder, 0.64f);
-        Vector3 desiredHand = ViewportPoint(RestHand, 0.72f);
+        Vector3 desiredShoulder = ViewportPoint(restShoulder, 0.64f);
+        Vector3 desiredHand = ViewportPoint(restHand, 0.72f);
         float sourceLength = Vector3.Distance(upperArm.position, forearm.position) +
             Vector3.Distance(forearm.position, hand.position);
         float desiredLength = Vector3.Distance(desiredShoulder, desiredHand);
@@ -92,7 +116,21 @@ public sealed class HaruDrawingArm : MonoBehaviour
         AlignShoulder(desiredShoulder);
 
         Color blue = new Color(22f / 255f, 127f / 255f, 195f / 255f, 1f);
-        crayon = CreateCrayon(blue);
+        // Show the crayon the prefab's hand already grips, so the first-person view keeps
+        // the authored grip. A free-floating crayon is only a fallback for rigs without one.
+        Transform gripped = FindChild(hand, "Crayon Grip");
+        crayonFollowsHand = gripped != null;
+        crayon = crayonFollowsHand ? PrepareGrippedCrayon(gripped, blue) : CreateCrayon(blue);
+        // The eraser model sits in the same hand; HaruHeldTool swaps it in for erasing.
+        heldTool = rigRoot.GetComponent<HaruHeldTool>();
+        Transform eraserGrip = FindChild(hand, "Eraser Grip");
+        if (eraserGrip != null)
+        {
+            foreach (Collider collider in eraserGrip.GetComponentsInChildren<Collider>(true)) Destroy(collider);
+            Renderer[] eraserRenderers = eraserGrip.GetComponentsInChildren<Renderer>(true);
+            ApplyOverlay(eraserRenderers, Color.white, "First Person Eraser");
+            crayonRenderers = crayonRenderers.Concat(eraserRenderers).ToArray();
+        }
         visibleRenderers.AddRange(crayonRenderers);
         armRenderers = visibleRenderers.ToArray();
         foreach (Renderer renderer in armRenderers)
@@ -142,7 +180,9 @@ public sealed class HaruDrawingArm : MonoBehaviour
                     float wa = GetArmWeight(weights[a], armBoneIndices);
                     float wb = GetArmWeight(weights[b], armBoneIndices);
                     float wc = GetArmWeight(weights[c], armBoneIndices);
-                    if (wa < 0.12f || wb < 0.12f || wc < 0.12f || (wa + wb + wc) / 3f < 0.4f) continue;
+                    // Generous, because the elbow skin is re-bound to the forearm below; a longer
+                    // sleeve puts the cut edge off the bottom of the screen.
+                    if (wa < 0.02f || wb < 0.02f || wc < 0.02f || (wa + wb + wc) / 3f < 0.15f) continue;
                     armTriangles.Add(a); armTriangles.Add(b); armTriangles.Add(c);
                 }
                 mesh.SetTriangles(armTriangles, subMesh, false);
@@ -153,6 +193,24 @@ public sealed class HaruDrawingArm : MonoBehaviour
                 Destroy(mesh);
                 renderer.enabled = false;
                 continue;
+            }
+
+            // Elbow skin is partly bound to the upper arm, which the view never shows and
+            // poses on its own; that stretched the cut end into a spike. Bind it to the
+            // forearm instead so the kept piece moves as one rigid sleeve.
+            int forearmIndex = System.Array.IndexOf(skinned.bones, forearm);
+            if (forearmIndex >= 0)
+            {
+                for (int i = 0; i < weights.Length; i++)
+                {
+                    BoneWeight weight = weights[i];
+                    if (!armBoneIndices.Contains(weight.boneIndex0)) weight.boneIndex0 = forearmIndex;
+                    if (!armBoneIndices.Contains(weight.boneIndex1)) weight.boneIndex1 = forearmIndex;
+                    if (!armBoneIndices.Contains(weight.boneIndex2)) weight.boneIndex2 = forearmIndex;
+                    if (!armBoneIndices.Contains(weight.boneIndex3)) weight.boneIndex3 = forearmIndex;
+                    weights[i] = weight;
+                }
+                mesh.boneWeights = weights;
             }
 
             runtimeMeshes.Add(mesh);
@@ -184,11 +242,11 @@ public sealed class HaruDrawingArm : MonoBehaviour
         float blend = 1f - Mathf.Exp(-12f * Time.deltaTime);
         visibility = Mathf.Lerp(visibility, view.enabled ? 1f : 0f, blend);
         float writingMotion = drawing.IsDrawing ? Mathf.Sin(Time.time * 18f) * 0.0025f : 0f;
-        Vector2 desiredViewport = RestHand + new Vector2(writingMotion, -writingMotion * 0.5f);
+        Vector2 desiredViewport = restHand + new Vector2(writingMotion, -writingMotion * 0.5f);
         smoothedHandViewport = Vector2.SmoothDamp(smoothedHandViewport, desiredViewport, ref handVelocity, 0.075f);
 
         float slideDown = Mathf.Lerp(0.24f, 0f, visibility);
-        Vector3 shoulderTarget = ViewportPoint(RestShoulder + Vector2.down * slideDown, 0.64f);
+        Vector3 shoulderTarget = ViewportPoint(restShoulder + Vector2.down * slideDown, 0.64f);
         Vector3 handTarget = ViewportPoint(smoothedHandViewport + Vector2.down * slideDown * 0.35f, 0.72f);
         upperArm.localRotation = upperRest;
         forearm.localRotation = forearmRest;
@@ -196,6 +254,12 @@ public sealed class HaruDrawingArm : MonoBehaviour
         AlignShoulder(shoulderTarget);
 
         SolveStableArm(transform.TransformPoint(handTarget));
+        RollHand();
+        if (heldTool != null) heldTool.Tool = drawing.CurrentTool;
+        // The authored grip bends the wrist; seen from here that left a notch where the
+        // hand's edge met the forearm. The hand pivots on the wrist, so it stays attached.
+        if (wristStraighten != 0f)
+            hand.rotation = Quaternion.AngleAxis(wristStraighten, transform.forward) * hand.rotation;
 
         // Match the requested silhouette: the crayon crosses the hand diagonally,
         // extending farther toward the lower-left and slightly behind the fingers.
@@ -204,7 +268,20 @@ public sealed class HaruDrawingArm : MonoBehaviour
         float visibleLength = Mathf.Lerp(0.045f, 0.16f, drawing.CrayonNormalized);
         Vector3 crayonTip = ViewportPoint(gripViewport + crayonDirection * visibleLength, 0.70f);
         Vector3 crayonBack = ViewportPoint(gripViewport - crayonDirection * 0.035f, 0.70f);
-        PositionCrayon(crayonBack, crayonTip);
+        if (!crayonFollowsHand) PositionCrayon(crayonBack, crayonTip);
+    }
+
+    // Turns the whole arm, rigidly, about the shoulder-to-hand line. No bone twists
+    // against its neighbour, so the forearm keeps the model's own smooth shape (twisting
+    // the forearm or wrist folded the skin into bumps). The hand lies on the axis, so it
+    // stays where the IK put it; the elbow is close to the axis and barely moves.
+    private void RollHand()
+    {
+        if (forearmTwist01 != null) forearmTwist01.localRotation = twist01Rest;
+        if (forearmTwist02 != null) forearmTwist02.localRotation = twist02Rest;
+        Vector3 axis = hand.position - upperArm.position;
+        if (handRoll == 0f || axis.sqrMagnitude <= 0.000001f) return;
+        upperArm.rotation = Quaternion.AngleAxis(handRoll, axis.normalized) * upperArm.rotation;
     }
 
     private void SolveStableArm(Vector3 target)
@@ -255,16 +332,7 @@ public sealed class HaruDrawingArm : MonoBehaviour
         foreach (Collider collider in result.GetComponentsInChildren<Collider>(true)) Destroy(collider);
 
         crayonRenderers = result.GetComponentsInChildren<Renderer>(true);
-        foreach (Renderer renderer in crayonRenderers)
-        {
-            Material[] materials = renderer.sharedMaterials;
-            for (int i = 0; i < materials.Length; i++)
-            {
-                materials[i] = CreateOverlayMaterial(materials[i], fallbackColor, "First Person Crayon");
-                materials[i].renderQueue = 4997;
-            }
-            renderer.sharedMaterials = materials;
-        }
+        ApplyCrayonOverlay(fallbackColor);
         if (crayonRenderers.Length > 0)
         {
             Bounds bounds = crayonRenderers[0].bounds;
@@ -272,6 +340,38 @@ public sealed class HaruDrawingArm : MonoBehaviour
             crayonSourceLength = Mathf.Max(bounds.size.x, bounds.size.y, bounds.size.z, 0.001f);
         }
         return result.transform;
+    }
+
+    private Transform PrepareGrippedCrayon(Transform gripped, Color fallbackColor)
+    {
+        foreach (Collider collider in gripped.GetComponentsInChildren<Collider>(true)) Destroy(collider);
+        crayonRenderers = gripped.GetComponentsInChildren<Renderer>(true);
+        ApplyCrayonOverlay(fallbackColor);
+        return gripped;
+    }
+
+    private void ApplyCrayonOverlay(Color fallbackColor) =>
+        ApplyOverlay(crayonRenderers, fallbackColor, "First Person Crayon");
+
+    private void ApplyOverlay(Renderer[] renderers, Color fallbackColor, string materialName)
+    {
+        foreach (Renderer renderer in renderers)
+        {
+            Material[] materials = renderer.sharedMaterials;
+            for (int i = 0; i < materials.Length; i++)
+            {
+                materials[i] = CreateOverlayMaterial(materials[i], fallbackColor, materialName);
+                materials[i].renderQueue = 4997;
+            }
+            renderer.sharedMaterials = materials;
+        }
+    }
+
+    private static Transform FindChild(Transform root, string childName)
+    {
+        foreach (Transform child in root.GetComponentsInChildren<Transform>(true))
+            if (child.name == childName) return child;
+        return null;
     }
 
     private void PositionCrayon(Vector3 from, Vector3 to)
@@ -299,7 +399,17 @@ public sealed class HaruDrawingArm : MonoBehaviour
         if (source != null)
         {
             Texture texture = source.HasProperty("_BaseMap") ? source.GetTexture("_BaseMap") : source.mainTexture;
-            if (texture != null && material.HasProperty("_BaseMap")) material.SetTexture("_BaseMap", texture);
+            if (texture != null && material.HasProperty("_BaseMap"))
+            {
+                material.SetTexture("_BaseMap", texture);
+                // Keep the source's tiling/offset, or labels and stripes land in the wrong place.
+                string scaleProperty = source.HasProperty("_BaseMap") ? "_BaseMap" : "_MainTex";
+                if (source.HasProperty(scaleProperty))
+                {
+                    material.SetTextureScale("_BaseMap", source.GetTextureScale(scaleProperty));
+                    material.SetTextureOffset("_BaseMap", source.GetTextureOffset(scaleProperty));
+                }
+            }
         }
         runtimeMaterials.Add(material);
         return material;

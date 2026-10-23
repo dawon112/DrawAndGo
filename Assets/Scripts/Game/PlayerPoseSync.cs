@@ -7,7 +7,7 @@ using UnityEngine.SceneManagement;
 [DisallowMultipleComponent]
 public sealed class PlayerPoseSync : MonoBehaviour
 {
-    private const string HaruMessage = "HaruPoseV2";
+    private const string HaruMessage = "HaruPoseV3";
     private const string DuduMessage = "DuduPoseV2";
     private const float SendInterval = 0.05f;
 
@@ -22,6 +22,8 @@ public sealed class PlayerPoseSync : MonoBehaviour
     private int remoteSurfaceIndex;
     private bool remoteFacingLeft;
     private float nextSendTime;
+    private HaruDrawingController haruDrawing;
+    private HaruHeldTool haruHeldTool;
     private int sceneIndex;
 
     public void Configure(Transform haruTransform, DuduSurfaceMovement duduMovement, DuduSurface[] mapSurfaces)
@@ -42,6 +44,10 @@ public sealed class PlayerPoseSync : MonoBehaviour
         }
 
         isHost = manager.IsHost;
+        // The held crayon/eraser follows Haru's tool on both screens.
+        haruDrawing = haru.GetComponentInChildren<HaruDrawingController>(true);
+        Transform haruVisual = haru.Find("Haru Visual");
+        haruHeldTool = haruVisual != null ? haruVisual.GetComponent<HaruHeldTool>() : null;
         sceneIndex = SceneManager.GetActiveScene().buildIndex;
         // Stages without CornerRoomLevel (the tutorial) index every Dudu surface by
         // hierarchy path, which is identical on both peers running the same build.
@@ -103,6 +109,7 @@ public sealed class PlayerPoseSync : MonoBehaviour
         writer.WriteValueSafe(sceneIndex);
         writer.WriteValueSafe(haru.position);
         writer.WriteValueSafe(haru.rotation);
+        writer.WriteValueSafe((byte)(haruDrawing != null ? haruDrawing.CurrentTool : DrawingTool.Pen));
         foreach (ulong clientId in manager.ConnectedClientsIds)
         {
             if (clientId != manager.LocalClientId)
@@ -126,12 +133,14 @@ public sealed class PlayerPoseSync : MonoBehaviour
 
     private void OnHaruPose(ulong sender, FastBufferReader reader)
     {
-        if (isHost || sender != NetworkManager.ServerClientId || !reader.TryBeginRead(32)) return;
+        if (isHost || sender != NetworkManager.ServerClientId || !reader.TryBeginRead(33)) return;
         // During a stage change the peer may still be in the previous scene.
         reader.ReadValueSafe(out int remoteScene);
         if (remoteScene != sceneIndex) return;
         reader.ReadValueSafe(out remotePosition);
         reader.ReadValueSafe(out remoteRotation);
+        reader.ReadValueSafe(out byte tool);
+        if (haruHeldTool != null && tool <= (byte)DrawingTool.Eraser) haruHeldTool.Tool = (DrawingTool)tool;
         hasRemotePose = true;
     }
 

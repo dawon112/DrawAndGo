@@ -279,6 +279,16 @@ public sealed class HaruDrawingController : MonoBehaviour
         EndStroke();
         if (crosshair != null)
             crosshair.SetEraserMode(tool == DrawingTool.Eraser);
+        HaruHeldTool held = FindHeldTool();
+        if (held != null) held.Tool = tool;
+    }
+
+    // The world Haru's hand (also seen by Dudu); the first-person arm follows CurrentTool itself.
+    private HaruHeldTool FindHeldTool()
+    {
+        Player3DMovement player = haruMovement != null ? haruMovement : GetComponentInParent<Player3DMovement>();
+        Transform visual = player != null ? player.transform.Find("Haru Visual") : null;
+        return visual != null ? visual.GetComponent<HaruHeldTool>() : null;
     }
 
     public void ForceDisableCameraLock()
