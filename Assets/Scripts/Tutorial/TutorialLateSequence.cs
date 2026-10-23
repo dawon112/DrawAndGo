@@ -203,7 +203,10 @@ public sealed partial class TutorialSequenceController
                 if (progress < 4) SetLateInstruction(hints[progress]);
                 else instructionPanel.SetActive(false);
             }
-            if (obstacleProgress == 4 && here == lateSections[4] && x >= -4.8f && !dialoguePanel.activeSelf)
+            // Online, Dudu's surface reaches the host in pose packets that can be dropped,
+            // so a short visit to section 4 may be missed; reaching any later section counts too.
+            bool reachedStarArea = here == lateSections[4] ? x >= -4.8f : here == lateSections[5] || here == lastSurface;
+            if (obstacleProgress == 4 && reachedStarArea && !dialoguePanel.activeSelf)
             {
                 CurrentStep = TutorialStep.Tutorial_05_Star;
                 lateDialoguePhase = 1;

@@ -33,24 +33,9 @@ public sealed partial class TutorialSequenceController
         }
         previousTool = tutorialDrawing.CurrentTool;
         tutorialDrawing.StrokeErased += OnTutorialStrokeErased;
-        tutorialDrawing.PenPointAllowed = IsTutorialPenPointAllowed;
-    }
-
-    private bool IsTutorialPenPointAllowed(DrawingSurface target, Vector3 point)
-    {
-        bool firstBridge = CurrentStep == TutorialStep.Tutorial_02_Draw && drawStarted && !successDialogue;
-        bool replacementBridge = CurrentStep == TutorialStep.Tutorial_03_Erase &&
-            CurrentErasePhase == ErasePhase.Redraw;
-        if (!firstBridge && !replacementBridge)
-            return true;
-        if (target == null || target.gameObject != surface.gameObject)
-            return false;
-        Vector2 p = surface.WorldToSurface(point);
-        float left = replacementBridge ? eraseGapLeft - 0.2f : gapLeft - 0.3f;
-        float right = replacementBridge ? eraseGapRight + 0.2f : gapRight + 0.3f;
-        const float strokeMargin = 0.02f;
-        return p.x >= left + strokeMargin && p.x <= right - strokeMargin &&
-            p.y >= groundSurfaceY - 0.35f + strokeMargin && p.y <= groundSurfaceY + 0.35f - strokeMargin;
+        // Drawing is never fenced in: the crayon has no limit, and locking the pen to the
+        // highlight until Dudu crossed read as "out of crayon". The highlights still guide,
+        // and each step only completes once a real bridge spans its gap.
     }
 
     private void OnTutorialStrokeErased(int sourceId)
@@ -237,10 +222,7 @@ public sealed partial class TutorialSequenceController
     private void DisposeErase()
     {
         if (tutorialDrawing != null)
-        {
             tutorialDrawing.StrokeErased -= OnTutorialStrokeErased;
-            tutorialDrawing.PenPointAllowed = null;
-        }
         if (blockingLineMaterial != null) Destroy(blockingLineMaterial);
     }
 }

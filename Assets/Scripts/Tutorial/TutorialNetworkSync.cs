@@ -141,6 +141,21 @@ public sealed partial class TutorialSequenceController
         }
     }
 
+    // Host diagnostics in Player.log: where Dudu was seen at each step change, so a stall
+    // can be traced to the condition the host was waiting for.
+    private TutorialStep loggedStep = (TutorialStep)(-1);
+
+    private void LogStepChange()
+    {
+        if (CurrentStep == loggedStep) return;
+        loggedStep = CurrentStep;
+        DuduSurface here = dudu.CurrentSurface;
+        string where = here != null
+            ? $"{here.name} x={here.WorldToSurface(dudu.transform.position).x:F2}"
+            : "no surface";
+        Debug.Log($"Tutorial step -> {CurrentStep} (Dudu on {where}, online={IsNetworked})", this);
+    }
+
     private static void SetActiveIfChanged(GameObject target, bool active)
     {
         if (target != null && target.activeSelf != active) target.SetActive(active);

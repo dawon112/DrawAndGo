@@ -71,6 +71,7 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
             return;
         }
         SendTutorialState();
+        LogStepChange();
         UpdateErase();
         UpdateLateTutorial();
         if (CurrentStep == TutorialStep.Tutorial_01_Move)
