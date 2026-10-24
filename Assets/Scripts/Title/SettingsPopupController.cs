@@ -29,9 +29,14 @@ public sealed class SettingsPopupController : MonoBehaviour
     private CoopInputAction waitingAction;
     private TMP_Text waitingLabel;
     private TMP_Text microphoneLabel;
+    private CanvasGroup canvasGroup;
+    private bool closing;
 
     private void Awake()
     {
+        canvasGroup = GetComponent<CanvasGroup>();
+        if (canvasGroup == null) canvasGroup = gameObject.AddComponent<CanvasGroup>();
+
         pages[(int)Page.Sound] = FindPage("SoundPage");
         pages[(int)Page.Display] = FindPage("DisplayPage");
         pages[(int)Page.ControlSelect] = FindPage("ControlSelectPage");
@@ -176,22 +181,44 @@ public sealed class SettingsPopupController : MonoBehaviour
 
     public void Open()
     {
+        // Reopened while sliding out: start over so the page drops in again.
+        if (closing)
+        {
+            closing = false;
+            gameObject.SetActive(false);
+        }
         CancelRebind();
         ShowPage(Page.Sound);
         transform.SetAsLastSibling();
+        canvasGroup.blocksRaycasts = true;
         gameObject.SetActive(true);
         IsAnyOpen = true;
     }
 
     public void Close()
     {
+        if (closing) return;
         CancelRebind();
         CoopInputSettings.Save();
         CoopDisplaySettings.Save();
         CoopAudioSettings.Save();
         LastClosedFrame = Time.frameCount;
         IsAnyOpen = false;
-        gameObject.SetActive(false);
+
+        // The page slides back up, then the popup hides; no clicks while it leaves.
+        PopupDropInAnimation shown = pages[(int)currentPage].GetComponent<PopupDropInAnimation>();
+        if (!isActiveAndEnabled || shown == null || !shown.isActiveAndEnabled)
+        {
+            gameObject.SetActive(false);
+            return;
+        }
+        closing = true;
+        canvasGroup.blocksRaycasts = false;
+        shown.PlayExit(() =>
+        {
+            closing = false;
+            gameObject.SetActive(false);
+        });
     }
 
     private void OnDisable()
@@ -291,6 +318,15 @@ public sealed class SettingsPopupController : MonoBehaviour
     {
         CancelRebind();
         currentPage = page;
-        for (int i = 0; i < pages.Length; i++) pages[i].SetActive(i == (int)page);
+        // Only opening the popup drops the page in; turning pages just swaps them.
+        bool popupShown = gameObject.activeInHierarchy;
+        for (int i = 0; i < pages.Length; i++)
+        {
+            bool show = i == (int)page;
+            if (show && popupShown && !pages[i].activeSelf &&
+                pages[i].TryGetComponent(out PopupDropInAnimation entrance))
+                entrance.SkipNextEntrance();
+            pages[i].SetActive(show);
+        }
     }
 }

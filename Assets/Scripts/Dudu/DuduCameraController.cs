@@ -491,6 +491,10 @@ public sealed class DuduCameraController : MonoBehaviour
 
     private static Vector3 GetReferencePosition(Renderer renderer)
     {
+        // A route line's stroke can end right at a room corner; its box centre is on its own wall.
+        CrayonRouteLine routeLine = renderer.GetComponentInParent<CrayonRouteLine>();
+        if (routeLine != null)
+            return routeLine.transform.position;
         if (renderer is LineRenderer line && line.positionCount > 0)
             return line.useWorldSpace ? line.GetPosition(0) : line.transform.TransformPoint(line.GetPosition(0));
         return renderer.transform.position;

@@ -106,6 +106,8 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
             successTrigger.SetActive(false);
             ShowDialogue(new[] { "두두", "하루" }, new[] { "우와! 하루가 그린 선을 밟을 수 있어!", "그럼 내가 길을 만들어줄게!" });
         }
+        // Last, so a step's normal clear in this frame always wins.
+        CatchUpToDudu();
     }
 
     private void LateUpdate()
@@ -141,6 +143,60 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
             body.transform.rotation, 0.15f, 1 << LayerMask.NameToLayer("DrawnStroke"), QueryTriggerInteraction.Ignore))
             if (Vector3.Dot(hit.normal, surface.Up) > 0.5f)
                 RecordSupportedStroke(hit.collider.GetComponentInParent<DrawingStroke>());
+    }
+
+    // The course itself decides how far the tutorial is: Dudu can only get past a gap,
+    // the blocking line or the obstacles once it is really solved. If a step's own check
+    // missed that (or a pose packet was dropped online), drop the earlier step's
+    // leftovers and start the step for where Dudu is now.
+    private void CatchUpToDudu()
+    {
+        if (dialoguePanel.activeSelf || CurrentStep >= TutorialStep.Tutorial_05_Star) return;
+        TutorialStep reached = StepAtDuduPosition();
+        if (reached <= CurrentStep) return;
+        Debug.Log($"Tutorial: Dudu is ahead of {CurrentStep}, catching up to {reached}.", this);
+
+        successDialogue = true;
+        instructionPanel.SetActive(false);
+        highlight.SetActive(false);
+        startTrigger.SetActive(false);
+        successTrigger.SetActive(false);
+        if (reached == TutorialStep.Tutorial_03_Erase)
+        {
+            CurrentStep = TutorialStep.Tutorial_03_Erase;
+            eraseStartTrigger.SetActive(true);
+            if (eraseStartTrigger.GetComponent<Collider>().bounds.Intersects(dudu.GetComponent<Collider>().bounds))
+                EnterEraseRegion(false, dudu);
+            return;
+        }
+
+        CurrentErasePhase = ErasePhase.Completed;
+        eraseStartTrigger.SetActive(false);
+        eraseSuccessTrigger.SetActive(false);
+        eraseHighlight.SetActive(false);
+        replacementHighlight.SetActive(false);
+        if (reached == TutorialStep.Tutorial_04_Obstacle) BeginObstacleTutorial();
+        else BeginStarTutorial();
+    }
+
+    // The step whose part of the course Dudu is standing on.
+    private TutorialStep StepAtDuduPosition()
+    {
+        DuduSurface here = dudu.CurrentSurface;
+        if (here == null) return TutorialStep.Tutorial_01_Move;
+        float x = here.WorldToSurface(dudu.transform.position).x;
+        if (lateSections != null && here != surface)
+        {
+            if (here == lateSections[4] ? x >= -4.8f : here == lateSections[5] || here == lastSurface)
+                return TutorialStep.Tutorial_05_Star;
+            return TutorialStep.Tutorial_04_Obstacle;
+        }
+        if (here != surface) return TutorialStep.Tutorial_01_Move;
+        // Past the erase gap, or at the blocking line after the first gap. The margins sit
+        // beyond each step's own success triggers, so a normal clear always comes first.
+        if (x > eraseGapRight + 1f) return TutorialStep.Tutorial_04_Obstacle;
+        if (x > eraseGapLeft - 0.5f) return TutorialStep.Tutorial_03_Erase;
+        return TutorialStep.Tutorial_01_Move;
     }
 
     public void EnterRegion(bool isExit, DuduSurfaceMovement player)

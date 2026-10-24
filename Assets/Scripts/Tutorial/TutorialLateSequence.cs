@@ -21,6 +21,7 @@ public sealed partial class TutorialSequenceController
     private Coroutine doorHintRoutine;
     private Material obstacleMaterial;
     private DuduSurface authoredLastSurface;
+    private float nextRefusedStarLog;
 
     private void Awake()
     {
@@ -207,25 +208,37 @@ public sealed partial class TutorialSequenceController
             // so a short visit to section 4 may be missed; reaching any later section counts too.
             bool reachedStarArea = here == lateSections[4] ? x >= -4.8f : here == lateSections[5] || here == lastSurface;
             if (obstacleProgress == 4 && reachedStarArea && !dialoguePanel.activeSelf)
-            {
-                CurrentStep = TutorialStep.Tutorial_05_Star;
-                lateDialoguePhase = 1;
-                ShowDialogue(new[] { "두두", "하루" }, new[] { "하루! 저기 반짝이는 게 있어!", "한번 가져가 볼래?" });
-            }
+                BeginStarTutorial();
         }
+    }
+
+    private void BeginStarTutorial()
+    {
+        CurrentStep = TutorialStep.Tutorial_05_Star;
+        lateDialoguePhase = 1;
+        ShowDialogue(new[] { "두두", "하루" }, new[] { "하루! 저기 반짝이는 게 있어!", "한번 가져가 볼래?" });
     }
 
     public bool CanCollectStar(TutorialStarCollectible star)
     {
         // Online, the host collects from Dudu's synced pose and the client follows.
         if (!IsAuthority) return false;
-        if (courseStars[0] == star) return CurrentStep == TutorialStep.Tutorial_05_Star &&
-            lateDialoguePhase == 2 && dudu.CurrentSurface == lateSections[4];
-        if (courseStars[1] == star) return CurrentStep == TutorialStep.Tutorial_06_FinalTest &&
-            tutorialRoom.CollectedStars == 1 && dudu.CurrentSurface == lateSections[5];
-        if (courseStars[2] == star) return CurrentStep == TutorialStep.Tutorial_06_FinalTest &&
-            tutorialRoom.CollectedStars == 2 && dudu.CurrentSurface == lastSurface;
-        return false;
+        // The first star counts as soon as its step has begun, even mid-dialogue: Dudu
+        // standing on it must never stall the tutorial.
+        bool allowed = courseStars[0] == star ? CurrentStep == TutorialStep.Tutorial_05_Star &&
+                tutorialRoom.CollectedStars == 0 && dudu.CurrentSurface == lateSections[4] :
+            courseStars[1] == star ? CurrentStep == TutorialStep.Tutorial_06_FinalTest &&
+                tutorialRoom.CollectedStars == 1 && dudu.CurrentSurface == lateSections[5] :
+            courseStars[2] == star && CurrentStep == TutorialStep.Tutorial_06_FinalTest &&
+                tutorialRoom.CollectedStars == 2 && dudu.CurrentSurface == lastSurface;
+        if (!allowed && Time.unscaledTime >= nextRefusedStarLog)
+        {
+            // Player.log trail for a star Dudu touches but cannot take.
+            nextRefusedStarLog = Time.unscaledTime + 2f;
+            Debug.Log($"Tutorial: {star.name} refused (step {CurrentStep}, stars {tutorialRoom.CollectedStars}, " +
+                $"Dudu on {(dudu.CurrentSurface != null ? dudu.CurrentSurface.name : "no surface")}).", star);
+        }
+        return allowed;
     }
 
     private void OnTutorialStarCollected(int count)
@@ -254,7 +267,7 @@ public sealed partial class TutorialSequenceController
             lateDialoguePhase = 2;
             SetLateInstruction("별을 획득해보세요! ★");
         }
-        else if (CurrentStep == TutorialStep.Tutorial_05_Star && lateDialoguePhase == 3 && tutorialRoom.CollectedStars == 1)
+        else if (CurrentStep == TutorialStep.Tutorial_05_Star && lateDialoguePhase == 3 && tutorialRoom.CollectedStars >= 1)
         {
             CurrentStep = TutorialStep.Tutorial_06_FinalTest;
             instructionPanel.SetActive(false);

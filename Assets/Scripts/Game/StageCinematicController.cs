@@ -256,7 +256,7 @@ public sealed class StageCinematicController : MonoBehaviour
         cinematicCamera.transform.SetPositionAndRotation(haruCamera.transform.position, haruCamera.transform.rotation);
         Vector3 center = DoorCenter(level.Door);
         Transform focus = CreateLookPoint(transform, "TutorialDoorCameraPoint", center,
-            DoorFrontPosition(center, level.FinalSurface, 6f));
+            DoorFrontPosition(center, level.Door.transform, 6f));
         GameObject whiteBeyond = BuildWhiteBeyondDoor(center, focus.position);
         yield return MoveCamera(focus.position, focus.rotation, 58f, introBlendDuration);
         if (skipRequested) { FinishTutorialClearImmediately(level, whiteBeyond); yield break; }
@@ -429,9 +429,12 @@ public sealed class StageCinematicController : MonoBehaviour
         return center + normal * distance;
     }
 
-    private Vector3 DoorFrontPosition(Vector3 center, DuduSurface surface, float distance)
+    // Straight in front of the door, on Haru's side. The door can sit on a different
+    // wall than the last Dudu surface, so its own facing decides the shot.
+    private Vector3 DoorFrontPosition(Vector3 center, Transform door, float distance)
     {
-        Vector3 normal = surface != null ? surface.Normal.normalized : Vector3.forward;
+        Vector3 normal = Vector3.ProjectOnPlane(door.forward, Vector3.up).normalized;
+        if (normal.sqrMagnitude < 0.1f) normal = Vector3.forward;
         if (Vector3.Dot(haruMovement.transform.position - center, normal) < 0f) normal = -normal;
         return center + normal * distance;
     }
