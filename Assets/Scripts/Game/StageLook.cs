@@ -17,16 +17,17 @@ public sealed class StageLook : ScriptableObject
     // Warmth comes from the light, not a strong grade, so unlit crayon lines and
     // Dudu's drawings keep their true colours.
     public Color sunColor = new Color(1f, 0.83f, 0.64f);
-    [Min(0f)] public float sunIntensity = 1.35f;
-    public Vector3 sunRotation = new Vector3(35f, 330f, 0f);
-    // The rooms are closed boxes; with shadows on, the walls would block the sun.
-    public LightShadows sunShadows = LightShadows.None;
-    [Range(0f, 1f)] public float sunShadowStrength = 0.7f;
+    [Min(0f)] public float sunIntensity = 3.2f;
+    public Vector3 sunRotation = new Vector3(30f, 70f, 0f);
+    // Used only in stages with windows (RoomOnlyDecor.letsSunIn): elsewhere the rooms
+    // are closed boxes and the walls would block the sun entirely.
+    public LightShadows sunShadows = LightShadows.Soft;
+    [Range(0f, 1f)] public float sunShadowStrength = 0.9f;
 
     [Header("Ambient light (the shade: soft lavender, as on the key visual's left wall)")]
-    public Color ambientSky = new Color(0.9f, 0.86f, 0.88f);
-    public Color ambientEquator = new Color(0.86f, 0.78f, 0.76f);
-    public Color ambientGround = new Color(0.58f, 0.46f, 0.4f);
+    public Color ambientSky = new Color(0.72f, 0.65f, 0.7f);
+    public Color ambientEquator = new Color(0.7f, 0.6f, 0.58f);
+    public Color ambientGround = new Color(0.44f, 0.34f, 0.3f);
 
     [Header("Dudu's 2D view")]
     [Tooltip("Fills the view around the sunlit page; above 1 to match the lit paper. Read by DuduCameraController.")]
@@ -64,13 +65,16 @@ public sealed class StageLook : ScriptableObject
 
     public void Apply()
     {
+        bool hasWindows = false;
+        foreach (RoomOnlyDecor decor in FindObjectsByType<RoomOnlyDecor>())
+            hasWindows |= decor.letsSunIn;
         foreach (Light light in FindObjectsByType<Light>())
         {
             if (light.type != LightType.Directional) continue;
             light.color = sunColor;
             light.intensity = sunIntensity;
             light.transform.rotation = Quaternion.Euler(sunRotation);
-            light.shadows = sunShadows;
+            light.shadows = hasWindows ? sunShadows : LightShadows.None;
             light.shadowStrength = sunShadowStrength;
         }
 

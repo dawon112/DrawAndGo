@@ -349,7 +349,7 @@ public sealed class DuduCameraController : MonoBehaviour
         if (source is SkinnedMeshRenderer || source.transform.IsChildOf(proxyRoot) ||
             visualProxies.Exists(item => item.source == source) ||
             sourceName == "Room Wall 6 - Closure" || sourceName.StartsWith("START") ||
-            sourceName.StartsWith("SECTION")) return;
+            sourceName.StartsWith("SECTION") || source.GetComponentInParent<RoomOnlyDecor>() != null) return;
 
         LineMagnet magnet = source.GetComponentInParent<LineMagnet>();
         DuduSurface sourceSurface = magnet != null && magnet.Surface != null
