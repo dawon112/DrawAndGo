@@ -254,8 +254,9 @@ public static class TutorialRoomBuilder
 
     private static void CreateGround(string name, DuduSurface surface, float x, float width, Transform parent, Material ink)
     {
-        Cube(name, surface.SurfaceToWorld(new Vector2(x, -2.4f)), surface.transform.rotation,
+        GameObject line = Cube(name, surface.SurfaceToWorld(new Vector2(x, -2.4f)), surface.transform.rotation,
             new Vector3(width, 0.14f, 0.18f), ink, parent);
+        CrayonRouteLineTool.Convert(line);
     }
 
     private static TutorialStarCollectible[] CreateStars(Transform parent, DuduSurface[] sections)

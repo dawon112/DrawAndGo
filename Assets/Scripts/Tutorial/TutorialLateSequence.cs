@@ -154,7 +154,7 @@ public sealed partial class TutorialSequenceController
         ground.transform.SetPositionAndRotation(target.SurfaceToWorld(new Vector2((left + right) * 0.5f, groundSurfaceY - 0.07f)) + target.Normal * 0.055f,
             target.transform.rotation);
         ground.transform.localScale = new Vector3(right - left, 0.14f, 0.18f);
-        ground.GetComponent<Renderer>().sharedMaterial = originalStartLine.GetComponent<Renderer>().sharedMaterial;
+        StyleLikeStartLine(ground);
     }
 
     private TutorialStarCollectible SpawnStar(Transform root, DuduSurface target, float x, string name)

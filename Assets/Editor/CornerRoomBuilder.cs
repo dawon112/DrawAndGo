@@ -131,7 +131,7 @@ public static class CornerRoomBuilder
             data.FindProperty("height").floatValue = 6f;
             data.ApplyModifiedPropertiesWithoutUndo();
             level.surfaces[i] = surface;
-            Cube("Ground - Section " + (i+1),surface.SurfaceToWorld(new Vector2(0,-2.4f)),rotation,new Vector3(width,.14f,.16f),ink);
+            CrayonRouteLineTool.Convert(Cube("Ground - Section " + (i+1),surface.SurfaceToWorld(new Vector2(0,-2.4f)),rotation,new Vector3(width,.14f,.16f),ink));
         }
         for (int i = 0; i < 5; i++)
         {
@@ -396,9 +396,6 @@ public static class CornerRoomBuilder
         DuduSurface surface = level.surfaces[3];
         Transform root = level.transform;
         Transform original = root.Find("Ground - Section 4");
-        Material material = original != null && original.TryGetComponent(out Renderer originalRenderer)
-            ? originalRenderer.sharedMaterial
-            : null;
         if (original != null)
             Object.DestroyImmediate(original.gameObject);
 
@@ -421,8 +418,7 @@ public static class CornerRoomBuilder
             segment.transform.SetPositionAndRotation(
                 surface.SurfaceToWorld(new Vector2(x, -2.4f)), surface.transform.rotation);
             segment.transform.localScale = new Vector3(sectionWidth, 0.14f, 0.16f);
-            if (material != null)
-                segment.GetComponent<Renderer>().sharedMaterial = material;
+            CrayonRouteLineTool.Convert(segment);
         }
     }
 

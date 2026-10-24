@@ -322,7 +322,16 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
         ground.transform.SetParent(root, false);
         ground.transform.SetPositionAndRotation(surface.SurfaceToWorld(new Vector2((from + to) * 0.5f, groundSurfaceY - 0.07f)) + surface.Normal * 0.055f, surface.transform.rotation);
         ground.transform.localScale = new Vector3(to - from, 0.14f, 0.18f);
-        ground.GetComponent<Renderer>().sharedMaterial = originalStartLine.GetComponent<Renderer>().sharedMaterial;
+        StyleLikeStartLine(ground);
+    }
+
+    // Course lines built during play look like the authored route line (a crayon line).
+    private void StyleLikeStartLine(GameObject ground)
+    {
+        if (originalStartLine.TryGetComponent(out CrayonRouteLine crayon))
+            CrayonRouteLine.AddTo(ground, crayon.Material);
+        else if (originalStartLine.TryGetComponent(out Renderer look))
+            ground.GetComponent<Renderer>().sharedMaterial = look.sharedMaterial;
     }
 
     private GameObject BuildTrigger(Transform root, string objectName, float x, bool isExit)
