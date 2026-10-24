@@ -68,7 +68,9 @@ public sealed class DuduCameraController : MonoBehaviour
     {
         if (cameraComponent == null) return;
         cameraComponent.clearFlags = CameraClearFlags.SolidColor;
-        cameraComponent.backgroundColor = Color.white;
+        // Around the page the view shows this colour; match the stage's sunlit paper.
+        StageLook look = StageLook.Load();
+        cameraComponent.backgroundColor = look != null ? look.duduBackdrop : Color.white;
     }
 
     public static void RegisterRuntimeRenderer(Renderer source)

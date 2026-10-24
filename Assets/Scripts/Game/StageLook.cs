@@ -29,7 +29,7 @@ public sealed class StageLook : ScriptableObject
     public Color ambientGround = new Color(0.58f, 0.46f, 0.4f);
 
     [Header("Dudu's 2D view")]
-    [Tooltip("Fills the view around the sunlit page; above 1 to match the lit paper.")]
+    [Tooltip("Fills the view around the sunlit page; above 1 to match the lit paper. Read by DuduCameraController.")]
     [ColorUsage(false, true)] public Color duduBackdrop = new Color(1.12f, 1f, 0.88f);
 
     [Header("Air (soft warm haze for depth)")]
@@ -90,13 +90,6 @@ public sealed class StageLook : ScriptableObject
             volume.isGlobal = true;
             volume.priority = 10f;
             volume.sharedProfile = postProfile;
-        }
-
-        foreach (DuduCameraController dudu in FindObjectsByType<DuduCameraController>(FindObjectsInactive.Include))
-        {
-            Camera duduCamera = dudu.GetComponent<Camera>();
-            if (duduCamera != null && duduCamera.clearFlags == CameraClearFlags.SolidColor)
-                duduCamera.backgroundColor = duduBackdrop;
         }
 
         // Every gameplay and cinematic camera shows the graded image.
