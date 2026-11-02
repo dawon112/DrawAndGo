@@ -32,7 +32,8 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
     private GameObject highlight, startTrigger, successTrigger, instructionPanel, dialoguePanel;
     private RectTransform haruViewport;
     private Camera duduCamera;
-    private Text instruction, speaker, dialogue;
+    private Text instruction;
+    private TutorialDialogueBox dialogueBox;
     private string[] speakers, lines;
     private int dialogueIndex;
     private Material highlightMaterial;
@@ -299,7 +300,7 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
         // Dudu keeps moving while a line is shown; only Enter advances it.
         instructionPanel.SetActive(false);
         dialoguePanel.SetActive(true);
-        speaker.text = speakers[0]; dialogue.text = lines[0];
+        dialogueBox.Show(speakers[0], lines[0]);
     }
 
     private void AdvanceDialogue()
@@ -308,7 +309,7 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
         dialogueIndex++;
         if (dialogueIndex < lines.Length)
         {
-            speaker.text = speakers[dialogueIndex]; dialogue.text = lines[dialogueIndex];
+            dialogueBox.Show(speakers[dialogueIndex], lines[dialogueIndex]);
             return;
         }
         dialoguePanel.SetActive(false);
@@ -416,11 +417,10 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
         haruViewport.SetParent(canvasObject.transform, false);
         instructionPanel = Panel("InstructionPanel", haruViewport, new Vector2(0.08f, 0.74f), new Vector2(0.92f, 0.92f));
         instruction = Label("InstructionText", instructionPanel.transform, Vector2.zero, Vector2.one, 30, TextAnchor.MiddleCenter);
-        dialoguePanel = Panel("DialoguePanel", canvasObject.transform, new Vector2(0.12f, 0.04f), new Vector2(0.88f, 0.23f));
-        speaker = Label("SpeakerName", dialoguePanel.transform, new Vector2(0.035f, 0.63f), new Vector2(0.95f, 0.95f), 28, TextAnchor.MiddleLeft);
-        speaker.color = new Color(1f, 0.8f, 0.35f);
-        dialogue = Label("DialogueText", dialoguePanel.transform, new Vector2(0.035f, 0.22f), new Vector2(0.95f, 0.67f), 32, TextAnchor.MiddleLeft);
-        Label("ContinueHint", dialoguePanel.transform, new Vector2(0.03f, 0.02f), new Vector2(0.96f, 0.24f), 20, TextAnchor.MiddleRight).text = "Enter  다음";
+        // The speech box's look lives in its prefab so it can be edited in the editor.
+        dialogueBox = Instantiate(Resources.Load<TutorialDialogueBox>("UI/TutorialDialogue"), canvasObject.transform, false);
+        dialoguePanel = dialogueBox.gameObject;
+        dialoguePanel.SetActive(false);
     }
 
     private static GameObject Panel(string name, Transform parent, Vector2 min, Vector2 max)

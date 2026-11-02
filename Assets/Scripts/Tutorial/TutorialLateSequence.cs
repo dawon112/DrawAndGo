@@ -272,7 +272,7 @@ public sealed partial class TutorialSequenceController
 
     private void UpdateSketchDanger()
     {
-        bool dangerOpen = dialoguePanel.activeSelf && dialogue.text == DangerWarningLine;
+        bool dangerOpen = dialoguePanel.activeSelf && dialogueBox.Line == DangerWarningLine;
         dangerWarningSeen |= dangerOpen;
         // The cloud starts firing as soon as the warning appears, read or not.
         if (sketchShooter != null && !sketchShooter.enabled &&

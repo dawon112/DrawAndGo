@@ -108,7 +108,8 @@ public static class CoopInputSettings
 
     public static bool CanBind(Key key)
     {
-        return key != Key.None && key != Key.Escape && key != Key.Tab && key != Key.C &&
+        // C and V belong to quick chat and the microphone.
+        return key != Key.None && key != Key.Escape && key != Key.Tab && key != Key.C && key != Key.V &&
                Enum.IsDefined(typeof(Key), key);
     }
 

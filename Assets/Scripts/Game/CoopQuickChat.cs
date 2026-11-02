@@ -80,7 +80,7 @@ public sealed class CoopQuickChat : MonoBehaviour
         if (keyboard == null) return;
         if (keyboard.cKey.wasPressedThisFrame)
         {
-            menu.SetActive(!menu.activeSelf);
+            ToggleMenu();
             return;
         }
 
@@ -92,6 +92,13 @@ public sealed class CoopQuickChat : MonoBehaviour
             menu.SetActive(false);
             break;
         }
+    }
+
+    // Also used by the quick-chat button on the left of the screen (CoopCommsHud).
+    public void ToggleMenu()
+    {
+        if (SettingsPopupController.IsAnyOpen) return;
+        menu.SetActive(!menu.activeSelf);
     }
 
     private void RegisterNetworkIfNeeded()
