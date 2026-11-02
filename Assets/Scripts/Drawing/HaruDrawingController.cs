@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
 public enum DrawingTool
@@ -43,6 +44,7 @@ public sealed class HaruDrawingController : MonoBehaviour
     private int strokeNumber;
     private DrawingTool currentTool = DrawingTool.Pen;
     private bool cameraLock;
+    private bool pressStartedOnUi;
     private int strokeLayer;
     private float currentCrayon;
 
@@ -115,6 +117,16 @@ public sealed class HaruDrawingController : MonoBehaviour
             ClearSurfaceAim();
 
         if (mouse.leftButton.wasReleasedThisFrame || !mouse.leftButton.isPressed)
+        {
+            pressStartedOnUi = false;
+            EndStroke();
+            return;
+        }
+
+        // With the cursor free (camera lock), a click on a screen button is not a stroke.
+        if (mouse.leftButton.wasPressedThisFrame)
+            pressStartedOnUi = cameraLock && EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+        if (pressStartedOnUi)
         {
             EndStroke();
             return;
