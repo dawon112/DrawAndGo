@@ -63,8 +63,8 @@ public sealed partial class TutorialSequenceController
             erasePhase = (int)CurrentErasePhase,
             serial = dialogueSerial,
             dialogue = dialoguePanel.activeSelf,
-            speaker = speaker.text,
-            line = dialogue.text,
+            speaker = dialogueBox.Speaker,
+            line = dialogueBox.Line,
             instruction = instructionPanel.activeSelf,
             instructionText = instruction.text,
             highlight = highlight.activeSelf,
@@ -121,8 +121,7 @@ public sealed partial class TutorialSequenceController
             dialoguePanel.SetActive(state.dialogue);
             dudu.SetDialogueInputLocked(state.dialogue);
         }
-        speaker.text = state.speaker;
-        dialogue.text = state.line;
+        dialogueBox.Show(state.speaker, state.line);
         instruction.text = state.instructionText;
         if (instructionPanel.activeSelf != state.instruction) instructionPanel.SetActive(state.instruction);
         SetActiveIfChanged(highlight, state.highlight);
