@@ -3,7 +3,9 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public sealed class DuduHomingShooter : MonoBehaviour
 {
-    private const float LightningVisualOffset = 0.02f;
+    // In front of the wall's face (walls are 0.1 thick) and just behind Dudu's sprite.
+    // At 0.02 the bolt sat inside the wall and could vanish from view.
+    private const float LightningVisualOffset = 0.12f;
 
     [Header("References")]
     [SerializeField] private DuduSurface surface;
@@ -114,12 +116,13 @@ public sealed class DuduHomingShooter : MonoBehaviour
 
     private bool CanRecognizeTarget()
     {
-        if (surface == null || target == null || target.CurrentSurface != surface)
+        // Dudu on a neighbouring wall counts too: the bolt can follow him around the corner.
+        if (surface == null || target == null ||
+            !DuduHomingProjectile.TryMapToSurface(surface, target.CurrentSurface, target.transform.position, out Vector2 targetPosition))
             return false;
 
         EnsureLightningSpawnPoint();
         Vector2 emitterPosition = surface.WorldToSurface(lightningSpawnPoint.position);
-        Vector2 targetPosition = surface.WorldToSurface(target.transform.position);
         return Vector2.Distance(emitterPosition, targetPosition) <= attackRange &&
             HasClearLineOfSight(emitterPosition, targetPosition);
     }
@@ -158,7 +161,8 @@ public sealed class DuduHomingShooter : MonoBehaviour
 
         EnsureLightningSpawnPoint();
         Vector2 emitterPosition = surface.WorldToSurface(lightningSpawnPoint.position);
-        Vector2 targetPosition = surface.WorldToSurface(target.transform.position);
+        if (!DuduHomingProjectile.TryMapToSurface(surface, target.CurrentSurface, target.transform.position, out Vector2 targetPosition))
+            targetPosition = surface.WorldToSurface(target.transform.position);
         Vector2 fireDirection = (targetPosition - emitterPosition).normalized;
         Vector2 spawnPosition = emitterPosition + fireDirection * 0.05f;
 
@@ -192,6 +196,7 @@ public sealed class DuduHomingShooter : MonoBehaviour
             projectileLifetime,
             spawnPosition,
             LightningVisualOffset);
+        homingProjectile.SetMaxHorizontalReach(projectileMaxHorizontalReach);
         PlayFireSound();
     }
 
@@ -222,9 +227,10 @@ public sealed class DuduHomingShooter : MonoBehaviour
 
         Vector2 emitter = GetEmitterSurfacePosition();
         SpriteRenderer cloudRenderer = GetComponentInChildren<SpriteRenderer>();
+        // Bullets start from inside the cloud, not its lower edge, so they come from further away.
         float downwardOffset = cloudRenderer != null
-            ? Mathf.Max(0.15f, cloudRenderer.bounds.extents.y * 0.65f)
-            : 0.35f;
+            ? cloudRenderer.bounds.extents.y * 0.2f
+            : 0.1f;
         lightningSpawnPoint.SetPositionAndRotation(
             SurfaceToWorld(emitter - Vector2.up * downwardOffset),
             surface.transform.rotation);
@@ -297,13 +303,23 @@ public sealed class DuduHomingShooter : MonoBehaviour
         return defaultFireSound;
     }
 
+    public void SetProjectilePrefab(GameObject prefab) => projectilePrefab = prefab;
+
+    public void SetAttackRange(float range) => attackRange = Mathf.Max(0f, range);
+
+    // How far sideways a bolt may travel from where it was fired (0 = no limit).
+    public void SetProjectileReach(float reach) => projectileMaxHorizontalReach = Mathf.Max(0f, reach);
+    private float projectileMaxHorizontalReach;
+
     private void ApplySurfaceTransform()
     {
         if (surface == null)
             return;
 
+        // Like the bolts, in front of the wall's face so Haru sees the cloud in 3D;
+        // just behind the bolts so they are drawn over it.
         transform.SetPositionAndRotation(
-            surface.SurfaceToWorld(surfacePosition),
+            SurfaceToWorld(surfacePosition) - surface.Normal.normalized * 0.02f,
             surface.transform.rotation);
     }
 

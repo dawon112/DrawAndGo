@@ -113,6 +113,7 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
     private void LateUpdate()
     {
         if (!built) return;
+        UpdateSketchDanger();
         // Obstacle hints belong to Dudu's view; the earlier drawing hints stay with Haru.
         // Online, each player has one view, so every hint shows on the local camera.
         Camera instructionCamera = IsNetworked ? (IsAuthority ? haruCamera : duduCamera) :
@@ -295,7 +296,7 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
     {
         speakers = names; lines = text; dialogueIndex = 0;
         dialogueSerial++;
-        dudu.SetDialogueInputLocked(true);
+        // Dudu keeps moving while a line is shown; only Enter advances it.
         instructionPanel.SetActive(false);
         dialoguePanel.SetActive(true);
         speaker.text = speakers[0]; dialogue.text = lines[0];
@@ -311,7 +312,6 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
             return;
         }
         dialoguePanel.SetActive(false);
-        dudu.SetDialogueInputLocked(false);
         if (CurrentStep == TutorialStep.Tutorial_03_Erase)
         {
             FinishEraseDialogue();
@@ -322,6 +322,8 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
             FinishLateDialogue();
             return;
         }
+        // Sketch course warnings (wind, danger) only close; the obstacle step continues.
+        if (CurrentStep == TutorialStep.Tutorial_04_Obstacle) return;
         if (successDialogue)
         {
             instructionPanel.SetActive(false);
@@ -447,7 +449,6 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
 
     private void OnDestroy()
     {
-        if (dudu != null) dudu.SetDialogueInputLocked(false);
         DisposeNetwork();
         DisposeErase();
         DisposeLateTutorial();

@@ -13,6 +13,18 @@ public sealed partial class TutorialSequenceController
     [SerializeField] private DuduMovingObstacle knockbackPrefab;
     [SerializeField] private DuduStainObstacle slowPrefab;
     [SerializeField] private WindZone windPrefab;
+    [Tooltip("Floorless course from the layout sketch instead of the old full-floor obstacle course.")]
+    [SerializeField] private bool useSketchCourse = true;
+    [SerializeField] private GameObject lightningProjectilePrefab;
+    [SerializeField] private Material lightningMaterial;
+    [SerializeField] private Sprite stormCloudSprite;
+    [SerializeField] private RuntimeAnimatorController stormCloudAnimator;
+    private const string WindWarningLine = "바람이 분다! 잘 하면 2개까지 갈 수 있을지도?";
+    private const string DangerWarningLine = "위험해 피해!";
+    // Sketch course on Wall9 (lateSections[2]), surface x from -6.5 at the Wall2 corner.
+    private const float SketchBoxX = -2.6f, SketchDangerLeft = 1.85f;
+    private DuduHomingShooter sketchShooter;
+    private bool windWarningShown, dangerWarningShown, dangerWarningSeen;
 
     private readonly TutorialStarCollectible[] courseStars = new TutorialStarCollectible[3];
     private DuduSurface[] lateSections;
@@ -74,6 +86,15 @@ public sealed partial class TutorialSequenceController
         // Only the authored 2D route lines are substituted during play.
         if (secondRouteLine != null) secondRouteLine.SetActive(false);
         if (finalTestRouteLine != null) finalTestRouteLine.SetActive(false);
+        obstacleMaterial = new Material(Shader.Find("Sprites/Default"));
+        obstacleMaterial.color = new Color(0.22f, 0.31f, 0.39f);
+        if (useSketchCourse) BuildSketchCourse(root);
+        else BuildClassicCourse(root, second, third, corner, fifth);
+        FinishLateCourse(root, triggers, fourth, fifth);
+    }
+
+    private void BuildClassicCourse(Transform root, DuduSurface second, DuduSurface third, DuduSurface corner, DuduSurface fifth)
+    {
         BuildLateGround(root, second, "ObstacleGround", -second.Width * 0.5f, second.Width * 0.5f);
         BuildLateGround(root, third, "ObstacleTurnGround", -third.Width * 0.5f, third.Width * 0.5f);
         BuildLateGround(root, corner, "StarApproachGround", -corner.Width * 0.5f, corner.Width * 0.5f);
@@ -83,8 +104,6 @@ public sealed partial class TutorialSequenceController
         BuildLateGround(root, fifth, "FinalGapRight", 2.3f, fifth.Width * 0.5f);
         BuildLateGround(root, lastSurface, "DoorApproachGround", -lastSurface.Width * 0.5f, lastSurface.Width * 0.5f);
 
-        obstacleMaterial = new Material(Shader.Find("Sprites/Default"));
-        obstacleMaterial.color = new Color(0.22f, 0.31f, 0.39f);
         GameObject block = GameObject.CreatePrimitive(PrimitiveType.Cube);
         block.name = "Tutorial_Block";
         block.transform.SetParent(root, false);
@@ -124,8 +143,6 @@ public sealed partial class TutorialSequenceController
         wind.GetComponent<BoxCollider>().size = new Vector3(14f, 7f, 2f);
         wind.Configure(third, Vector2.left, 1.3f);
 
-        courseStars[0] = SpawnStar(root, fourth, -2.6f, "Tutorial_Star_1");
-        courseStars[1] = SpawnStar(root, fifth, 2.95f, "Tutorial_Star_2");
         // A familiar obstacle is revisited before the final star; the corridor after it stays clear.
         DuduStainObstacle review = Instantiate(slowPrefab, root);
         review.name = "FinalTest_Fog_Slow";
@@ -133,6 +150,141 @@ public sealed partial class TutorialSequenceController
         review.SetSurfaceNormalOffset(0.09f);
         review.SetEffectDuration(0.15f);
         TightenFogTrigger(review);
+    }
+
+    // Course from the layout sketch, after the stairs (surface units, floor line y=groundSurfaceY).
+    // The whole sketch fits the front of the route (Wall1, Wall2, Wall9, Wall4): jump down to a
+    // short line, hop onto a box, ride the wind to a line and, with luck, on to the wide danger
+    // line under the storm clouds. The rest of the route has no floor at all: Haru draws it.
+    private void BuildSketchCourse(Transform root)
+    {
+        foreach (CrayonRouteLine line in FindObjectsByType<CrayonRouteLine>())
+            if (!line.transform.IsChildOf(root)) line.gameObject.SetActive(false);
+
+        DuduSurface stairs = lateSections[1], windWall = lateSections[2];
+
+        // A short floor leads onto the stairs; nothing is below them or after them.
+        float left = -stairs.Width * 0.5f;
+        // Stairs of crayon Block obstacles stacked 1, 2 and 3 high, as in the sketch,
+        // ending where the old stairs did so the jump to the box stays the same.
+        const float stairsRight = 2.1f, blockWidth = 0.8f;
+        float stairsLeft = stairsRight - 3 * blockWidth;
+        BoxCollider blockShape = knockbackPrefab.GetComponent<BoxCollider>();
+        float blockHeight = blockWidth * blockShape.size.y / blockShape.size.x;
+        BuildLateGround(root, stairs, "Sketch_StairsEntry", left, stairsLeft);
+        for (int column = 0; column < 3; column++)
+            for (int row = 0; row <= column; row++)
+                SketchBlock(root, stairs, "Sketch_Stair_" + (column + 1) + "_" + (row + 1),
+                    stairsLeft + blockWidth * (column + 0.5f), groundSurfaceY + blockHeight * (row + 0.5f), blockWidth, blockHeight);
+
+        // No floor between the stairs and the box: jump (or walk a drawn line) from the top step.
+        // The checkpoint sits on the box, so a respawn always lands on it.
+        SketchBlock(root, windWall, "Sketch_WindBox", SketchBoxX, groundSurfaceY + 0.6f, 1.2f, 1.2f);
+        SketchCheckpoint(root, windWall, SketchBoxX);
+
+        // Wind from the box carries Dudu over the gap onto the danger line.
+        WindZone wind = Instantiate(windPrefab, root);
+        wind.name = "Sketch_Zone_Windy";
+        float windLeft = SketchBoxX + 0.6f, windRight = SketchDangerLeft - 0.8f;
+        wind.transform.SetPositionAndRotation(windWall.SurfaceToWorld(new Vector2((windLeft + windRight) * 0.5f, groundSurfaceY + 1.8f)) +
+            windWall.Normal * 0.08f, windWall.transform.rotation);
+        wind.transform.localScale = new Vector3(0.18f, 0.25f, 0.03f);
+        wind.GetComponent<BoxCollider>().size = new Vector3((windRight - windLeft) / 0.18f, 3.6f / 0.25f, 2f);
+        wind.Configure(windWall, Vector2.right, 1.3f);
+
+        // Wide danger line from the end of this wall across the whole next one, so there is
+        // room to dodge. One storm cloud above its start; it holds fire until the warning
+        // appears and only reaches the danger line.
+        DuduSurface dangerCorner = lateSections[3];
+        BuildLateGround(root, windWall, "Sketch_DangerLine", SketchDangerLeft, windWall.Width * 0.5f);
+        BuildLateGround(root, dangerCorner, "Sketch_DangerLine_Corner", -dangerCorner.Width * 0.5f, dangerCorner.Width * 0.5f);
+        SketchCheckpoint(root, windWall, SketchDangerLeft + 0.6f);
+        // High above the line, so a bullet takes long enough to arrive that it can be dodged.
+        // Bolts follow Dudu around the corner across the danger line, but stop short of
+        // its far end (about the last 1.5 units), which stays safe.
+        sketchShooter = SketchStormCloud(root, windWall, new Vector2(5.4f, 2f), 6.7f);
+        sketchShooter.SetProjectileReach(5.8f);
+    }
+
+    private DuduHomingShooter SketchStormCloud(Transform root, DuduSurface target, Vector2 position, float range)
+    {
+        GameObject cloud = new GameObject("Sketch_StormCloud", typeof(SpriteRenderer), typeof(Animator));
+        cloud.transform.SetParent(root, false);
+        cloud.transform.localScale = Vector3.one * 0.13f;
+        cloud.GetComponent<SpriteRenderer>().sprite = stormCloudSprite;
+        cloud.GetComponent<Animator>().runtimeAnimatorController = stormCloudAnimator;
+        DuduHomingShooter shooter = cloud.AddComponent<DuduHomingShooter>();
+        shooter.SetProjectilePrefab(lightningProjectilePrefab);
+        shooter.Configure(target, dudu, position, lightningMaterial);
+        shooter.SetAttackRange(range);
+        shooter.enabled = false;
+        return shooter;
+    }
+
+    // A Block obstacle: the crayon block art and collider of the obstacle prefab, standing
+    // still and safe to stand on (the moving, bouncing part is removed), sized to width x height.
+    private void SketchBlock(Transform root, DuduSurface target, string name, float x, float y, float width, float height)
+    {
+        DuduMovingObstacle mover = Instantiate(knockbackPrefab, root);
+        GameObject block = mover.gameObject;
+        block.name = name;
+        DestroyImmediate(mover);
+        // Its interpolated rigidbody would keep pulling the block back to where it spawned.
+        DestroyImmediate(block.GetComponent<Rigidbody>());
+        BoxCollider box = block.GetComponent<BoxCollider>();
+        float scaleX = width / box.size.x;
+        block.transform.localScale = new Vector3(scaleX, height / box.size.y, scaleX);
+        block.transform.SetPositionAndRotation(target.SurfaceToWorld(new Vector2(x, y)) + target.Normal * 0.09f,
+            target.transform.rotation);
+        // Deep collider, so Dudu stays on his 2D plane.
+        Vector3 size = box.size;
+        size.z = Mathf.Max(size.z, 4.7f);
+        box.size = size;
+    }
+
+    // Later deaths respawn here instead of at the stage start.
+    private void SketchCheckpoint(Transform root, DuduSurface target, float x)
+    {
+        GameObject checkpoint = new GameObject("Sketch_Checkpoint", typeof(BoxCollider));
+        checkpoint.transform.SetParent(root, false);
+        checkpoint.transform.SetPositionAndRotation(target.SurfaceToWorld(new Vector2(x, groundSurfaceY + 1f)), target.transform.rotation);
+        checkpoint.GetComponent<BoxCollider>().size = new Vector3(0.6f, 2f, 3f);
+        checkpoint.AddComponent<DuduCheckpoint>();
+    }
+
+    // Wind and danger warnings from the sketch. Nothing pauses for them; the storm cloud only
+    // holds fire until the danger warning appears (both peers decide this from the shown line).
+    private void UpdateSketchDialogues(DuduSurface here, float x)
+    {
+        if (!useSketchCourse || dialoguePanel.activeSelf) return;
+        if (here != lateSections[2]) return;
+        if (!windWarningShown && x <= SketchBoxX + 0.6f)
+        {
+            windWarningShown = true;
+            ShowDialogue(new[] { "두두" }, new[] { WindWarningLine });
+        }
+        else if (!dangerWarningShown && x >= SketchDangerLeft)
+        {
+            dangerWarningShown = true;
+            ShowDialogue(new[] { "두두" }, new[] { DangerWarningLine });
+        }
+    }
+
+    private void UpdateSketchDanger()
+    {
+        bool dangerOpen = dialoguePanel.activeSelf && dialogue.text == DangerWarningLine;
+        dangerWarningSeen |= dangerOpen;
+        // The cloud starts firing as soon as the warning appears, read or not.
+        if (sketchShooter != null && !sketchShooter.enabled &&
+            (dangerWarningSeen || CurrentStep >= TutorialStep.Tutorial_06_FinalTest))
+            sketchShooter.enabled = true;
+    }
+
+
+    private void FinishLateCourse(Transform root, Transform triggers, DuduSurface fourth, DuduSurface fifth)
+    {
+        courseStars[0] = SpawnStar(root, fourth, -2.6f, "Tutorial_Star_1");
+        courseStars[1] = SpawnStar(root, fifth, 2.95f, "Tutorial_Star_2");
         courseStars[2] = SpawnStar(root, lastSurface, 7f, "Tutorial_Star_3");
         tutorialRoom.Configure(lateSections, courseStars, tutorialRoom.Door, dudu);
 
@@ -195,17 +347,21 @@ public sealed partial class TutorialSequenceController
             DuduSurface here = dudu.CurrentSurface;
             float x = here.WorldToSurface(dudu.transform.position).x;
             int progress = here == lateSections[1] ? (x > 2f ? 2 : x > -0.9f ? 1 : 0) :
-                here == lateSections[2] ? (x > 3.3f ? 4 : x > -1f ? 3 : 2) :
+                here == lateSections[2] ? (useSketchCourse ? (x > SketchDangerLeft - 0.5f ? 4 : x > SketchBoxX - 0.6f ? 3 : 2) :
+                    (x > 3.3f ? 4 : x > -1f ? 3 : 2)) :
                 here == lateSections[3] || here == lateSections[4] || here == lateSections[5] || here == lastSurface ? 4 : 0;
             if (progress > obstacleProgress)
             {
                 obstacleProgress = progress;
-                string[] hints = { "block를 넘어가세요!", "block_knockback을 피해보세요!", "fog_slow를 통과해보세요!", "zone_windy를 통과해보세요!" };
+                string[] hints = useSketchCourse
+                    ? new[] { "계단을 올라가 보세요!", "꼭대기에서 점프!", "상자로 점프해 보세요!", "바람을 타고 날아가요!" }
+                    : new[] { "block를 넘어가세요!", "block_knockback을 피해보세요!", "fog_slow를 통과해보세요!", "zone_windy를 통과해보세요!" };
                 if (progress < 4) SetLateInstruction(hints[progress]);
                 else instructionPanel.SetActive(false);
             }
             // Online, Dudu's surface reaches the host in pose packets that can be dropped,
             // so a short visit to section 4 may be missed; reaching any later section counts too.
+            UpdateSketchDialogues(here, x);
             bool reachedStarArea = here == lateSections[4] ? x >= -4.8f : here == lateSections[5] || here == lastSurface;
             if (obstacleProgress == 4 && reachedStarArea && !dialoguePanel.activeSelf)
                 BeginStarTutorial();

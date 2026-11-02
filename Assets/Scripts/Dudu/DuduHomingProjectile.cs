@@ -13,6 +13,48 @@ public sealed class DuduHomingProjectile : MonoBehaviour
     private float moveSpeed;
     private float remainingLifetime;
     private float visualOffset;
+    private BoxCollider targetBody;
+    private Vector3 tipLocalPosition;
+    private float tipHitRadius = 0.1f;
+    private float maxHorizontalReach;
+    private float horizontalTravel;
+
+    // Optional cap on how far the bolt may travel sideways from where it was fired (0 = none).
+    public void SetMaxHorizontalReach(float reach) => maxHorizontalReach = Mathf.Max(0f, reach);
+
+    // A position on a neighbouring wall, in this wall's unwrapped coordinates (the 2D view
+    // lays the walls side by side), so homing and hits work across a room corner.
+    public static bool TryMapToSurface(DuduSurface surface, DuduSurface other, Vector3 worldPosition, out Vector2 position)
+    {
+        position = Vector2.zero;
+        if (surface == null || other == null) return false;
+        Vector2 local = other.WorldToSurface(worldPosition);
+        float seam = surface.Width * 0.5f + other.Width * 0.5f;
+        if (other == surface) position = local;
+        else if (other == surface.nextSurface) position = new Vector2(local.x + seam, local.y);
+        else if (other == surface.previousSurface) position = new Vector2(local.x - seam, local.y);
+        else return false;
+        return true;
+    }
+
+    private bool TryGetTargetSurfacePosition(out Vector2 position)
+        => TryMapToSurface(surface, target.CurrentSurface, target.transform.position, out position);
+
+    // Past the wall's edge the bolt moves onto the neighbouring wall.
+    private void CrossSeam(ref Vector2 position)
+    {
+        float half = surface.Width * 0.5f;
+        if (position.x > half && surface.nextSurface != null)
+        {
+            position.x -= half + surface.nextSurface.Width * 0.5f;
+            surface = surface.nextSurface;
+        }
+        else if (position.x < -half && surface.previousSurface != null)
+        {
+            position.x += half + surface.previousSurface.Width * 0.5f;
+            surface = surface.previousSurface;
+        }
+    }
 
     public void Configure(
         DuduSurface targetSurface,
@@ -28,7 +70,17 @@ public sealed class DuduHomingProjectile : MonoBehaviour
         moveSpeed = Mathf.Max(0f, speed);
         remainingLifetime = Mathf.Max(0.1f, lifetime);
         surfacePosition = startSurfacePosition;
-        visualOffset = Mathf.Clamp(surfaceVisualOffset, 0.01f, 0.03f);
+        visualOffset = Mathf.Clamp(surfaceVisualOffset, 0.01f, 0.15f);
+        targetBody = target != null ? target.GetComponent<BoxCollider>() : null;
+        // The artwork's tip is at the bottom of the sprite (see GetMovementRotation); the
+        // outer 15% is transparent padding.
+        SpriteRenderer art = GetComponent<SpriteRenderer>();
+        if (art != null && art.sprite != null)
+        {
+            Bounds spriteBounds = art.sprite.bounds;
+            tipLocalPosition = spriteBounds.center - Vector3.up * spriteBounds.extents.y * 0.85f;
+            tipHitRadius = spriteBounds.extents.x * 0.3f * Mathf.Abs(transform.lossyScale.x);
+        }
         movementDirection = GetDirectionToTarget();
         transform.SetPositionAndRotation(SurfaceToWorld(surfacePosition), GetMovementRotation());
     }
@@ -62,7 +114,8 @@ public sealed class DuduHomingProjectile : MonoBehaviour
             return;
         }
 
-        if (target.CurrentSurface != surface)
+        // Dudu may walk around a corner onto a neighbouring wall; the bolt follows him there.
+        if (!TryGetTargetSurfacePosition(out _))
         {
             Destroy(gameObject);
             return;
@@ -73,7 +126,15 @@ public sealed class DuduHomingProjectile : MonoBehaviour
             movementDirection = desiredDirection.normalized;
 
         // Direction changes must never change the projectile's travel speed.
-        Vector2 nextSurfacePosition = surfacePosition + movementDirection.normalized * moveSpeed * Time.fixedDeltaTime;
+        Vector2 step = movementDirection.normalized * moveSpeed * Time.fixedDeltaTime;
+        horizontalTravel += step.x;
+        if (maxHorizontalReach > 0f && Mathf.Abs(horizontalTravel) > maxHorizontalReach)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Vector2 nextSurfacePosition = surfacePosition + step;
+        CrossSeam(ref nextSurfacePosition);
         Vector3 nextWorldPosition = SurfaceToWorld(nextSurfacePosition);
         Vector3 displacement = nextWorldPosition - body.position;
         if (TouchesDrawnLineAlongMove(displacement))
@@ -95,44 +156,21 @@ public sealed class DuduHomingProjectile : MonoBehaviour
 
     private bool TouchesTargetAlongMove(Vector3 displacement)
     {
-        if (projectileSphere == null || target == null)
+        if (target == null || targetBody == null)
             return false;
 
-        // The game is presented in unwrapped 2D coordinates. Test the complete
-        // visible travel segment there as well, so a rendered overlap can never
-        // slip through because of 3D layers, sprite padding, or trigger timing.
-        Vector2 start2D = surface.WorldToSurface(body.position);
-        Vector2 end2D = surface.WorldToSurface(body.position + displacement);
-        Vector2 target2D = surface.WorldToSurface(target.transform.position);
-        Vector2 segment2D = end2D - start2D;
-        float segmentT = segment2D.sqrMagnitude > Mathf.Epsilon
-            ? Mathf.Clamp01(Vector2.Dot(target2D - start2D, segment2D) / segment2D.sqrMagnitude)
-            : 0f;
-        Vector2 closest2D = start2D + segment2D * segmentT;
-        const float visibleHitRadius = 0.85f;
-        if (Vector2.Distance(closest2D, target2D) <= visibleHitRadius)
-            return true;
-
-        Vector3 scale = transform.lossyScale;
-        float radius = projectileSphere.radius * Mathf.Max(
-            Mathf.Abs(scale.x), Mathf.Abs(scale.y), Mathf.Abs(scale.z));
-        Vector3 center = body.position + body.rotation * Vector3.Scale(projectileSphere.center, scale);
-
-        foreach (Collider other in Physics.OverlapSphere(
-            center, radius, Physics.AllLayers, QueryTriggerInteraction.Collide))
-            if (other.GetComponentInParent<DuduSurfaceMovement>() == target)
-                return true;
-
-        float distance = displacement.magnitude;
-        if (distance <= Mathf.Epsilon)
+        // Hit only where the bolt is drawn: its tip against Dudu's body box, in the
+        // unwrapped 2D view. The old sphere (and a fixed 0.85 circle) was about as wide
+        // as the whole sprite, so the bolt vanished and Dudu was hit before they touched.
+        Vector2 tip2D = surface.WorldToSurface(transform.TransformPoint(tipLocalPosition) + displacement);
+        if (!TryMapToSurface(surface, target.CurrentSurface, targetBody.transform.TransformPoint(targetBody.center), out Vector2 body2D))
             return false;
-
-        foreach (RaycastHit hit in Physics.SphereCastAll(
-            center, radius, displacement / distance, distance, Physics.AllLayers, QueryTriggerInteraction.Collide))
-            if (hit.collider.GetComponentInParent<DuduSurfaceMovement>() == target)
-                return true;
-
-        return false;
+        Vector3 bodyScale = targetBody.transform.lossyScale;
+        Vector2 halfSize = new Vector2(Mathf.Abs(targetBody.size.x * bodyScale.x), Mathf.Abs(targetBody.size.y * bodyScale.y)) * 0.5f;
+        Vector2 outside = new Vector2(
+            Mathf.Max(0f, Mathf.Abs(tip2D.x - body2D.x) - halfSize.x),
+            Mathf.Max(0f, Mathf.Abs(tip2D.y - body2D.y) - halfSize.y));
+        return outside.magnitude <= tipHitRadius;
     }
 
     private Quaternion GetMovementRotation()
@@ -147,20 +185,11 @@ public sealed class DuduHomingProjectile : MonoBehaviour
         return surface.transform.rotation * Quaternion.Euler(0f, 0f, angle + 90f);
     }
 
+    // Dudu is hit only by the visible-tip test in FixedUpdate, never by this wide trigger.
     private void OnTriggerEnter(Collider other)
     {
         if (other.GetComponentInParent<DrawingStroke>() != null)
-        {
             Destroy(gameObject);
-            return;
-        }
-
-        DuduSurfaceMovement dudu = other.GetComponentInParent<DuduSurfaceMovement>();
-        if (dudu == null || dudu != target)
-            return;
-
-        dudu.Die();
-        Destroy(gameObject);
     }
 
     private bool TouchesDrawnLineAlongMove(Vector3 displacement)
@@ -198,10 +227,10 @@ public sealed class DuduHomingProjectile : MonoBehaviour
 
     private Vector2 GetDirectionToTarget()
     {
-        if (surface == null || target == null)
+        if (surface == null || target == null || !TryGetTargetSurfacePosition(out Vector2 targetPosition))
             return Vector2.right;
 
-        Vector2 direction = surface.WorldToSurface(target.transform.position) - surfacePosition;
+        Vector2 direction = targetPosition - surfacePosition;
         return direction.sqrMagnitude > 0.0001f ? direction.normalized : Vector2.right;
     }
 

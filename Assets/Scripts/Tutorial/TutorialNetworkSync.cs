@@ -117,10 +117,7 @@ public sealed partial class TutorialSequenceController
         CurrentErasePhase = (ErasePhase)state.erasePhase;
         remoteSerial = state.serial;
         if (dialoguePanel.activeSelf != state.dialogue)
-        {
             dialoguePanel.SetActive(state.dialogue);
-            dudu.SetDialogueInputLocked(state.dialogue);
-        }
         speaker.text = state.speaker;
         dialogue.text = state.line;
         instruction.text = state.instructionText;

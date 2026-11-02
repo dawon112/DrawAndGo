@@ -11647,8 +11647,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 12cb5ce3e6de4484b5d58f5470a07d01, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TutorialSequenceController
-  eraseGapLeft: 4.2
-  eraseGapRight: 9
+  eraseGapLeft: 5.2
+  eraseGapRight: 9.6
   tutorialRoom: {fileID: 1678319095}
   lastSurface: {fileID: 822351890}
   secondRouteLine: {fileID: 1531181261}
@@ -11657,6 +11657,11 @@ MonoBehaviour:
   knockbackPrefab: {fileID: 184948602, guid: b33e0cd768f3482eb6fdccddf0eb934b, type: 3}
   slowPrefab: {fileID: 922511671, guid: 132f8c025d1043039fea0acc9c5d66c9, type: 3}
   windPrefab: {fileID: 5202116702491237219, guid: c6eb9ee828ed8e04f9017350c08ea014, type: 3}
+  useSketchCourse: 1
+  lightningProjectilePrefab: {fileID: 100000, guid: 7a6f8b69af674d13aa58a7ec34104e76, type: 3}
+  lightningMaterial: {fileID: 2100000, guid: 7df8e190159d34c48803da18ceb3d8a7, type: 2}
+  stormCloudSprite: {fileID: 1455431123, guid: 3068f276cfaa3ad46b912f03859d98e9, type: 3}
+  stormCloudAnimator: {fileID: 9100000, guid: 0b8c5fdbef297b94ca9d30dd7e9a99aa, type: 2}
   haru: {fileID: 820480126}
   haruLook: {fileID: 1100589744}
   haruCamera: {fileID: 1100589745}
@@ -11666,8 +11671,8 @@ MonoBehaviour:
   originalStartLine: {fileID: 1028374874}
   requiredMoveDistance: 2
   requiredMouseDelta: 180
-  gapLeft: -3
-  gapRight: 2.2
+  gapLeft: -6
+  gapRight: -0.8
   groundSurfaceY: -2.33
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
