@@ -397,7 +397,7 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         if (Vector3.Dot(current.normal, up) < minUp)
             return false;
 
-        if (Mathf.Abs(speed) <= 0.0001f && current.collider.GetComponentInParent<DrawingStroke>() != null)
+        if (Mathf.Abs(speed) <= 0.0001f && IsWalkableLine(current.collider))
         {
             // Stay on the verified support without repeated height corrections
             // or gravity-induced sliding while the player is not walking.
@@ -410,7 +410,7 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         Vector3 horizontalMove = right * speed * Time.fixedDeltaTime;
         float reach = horizontalMove.magnitude * Mathf.Tan(maxWalkableSlopeAngle * Mathf.Deg2Rad) + probeLift;
         if (!TryFindSupport(center + horizontalMove, half, up, reach, reach * 2f, out RaycastHit next) ||
-            next.collider.GetComponentInParent<DrawingStroke>() == null ||
+            !IsWalkableLine(next.collider) ||
             Vector3.Dot(next.normal, up) < minUp)
             return false;
 
@@ -454,6 +454,15 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         jumpConsumedUntilLanding = false;
         lastGroundedTime = Time.time;
         return true;
+    }
+
+    // Lines Dudu walks along (and stands still on) without sliding: Haru's strokes, and
+    // authored crayon ground lines that are tilted. Flat ground keeps plain physics.
+    private bool IsWalkableLine(Collider other)
+    {
+        if (other.GetComponentInParent<DrawingStroke>() != null) return true;
+        return other.GetComponent<CrayonRouteLine>() != null && currentSurface != null &&
+            Mathf.Abs(Vector3.Dot(other.transform.right, currentSurface.Up.normalized)) > 0.01f;
     }
 
     private bool TryFindSupport(Vector3 center, Vector3 half, Vector3 up,

@@ -13,6 +13,8 @@ public sealed partial class TutorialSequenceController
     [SerializeField] private DuduMovingObstacle knockbackPrefab;
     [SerializeField] private DuduStainObstacle slowPrefab;
     [SerializeField] private WindZone windPrefab;
+    [SerializeField] private NoDrawZone noDrawZonePrefab;
+    [SerializeField] private HotZone hotZonePrefab;
     [Tooltip("Floorless course from the layout sketch instead of the old full-floor obstacle course.")]
     [SerializeField] private bool useSketchCourse = true;
     [SerializeField] private GameObject lightningProjectilePrefab;
@@ -23,6 +25,11 @@ public sealed partial class TutorialSequenceController
     private const string DangerWarningLine = "위험해 피해!";
     // Sketch course on Wall9 (lateSections[2]), surface x from -6.5 at the Wall2 corner.
     private const float SketchBoxX = -2.6f, SketchDangerLeft = 1.85f;
+    // Zone course on Wall5 (lateSections[4]): heights above the ground line. The rising
+    // ground starts after the hot zones and climbs 0.3 per unit (about 17 degrees).
+    private const float ZoneLineLift = 0.8f;
+    private const float SlopeStartX = 4.1f, SlopeStartLift = 0.6f, SlopeRise = 0.3f, SlopeCornerLength = 3.5f;
+    private const float SlopeCornerFlat = 0.7f;
     private DuduHomingShooter sketchShooter;
     private bool windWarningShown, dangerWarningShown, dangerWarningSeen;
 
@@ -204,6 +211,103 @@ public sealed partial class TutorialSequenceController
         // its far end (about the last 1.5 units), which stays safe.
         sketchShooter = SketchStormCloud(root, windWall, new Vector2(5.4f, 2f), 6.7f);
         sketchShooter.SetProjectileReach(5.8f);
+
+        BuildSketchZoneCourse(root, lateSections[4]);
+    }
+
+    // After the danger line (next wall): a gap under a no-draw zone with a bouncing Vertical
+    // Block rising and sinking through it, a short raised line, a long gap under two hot zones
+    // (Haru's lines there fade after 2 s), then a long ground rising to the right around the
+    // corner onto the next wall, with the first star on it.
+    private void BuildSketchZoneCourse(Transform root, DuduSurface wall)
+    {
+        float left = -wall.Width * 0.5f;
+        BuildLateGround(root, wall, "Sketch_ZoneEntry", left, -5.3f);
+        SketchZone(noDrawZonePrefab, root, wall, "Sketch_NoDrawZone", -5.3f, -2.5f, groundSurfaceY - 0.1f, groundSurfaceY + 1.3f);
+
+        // The Vertical Obstacle: rises and sinks through the no-draw zone and bounces Dudu away.
+        DuduMovingObstacle lift = Instantiate(knockbackPrefab, root);
+        lift.name = "Sketch_VerticalBlock";
+        BoxCollider liftBox = lift.GetComponent<BoxCollider>();
+        float liftScale = 1f / liftBox.size.x;
+        lift.transform.localScale = Vector3.one * liftScale;
+        Vector3 liftSize = liftBox.size;
+        liftSize.z = Mathf.Max(liftSize.z, 4.7f);
+        liftBox.size = liftSize;
+        lift.Configure(wall, DuduMovingObstacle.MovementAxis.Vertical,
+            new Vector2(-3.9f, groundSurfaceY + 0.65f), 1.8f, 3.6f);
+        lift.SetSurfaceNormalOffset(0.09f);
+
+        // Zones and floors only meet at their edges: none of them overlaps another.
+        BuildLateGround(root, wall, "Sketch_ZoneLine", -2.2f, -0.9f, ZoneLineLift);
+        SketchZone(hotZonePrefab, root, wall, "Sketch_HotZone_1", -0.8f, 1.6f, groundSurfaceY + 0.5f, groundSurfaceY + 2.1f);
+        SketchZone(hotZonePrefab, root, wall, "Sketch_HotZone_2", 1.6f, 4f, groundSurfaceY + 0.5f, groundSurfaceY + 2.1f);
+
+        // A long ground rising to the right, carried on around the corner onto the next wall.
+        // It is level for a short way on both sides of the corner: crossing a corner moves
+        // Dudu sideways at the same height, which on a rise would sink him into the ground.
+        DuduSurface next = lateSections[5];
+        float right = wall.Width * 0.5f, flatStart = right - SlopeCornerFlat, cornerLift = SlopeLiftAt(flatStart);
+        BuildLateSlope(root, wall, "Sketch_Slope", SlopeStartX, SlopeStartLift, flatStart, cornerLift);
+        BuildLateGround(root, wall, "Sketch_Slope_Level", flatStart, right, cornerLift);
+        float nextLeft = -next.Width * 0.5f, riseStart = nextLeft + SlopeCornerFlat;
+        BuildLateGround(root, next, "Sketch_Slope_Corner_Level", nextLeft, riseStart, cornerLift);
+        BuildLateSlope(root, next, "Sketch_Slope_Corner", riseStart, cornerLift,
+            riseStart + SlopeCornerLength, cornerLift + SlopeCornerLength * SlopeRise);
+        SketchCheckpoint(root, wall, left + 0.8f);
+    }
+
+    // Height of the rising ground above the ground line at x on the zone wall.
+    private static float SlopeLiftAt(float x) => SlopeStartLift + (x - SlopeStartX) * SlopeRise;
+
+    // A ground line from (x0, lift0) to (x1, lift1), lifts above the ground line.
+    private void BuildLateSlope(Transform root, DuduSurface target, string name, float x0, float lift0, float x1, float lift1)
+    {
+        GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        ground.name = name;
+        ground.transform.SetParent(root, false);
+        Vector2 start = new Vector2(x0, groundSurfaceY + lift0), end = new Vector2(x1, groundSurfaceY + lift1);
+        Vector2 along = end - start;
+        float angle = Mathf.Atan2(along.y, along.x) * Mathf.Rad2Deg;
+        Quaternion rotation = target.transform.rotation * Quaternion.Euler(0f, 0f, angle);
+        // Top face on the line, like BuildLateGround's flat lines.
+        Vector3 center = target.SurfaceToWorld((start + end) * 0.5f) + target.Normal * 0.055f - rotation * Vector3.up * 0.07f;
+        ground.transform.SetPositionAndRotation(center, rotation);
+        ground.transform.localScale = new Vector3(along.magnitude, 0.14f, 0.18f);
+        StyleLikeStartLine(ground);
+    }
+
+    // A zone prefab scaled so its collider (and art) covers the given surface rectangle.
+    private void SketchZone(Component prefab, Transform root, DuduSurface target, string name,
+        float left, float right, float bottom, float top)
+    {
+        if (prefab == null)
+        {
+            Debug.LogError($"Tutorial: {name} prefab is not assigned.", this);
+            return;
+        }
+        Component zone = Instantiate(prefab, root);
+        zone.name = name;
+        BoxCollider box = zone.GetComponent<BoxCollider>();
+        // The prefab art does not match its collider. Make the zone the art's visible extent
+        // (the sprite's tight outline, without its transparent margin), so what Haru sees is
+        // exactly where the zone works and neighbours never overlap.
+        SpriteRenderer art = zone.GetComponent<SpriteRenderer>();
+        if (art != null && art.sprite != null)
+        {
+            Vector2 min = Vector2.positiveInfinity, max = Vector2.negativeInfinity;
+            foreach (Vector2 vertex in art.sprite.vertices) { min = Vector2.Min(min, vertex); max = Vector2.Max(max, vertex); }
+            box.center = new Vector3((min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f, box.center.z);
+            box.size = new Vector3(max.x - min.x, max.y - min.y, box.size.z);
+        }
+        Vector3 scale = zone.transform.localScale;
+        zone.transform.localScale = new Vector3((right - left) / box.size.x, (top - bottom) / box.size.y, scale.z);
+        // Place by the collider centre, in front of the wall like the prefabs' own snapping.
+        Vector3 center = target.SurfaceToWorld(new Vector2((left + right) * 0.5f, (bottom + top) * 0.5f)) + target.Normal * 0.08f;
+        zone.transform.SetPositionAndRotation(center, target.transform.rotation);
+        zone.transform.position -= zone.transform.TransformVector(box.center);
+        if (zone is NoDrawZone noDraw) noDraw.Configure(target);
+        else if (zone is HotZone hot) hot.Configure(target);
     }
 
     private DuduHomingShooter SketchStormCloud(Transform root, DuduSurface target, Vector2 position, float range)
@@ -283,7 +387,10 @@ public sealed partial class TutorialSequenceController
 
     private void FinishLateCourse(Transform root, Transform triggers, DuduSurface fourth, DuduSurface fifth)
     {
-        courseStars[0] = SpawnStar(root, fourth, -2.6f, "Tutorial_Star_1");
+        // In the sketch course the first star waits on the raised ground after the hot zones.
+        courseStars[0] = useSketchCourse
+            ? SpawnStar(root, fourth, 5.6f, "Tutorial_Star_1", SlopeLiftAt(5.6f))
+            : SpawnStar(root, fourth, -2.6f, "Tutorial_Star_1");
         courseStars[1] = SpawnStar(root, fifth, 2.95f, "Tutorial_Star_2");
         courseStars[2] = SpawnStar(root, lastSurface, 7f, "Tutorial_Star_3");
         tutorialRoom.Configure(lateSections, courseStars, tutorialRoom.Door, dudu);
@@ -299,22 +406,22 @@ public sealed partial class TutorialSequenceController
         exit.GetComponent<TutorialDoorExitTrigger>().Configure(this);
     }
 
-    private void BuildLateGround(Transform root, DuduSurface target, string name, float left, float right)
+    private void BuildLateGround(Transform root, DuduSurface target, string name, float left, float right, float lift = 0f)
     {
         GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Cube);
         ground.name = name;
         ground.transform.SetParent(root, false);
-        ground.transform.SetPositionAndRotation(target.SurfaceToWorld(new Vector2((left + right) * 0.5f, groundSurfaceY - 0.07f)) + target.Normal * 0.055f,
+        ground.transform.SetPositionAndRotation(target.SurfaceToWorld(new Vector2((left + right) * 0.5f, groundSurfaceY + lift - 0.07f)) + target.Normal * 0.055f,
             target.transform.rotation);
         ground.transform.localScale = new Vector3(right - left, 0.14f, 0.18f);
         StyleLikeStartLine(ground);
     }
 
-    private TutorialStarCollectible SpawnStar(Transform root, DuduSurface target, float x, string name)
+    private TutorialStarCollectible SpawnStar(Transform root, DuduSurface target, float x, string name, float lift = 0f)
     {
         TutorialStarCollectible star = Instantiate(starPrefab, root);
         star.name = name;
-        star.transform.SetPositionAndRotation(target.SurfaceToWorld(new Vector2(x, groundSurfaceY + 0.8f)) + target.Normal * 0.13f,
+        star.transform.SetPositionAndRotation(target.SurfaceToWorld(new Vector2(x, groundSurfaceY + lift + 0.8f)) + target.Normal * 0.13f,
             target.transform.rotation);
         return star;
     }

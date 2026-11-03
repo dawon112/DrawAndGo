@@ -10,6 +10,8 @@ public sealed class HotZone : MonoBehaviour
     [SerializeField] private Renderer visualRenderer;
     [SerializeField] private Color zoneColor = new Color(1f, 0.18f, 0.12f, 0.28f);
 
+    // Strokes sit just in front of their wall; anything further away is on another wall.
+    private const float MaxWallDistance = 0.5f;
     private static readonly List<HotZone> ActiveZones = new List<HotZone>();
     private BoxCollider zoneCollider;
 
@@ -47,6 +49,8 @@ public sealed class HotZone : MonoBehaviour
         {
             if (zone == null || zone.surface == null) continue;
             if (Mathf.Abs(Vector3.Dot(surfaceNormal.normalized, zone.surface.Normal.normalized)) < 0.9f) continue;
+            // A parallel wall elsewhere in the room (same facing) is not this zone's wall.
+            if (Mathf.Abs(Vector3.Dot(worldPoint - zone.surface.transform.position, zone.surface.Normal.normalized)) > MaxWallDistance) continue;
             if (!zone.Contains(worldPoint)) continue;
             duration = zone.fadeDuration;
             return true;
