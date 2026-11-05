@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+// After TutorialSequenceController (100) has set up its walls, so this binds to the final ones.
+[DefaultExecutionOrder(200)]
 [DisallowMultipleComponent]
 [RequireComponent(typeof(Collider))]
 public sealed class DuduStainObstacle : MonoBehaviour

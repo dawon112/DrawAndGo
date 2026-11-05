@@ -189,8 +189,7 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
         float x = here.WorldToSurface(dudu.transform.position).x;
         if (lateSections != null && here != surface)
         {
-            if (here == lateSections[4] ? x >= -4.8f : here == lateSections[5] || here == lastSurface)
-                return TutorialStep.Tutorial_05_Star;
+            if (ReachedFirstStarArea(here, x)) return TutorialStep.Tutorial_05_Star;
             return TutorialStep.Tutorial_04_Obstacle;
         }
         if (here != surface) return TutorialStep.Tutorial_01_Move;

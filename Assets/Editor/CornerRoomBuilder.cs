@@ -7,15 +7,8 @@ using UnityEngine.SceneManagement;
 
 public static class CornerRoomBuilder
 {
-    [InitializeOnLoadMethod]
-    private static void ScheduleBuild()
-    {
-        EditorApplication.delayCall += () =>
-        {
-            if (!EditorApplication.isPlayingOrWillChangePlaymode) Build();
-        };
-    }
-
+    // Menu only. It used to run after every compile, which reopened this scene (dropping
+    // unsaved edits in any other scene) and reset hand-placed coins, lines and obstacles.
     [MenuItem("Tools/Draw And Go/Build Corner Room")]
     public static void Build()
     {
@@ -350,7 +343,7 @@ public static class CornerRoomBuilder
                 surface.SurfaceToWorld(new Vector2(horizontalPositions[i], -1.25f)) +
                     surface.Normal * .16f,
                 surface.transform.rotation);
-            coin.transform.localScale = Vector3.one * 0.96f;
+            coin.transform.localScale = Vector3.one * 0.07f; // Same as CornerRoomLevel applies in play.
             SpriteRenderer renderer = coin.GetComponent<SpriteRenderer>();
             if (renderer != null)
                 renderer.sortingOrder = 20;

@@ -50,7 +50,8 @@ public sealed class DuduHomingShooter : MonoBehaviour
 
     private void Awake()
     {
-        gameObject.name = "StormCloud";
+        // Online sync matches hazards by hierarchy path, so "StormCloud 2" keeps its own name.
+        if (!gameObject.name.StartsWith("StormCloud")) gameObject.name = "StormCloud";
         EnsureLightningSpawnPoint();
     }
 
@@ -309,7 +310,8 @@ public sealed class DuduHomingShooter : MonoBehaviour
 
     // How far sideways a bolt may travel from where it was fired (0 = no limit).
     public void SetProjectileReach(float reach) => projectileMaxHorizontalReach = Mathf.Max(0f, reach);
-    private float projectileMaxHorizontalReach;
+    [Tooltip("How far sideways a bolt may travel from where it was fired (0 = no limit).")]
+    [SerializeField, Min(0f)] private float projectileMaxHorizontalReach;
 
     private void ApplySurfaceTransform()
     {

@@ -20,25 +20,25 @@ public static class HomingProjectilePrefabBuilder
         if (!AssetDatabase.IsValidFolder("Assets/Prefabs")) AssetDatabase.CreateFolder("Assets", "Prefabs");
         if (!AssetDatabase.IsValidFolder(Folder)) AssetDatabase.CreateFolder("Assets/Prefabs", "Enemies");
 
+        // Only when the prefab is missing: past this point the main scene is opened and saved,
+        // which on every compile would drop unsaved edits in whatever scene is open.
         GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
-        if (prefab == null)
-        {
-            GameObject projectile = new GameObject("Homing Projectile");
-            SpriteRenderer renderer = projectile.AddComponent<SpriteRenderer>();
-            renderer.color = Color.black;
-            renderer.sortingOrder = 25;
-            SphereCollider collider = projectile.AddComponent<SphereCollider>();
-            collider.isTrigger = true;
-            Rigidbody body = projectile.AddComponent<Rigidbody>();
-            body.useGravity = false;
-            body.isKinematic = true;
-            body.interpolation = RigidbodyInterpolation.Interpolate;
-            body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
-            body.constraints = RigidbodyConstraints.None;
-            projectile.AddComponent<DuduHomingProjectile>();
-            prefab = PrefabUtility.SaveAsPrefabAsset(projectile, PrefabPath);
-            Object.DestroyImmediate(projectile);
-        }
+        if (prefab != null) return;
+        GameObject projectile = new GameObject("Homing Projectile");
+        SpriteRenderer renderer = projectile.AddComponent<SpriteRenderer>();
+        renderer.color = Color.black;
+        renderer.sortingOrder = 25;
+        SphereCollider collider = projectile.AddComponent<SphereCollider>();
+        collider.isTrigger = true;
+        Rigidbody body = projectile.AddComponent<Rigidbody>();
+        body.useGravity = false;
+        body.isKinematic = true;
+        body.interpolation = RigidbodyInterpolation.Interpolate;
+        body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+        body.constraints = RigidbodyConstraints.None;
+        projectile.AddComponent<DuduHomingProjectile>();
+        prefab = PrefabUtility.SaveAsPrefabAsset(projectile, PrefabPath);
+        Object.DestroyImmediate(projectile);
 
         var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
         foreach (DuduHomingShooter shooter in Object.FindObjectsByType<DuduHomingShooter>(FindObjectsInactive.Include, FindObjectsSortMode.None))

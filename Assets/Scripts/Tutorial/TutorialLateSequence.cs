@@ -30,6 +30,11 @@ public sealed partial class TutorialSequenceController
     private const float ZoneLineLift = 0.8f;
     private const float SlopeStartX = 4.1f, SlopeStartLift = 0.6f, SlopeRise = 0.3f, SlopeCornerLength = 3.5f;
     private const float SlopeCornerFlat = 0.7f;
+    [Tooltip("Set by Tools > Draw And Go > 튜토리얼 코스를 씬으로 옮기기: the sketch course's objects live in the scene, not in code.")]
+    [SerializeField] private bool sketchCourseInScene;
+    [SerializeField] private DuduHomingShooter placedDangerCloud;
+    [SerializeField] private TutorialStarCollectible[] placedStars;
+    private DuduSurface firstStarWall;
     private DuduHomingShooter sketchShooter;
     private bool windWarningShown, dangerWarningShown, dangerWarningSeen;
 
@@ -95,7 +100,8 @@ public sealed partial class TutorialSequenceController
         if (finalTestRouteLine != null) finalTestRouteLine.SetActive(false);
         obstacleMaterial = new Material(Shader.Find("Sprites/Default"));
         obstacleMaterial.color = new Color(0.22f, 0.31f, 0.39f);
-        if (useSketchCourse) BuildSketchCourse(root);
+        if (useSketchCourse && sketchCourseInScene) UsePlacedSketchCourse(root);
+        else if (useSketchCourse) BuildSketchCourse(root);
         else BuildClassicCourse(root, second, third, corner, fifth);
         FinishLateCourse(root, triggers, fourth, fifth);
     }
@@ -163,10 +169,26 @@ public sealed partial class TutorialSequenceController
     // The whole sketch fits the front of the route (Wall1, Wall2, Wall9, Wall4): jump down to a
     // short line, hop onto a box, ride the wind to a line and, with luck, on to the wide danger
     // line under the storm clouds. The rest of the route has no floor at all: Haru draws it.
-    private void BuildSketchCourse(Transform root)
+    // The authored route lines give way to the course; hand-placed lines are the course.
+    private void HideAuthoredRouteLines(Transform root)
     {
         foreach (CrayonRouteLine line in FindObjectsByType<CrayonRouteLine>())
-            if (!line.transform.IsChildOf(root)) line.gameObject.SetActive(false);
+            if (!line.transform.IsChildOf(root) && line.transform.root.name != CrayonRouteLine.PlacedRootName)
+                line.gameObject.SetActive(false);
+    }
+
+    // The course was moved into the scene (Tools > Draw And Go > 튜토리얼 코스를 씬으로 옮기기):
+    // its objects are already there, this only connects what the steps below still drive.
+    private void UsePlacedSketchCourse(Transform root)
+    {
+        HideAuthoredRouteLines(root);
+        sketchShooter = placedDangerCloud;
+        if (sketchShooter != null) sketchShooter.enabled = false;
+    }
+
+    private void BuildSketchCourse(Transform root)
+    {
+        HideAuthoredRouteLines(root);
 
         DuduSurface stairs = lateSections[1], windWall = lateSections[2];
 
@@ -387,12 +409,21 @@ public sealed partial class TutorialSequenceController
 
     private void FinishLateCourse(Transform root, Transform triggers, DuduSurface fourth, DuduSurface fifth)
     {
-        // In the sketch course the first star waits on the raised ground after the hot zones.
-        courseStars[0] = useSketchCourse
-            ? SpawnStar(root, fourth, 5.6f, "Tutorial_Star_1", SlopeLiftAt(5.6f))
-            : SpawnStar(root, fourth, -2.6f, "Tutorial_Star_1");
-        courseStars[1] = SpawnStar(root, fifth, 2.95f, "Tutorial_Star_2");
-        courseStars[2] = SpawnStar(root, lastSurface, 7f, "Tutorial_Star_3");
+        firstStarWall = fourth;
+        if (useSketchCourse && sketchCourseInScene && HasAllPlacedStars())
+        {
+            for (int i = 0; i < courseStars.Length; i++) courseStars[i] = placedStars[i];
+            firstStarWall = WallOf(courseStars[0].transform.position, fourth);
+        }
+        else
+        {
+            // In the sketch course the first star waits on the raised ground after the hot zones.
+            courseStars[0] = useSketchCourse
+                ? SpawnStar(root, fourth, 5.6f, "Tutorial_Star_1", SlopeLiftAt(5.6f))
+                : SpawnStar(root, fourth, -2.6f, "Tutorial_Star_1");
+            courseStars[1] = SpawnStar(root, fifth, 2.95f, "Tutorial_Star_2");
+            courseStars[2] = SpawnStar(root, lastSurface, 7f, "Tutorial_Star_3");
+        }
         tutorialRoom.Configure(lateSections, courseStars, tutorialRoom.Door, dudu);
 
         GameObject exit = new GameObject("TutorialExitTrigger", typeof(BoxCollider), typeof(TutorialDoorExitTrigger));
@@ -405,6 +436,41 @@ public sealed partial class TutorialSequenceController
         exitCollider.size = new Vector3(2f, 3f, 1.8f);
         exit.GetComponent<TutorialDoorExitTrigger>().Configure(this);
     }
+
+    private bool HasAllPlacedStars()
+    {
+        bool complete = placedStars != null && placedStars.Length == courseStars.Length;
+        for (int i = 0; complete && i < placedStars.Length; i++) complete = placedStars[i] != null;
+        if (!complete) Debug.LogError("Tutorial: a placed star is missing, so the code's stars are used instead.", this);
+        return complete;
+    }
+
+    // The course wall a point lies on: the nearest wall plane whose span contains it.
+    private DuduSurface WallOf(Vector3 point, DuduSurface fallback)
+    {
+        DuduSurface best = fallback;
+        float bestDistance = 1f;
+        foreach (DuduSurface wall in lateSections)
+        {
+            if (Mathf.Abs(wall.WorldToSurface(point).x) > wall.Width * 0.5f + 1f) continue;
+            float distance = Mathf.Abs(Vector3.Dot(point - wall.transform.position, wall.Normal));
+            if (distance >= bestDistance) continue;
+            best = wall;
+            bestDistance = distance;
+        }
+        return best;
+    }
+
+    // From just inside the first star's wall onward along the route, wherever the star was put.
+    private bool ReachedFirstStarArea(DuduSurface here, float x)
+    {
+        int wall = System.Array.IndexOf(lateSections, firstStarWall);
+        int reached = System.Array.IndexOf(lateSections, here);
+        return reached > wall || reached == wall && x >= -here.Width * 0.5f + 1.7f;
+    }
+
+    private bool DuduIsOnWallOf(TutorialStarCollectible star) =>
+        dudu.CurrentSurface != null && WallOf(star.transform.position, null) == dudu.CurrentSurface;
 
     private void BuildLateGround(Transform root, DuduSurface target, string name, float left, float right, float lift = 0f)
     {
@@ -469,8 +535,7 @@ public sealed partial class TutorialSequenceController
             // Online, Dudu's surface reaches the host in pose packets that can be dropped,
             // so a short visit to section 4 may be missed; reaching any later section counts too.
             UpdateSketchDialogues(here, x);
-            bool reachedStarArea = here == lateSections[4] ? x >= -4.8f : here == lateSections[5] || here == lastSurface;
-            if (obstacleProgress == 4 && reachedStarArea && !dialoguePanel.activeSelf)
+            if (obstacleProgress == 4 && ReachedFirstStarArea(here, x) && !dialoguePanel.activeSelf)
                 BeginStarTutorial();
         }
     }
@@ -489,11 +554,11 @@ public sealed partial class TutorialSequenceController
         // The first star counts as soon as its step has begun, even mid-dialogue: Dudu
         // standing on it must never stall the tutorial.
         bool allowed = courseStars[0] == star ? CurrentStep == TutorialStep.Tutorial_05_Star &&
-                tutorialRoom.CollectedStars == 0 && dudu.CurrentSurface == lateSections[4] :
+                tutorialRoom.CollectedStars == 0 && DuduIsOnWallOf(star) :
             courseStars[1] == star ? CurrentStep == TutorialStep.Tutorial_06_FinalTest &&
-                tutorialRoom.CollectedStars == 1 && dudu.CurrentSurface == lateSections[5] :
+                tutorialRoom.CollectedStars == 1 && DuduIsOnWallOf(star) :
             courseStars[2] == star && CurrentStep == TutorialStep.Tutorial_06_FinalTest &&
-                tutorialRoom.CollectedStars == 2 && dudu.CurrentSurface == lastSurface;
+                tutorialRoom.CollectedStars == 2 && DuduIsOnWallOf(star);
         if (!allowed && Time.unscaledTime >= nextRefusedStarLog)
         {
             // Player.log trail for a star Dudu touches but cannot take.

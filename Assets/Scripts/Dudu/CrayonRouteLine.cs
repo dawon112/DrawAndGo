@@ -9,6 +9,8 @@ using UnityEngine.Rendering;
 [ExecuteAlways, DisallowMultipleComponent, RequireComponent(typeof(BoxCollider))]
 public sealed class CrayonRouteLine : MonoBehaviour
 {
+    // Hand-placed level objects live under this scene root (Tools > Draw And Go > 벽 배치 도구).
+    public const string PlacedRootName = "Placed Level";
     private const float SurfaceGap = 0.012f;
     private const float PointSpacing = 0.2f;
     private static readonly int SeedId = Shader.PropertyToID("_Seed");
@@ -34,8 +36,16 @@ public sealed class CrayonRouteLine : MonoBehaviour
     // In play mode: turns a box made with CreatePrimitive into a crayon line.
     public static CrayonRouteLine AddTo(GameObject box, Material material)
     {
-        if (box.TryGetComponent(out MeshRenderer mesh)) { mesh.enabled = false; Destroy(mesh); }
-        if (box.TryGetComponent(out MeshFilter filter)) Destroy(filter);
+        // The tutorial course also builds in edit mode for its Scene view preview.
+        if (box.TryGetComponent(out MeshRenderer mesh))
+        {
+            mesh.enabled = false;
+            if (Application.isPlaying) Destroy(mesh); else DestroyImmediate(mesh);
+        }
+        if (box.TryGetComponent(out MeshFilter filter))
+        {
+            if (Application.isPlaying) Destroy(filter); else DestroyImmediate(filter);
+        }
         CrayonRouteLine line = box.AddComponent<CrayonRouteLine>();
         line.Material = material;
         line.Rebuild();
@@ -87,8 +97,8 @@ public sealed class CrayonRouteLine : MonoBehaviour
         if (surface != null)
         {
             // Lie on the wall's visible face; Dudu's plane can sit inside a thick wall.
-            normal = surface.Normal;
-            centre -= normal * (Vector3.Dot(centre - surface.transform.position, normal) - VisibleFace(surface));
+            normal = WallSideNormal(surface);
+            centre -= normal * (Vector3.Dot(centre - surface.transform.position, normal) - VisibleFace(surface, normal));
         }
         centre += normal * SurfaceGap;
         stroke.transform.rotation = Quaternion.LookRotation(-normal, up);
@@ -127,23 +137,30 @@ public sealed class CrayonRouteLine : MonoBehaviour
         stroke.endColor = Color.white;
     }
 
+    // Flat against the wall, keeping the line's slope along it.
     private void SnapTo(DuduSurface surface)
     {
         Vector3 position = transform.position;
-        Vector3 normal = surface.Normal;
+        Vector3 normal = WallSideNormal(surface);
         position -= normal * (Vector3.Dot(position - surface.transform.position, normal) - surface.SurfaceOffset);
-        transform.SetPositionAndRotation(position, surface.transform.rotation);
+        transform.SetPositionAndRotation(position, Quaternion.LookRotation(-normal, transform.up));
         transform.hasChanged = false;
     }
 
+    // The side of the wall this line was placed on (a wall can face away from its room).
+    private Vector3 WallSideNormal(DuduSurface surface)
+    {
+        Vector3 normal = surface.Normal;
+        return Vector3.Dot(transform.position - surface.transform.position, normal) < -0.001f ? -normal : normal;
+    }
+
     // How far in front of the surface's plane its wall face is.
-    private static float VisibleFace(DuduSurface surface)
+    private static float VisibleFace(DuduSurface surface, Vector3 normal)
     {
         Bounds bounds;
         if (surface.TryGetComponent(out Collider wall)) bounds = wall.bounds;
         else if (surface.TryGetComponent(out Renderer look)) bounds = look.bounds;
         else return 0f;
-        Vector3 normal = surface.Normal;
         Vector3 reach = new Vector3(Mathf.Abs(normal.x), Mathf.Abs(normal.y), Mathf.Abs(normal.z));
         return Vector3.Dot(bounds.center - surface.transform.position, normal) + Vector3.Dot(reach, bounds.extents);
     }

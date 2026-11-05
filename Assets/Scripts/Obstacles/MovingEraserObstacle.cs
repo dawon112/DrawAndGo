@@ -1,5 +1,7 @@
 using UnityEngine;
 
+// After TutorialSequenceController (100) has set up its walls, so this binds to the final ones.
+[DefaultExecutionOrder(200)]
 [DisallowMultipleComponent]
 [RequireComponent(typeof(Rigidbody), typeof(BoxCollider))]
 public sealed class MovingEraserObstacle : MonoBehaviour
