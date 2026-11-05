@@ -30,6 +30,7 @@ public sealed class DuduCameraController : MonoBehaviour
     private DuduSurface[] surfaces;
     private float[] surfaceCenters;
     private float totalWidth;
+    private readonly List<Vector3> clippedLinePoints = new List<Vector3>();
     private float horizontalVelocity;
     private float nextProxyRefresh;
     private Player3DMovement player3D;
@@ -93,14 +94,12 @@ public sealed class DuduCameraController : MonoBehaviour
         if (surfaces == null || surfaces.Length == 0) return;
 
         surfaceCenters = new float[surfaces.Length];
-        float seamOverlap = targetDudu != null && targetDudu.TryGetComponent(out DuduSurfaceMovement movement)
-            ? movement.VisualSeamOverlap
-            : 0f;
+        // Walls are laid end to end at their real lengths, so what is drawn on either side of
+        // a corner keeps its own place, and Dudu walks straight on across the seam.
         for (int i = 0; i < surfaces.Length; i++)
         {
             surfaceCenters[i] = totalWidth + surfaces[i].Width * 0.5f;
             totalWidth += surfaces[i].Width;
-            if (i < surfaces.Length - 1) totalWidth -= seamOverlap;
         }
         for (int i = 0; i < surfaceCenters.Length; i++)
             surfaceCenters[i] -= totalWidth * 0.5f;
@@ -354,19 +353,38 @@ public sealed class DuduCameraController : MonoBehaviour
         LineMagnet magnet = source.GetComponentInParent<LineMagnet>();
         DuduSurface sourceSurface = magnet != null && magnet.Surface != null
             ? magnet.Surface
-            : FindSurface(GetReferencePosition(source));
+            : FindSurface(source);
         if (sourceSurface == null) return;
         Renderer proxy = CreateProxy(source);
         if (proxy != null) visualProxies.Add(new VisualProxy(source, proxy, sourceSurface));
     }
 
-    private DuduSurface FindSurface(Vector3 position)
+    // A drawn stroke knows which way its wall faces. Near a corner its points are close to both
+    // walls, so only walls facing the same way are candidates for it.
+    // Things on the walls face their wall too. Right at a corner a point is about as close to
+    // the neighbouring wall, and drawing it there turns it edge-on to the camera (it vanishes).
+    // Dudu himself is always on his current wall.
+    private DuduSurface FindSurface(Renderer source)
+    {
+        DuduSurfaceMovement walker = source.GetComponentInParent<DuduSurfaceMovement>();
+        if (walker != null && walker.CurrentSurface != null && System.Array.IndexOf(surfaces, walker.CurrentSurface) >= 0)
+            return walker.CurrentSurface;
+        DrawingStroke stroke = source.GetComponentInParent<DrawingStroke>();
+        Vector3 position = GetReferencePosition(source);
+        Vector3 facing = stroke != null ? stroke.SurfaceNormal : source.transform.forward;
+        return FindSurface(position, facing) ?? FindSurface(position, Vector3.zero);
+    }
+
+    private DuduSurface FindSurface(Vector3 position) => FindSurface(position, Vector3.zero);
+
+    private DuduSurface FindSurface(Vector3 position, Vector3 facing)
     {
         DuduSurface best = null;
         float bestScore = float.PositiveInfinity;
         foreach (DuduSurface surface in surfaces)
         {
             if (surface == null) continue;
+            if (facing != Vector3.zero && Mathf.Abs(Vector3.Dot(facing.normalized, surface.Normal.normalized)) < 0.9f) continue;
             Vector2 local = surface.WorldToSurface(position);
             float planeDistance = Mathf.Abs(Vector3.Dot(position - surface.transform.position, surface.Normal));
             float outsideX = Mathf.Max(0f, Mathf.Abs(local.x) - surface.Width * 0.5f - 1f);
@@ -442,11 +460,10 @@ public sealed class DuduCameraController : MonoBehaviour
                 visualProxies.RemoveAt(i);
                 continue;
             }
-            Vector3 referencePosition = GetReferencePosition(item.source);
             LineMagnet magnet = item.source.GetComponentInParent<LineMagnet>();
             DuduSurface liveSurface = magnet != null && magnet.Surface != null
                 ? magnet.Surface
-                : FindSurface(referencePosition);
+                : FindSurface(item.source);
             if (liveSurface != null) item.surface = liveSurface;
             int surfaceIndex = System.Array.IndexOf(surfaces, item.surface);
             if (surfaceIndex < 0) continue;
@@ -466,16 +483,28 @@ public sealed class DuduCameraController : MonoBehaviour
             }
             else if (item.source is LineRenderer sourceLine && item.proxy is LineRenderer line)
             {
-                line.positionCount = sourceLine.positionCount;
                 line.startWidth = sourceLine.startWidth; line.endWidth = sourceLine.endWidth;
                 line.startColor = sourceLine.startColor; line.endColor = sourceLine.endColor;
+                // A line ends at its wall's edge: anything poking past a corner would lie over
+                // the neighbouring wall's own drawing here.
+                float half = item.surface.Width * 0.5f;
+                float minX = surfaceCenters[surfaceIndex] + (surfaceIndex > 0 ? -half : float.NegativeInfinity);
+                float maxX = surfaceCenters[surfaceIndex] + (surfaceIndex < surfaces.Length - 1 ? half : float.PositiveInfinity);
+                clippedLinePoints.Clear();
+                Vector3 previous = Vector3.zero;
                 for (int point = 0; point < sourceLine.positionCount; point++)
                 {
                     Vector3 worldPoint = sourceLine.useWorldSpace ? sourceLine.GetPosition(point) :
                         sourceLine.transform.TransformPoint(sourceLine.GetPosition(point));
                     Vector2 pointLocal = item.surface.WorldToSurface(worldPoint);
-                    line.SetPosition(point, new Vector3(surfaceCenters[surfaceIndex] + pointLocal.x, pointLocal.y, -0.1f));
+                    Vector3 current = new Vector3(surfaceCenters[surfaceIndex] + pointLocal.x, pointLocal.y, -0.1f);
+                    if (point > 0) AddClippedSegment(previous, current, minX, maxX);
+                    else if (current.x >= minX && current.x <= maxX) clippedLinePoints.Add(current);
+                    previous = current;
                 }
+                line.positionCount = clippedLinePoints.Count;
+                for (int point = 0; point < clippedLinePoints.Count; point++)
+                    line.SetPosition(point, clippedLinePoints[point]);
             }
             else if (item.source.TryGetComponent(out TextMesh sourceText) && item.proxy.TryGetComponent(out TextMesh text))
             {
@@ -487,6 +516,29 @@ public sealed class DuduCameraController : MonoBehaviour
                 }
             }
         }
+    }
+
+    // Appends the part of segment a-b with minX <= x <= maxX (a itself is already added
+    // when it lies inside).
+    private void AddClippedSegment(Vector3 a, Vector3 b, float minX, float maxX)
+    {
+        float dx = b.x - a.x;
+        float enter = 0f, exit = 1f;
+        if (Mathf.Abs(dx) < 0.00001f)
+        {
+            if (a.x < minX || a.x > maxX) return;
+        }
+        else
+        {
+            float tMin = (minX - a.x) / dx, tMax = (maxX - a.x) / dx;
+            enter = Mathf.Max(0f, Mathf.Min(tMin, tMax));
+            exit = Mathf.Min(1f, Mathf.Max(tMin, tMax));
+            if (enter > exit) return;
+        }
+        Vector3 start = Vector3.Lerp(a, b, enter);
+        if (clippedLinePoints.Count == 0 || (clippedLinePoints[clippedLinePoints.Count - 1] - start).sqrMagnitude > 0.000001f)
+            clippedLinePoints.Add(start);
+        clippedLinePoints.Add(Vector3.Lerp(a, b, exit));
     }
 
     private static Vector3 GetReferencePosition(Renderer renderer)

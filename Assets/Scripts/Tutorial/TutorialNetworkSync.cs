@@ -70,7 +70,8 @@ public sealed partial class TutorialSequenceController
             highlight = highlight.activeSelf,
             eraseHighlight = eraseHighlight != null && eraseHighlight.activeSelf,
             replacementHighlight = replacementHighlight != null && replacementHighlight.activeSelf,
-            stars = tutorialRoom != null ? tutorialRoom.CollectedStars : 0,
+            // Which stars are taken (one bit each), since they can be taken in any order.
+            stars = tutorialRoom != null ? tutorialRoom.CollectedStarMask : 0,
             counter = tutorialRoom != null && tutorialRoom.IsStarCounterVisible,
             door = tutorialRoom != null && tutorialRoom.DoorOpened
         };

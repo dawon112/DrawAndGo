@@ -551,14 +551,13 @@ public sealed partial class TutorialSequenceController
     {
         // Online, the host collects from Dudu's synced pose and the client follows.
         if (!IsAuthority) return false;
-        // The first star counts as soon as its step has begun, even mid-dialogue: Dudu
+        // Stars count in any order (the course is placed by hand, so any of them can come
+        // first): the first one taken starts the star step's dialogue, the rest the final
+        // test. The first counts as soon as its step has begun, even mid-dialogue: Dudu
         // standing on it must never stall the tutorial.
-        bool allowed = courseStars[0] == star ? CurrentStep == TutorialStep.Tutorial_05_Star &&
-                tutorialRoom.CollectedStars == 0 && DuduIsOnWallOf(star) :
-            courseStars[1] == star ? CurrentStep == TutorialStep.Tutorial_06_FinalTest &&
-                tutorialRoom.CollectedStars == 1 && DuduIsOnWallOf(star) :
-            courseStars[2] == star && CurrentStep == TutorialStep.Tutorial_06_FinalTest &&
-                tutorialRoom.CollectedStars == 2 && DuduIsOnWallOf(star);
+        bool allowed = System.Array.IndexOf(courseStars, star) >= 0 && DuduIsOnWallOf(star) &&
+            (CurrentStep == TutorialStep.Tutorial_05_Star && tutorialRoom.CollectedStars == 0 ||
+             CurrentStep == TutorialStep.Tutorial_06_FinalTest && tutorialRoom.CollectedStars >= 1);
         if (!allowed && Time.unscaledTime >= nextRefusedStarLog)
         {
             // Player.log trail for a star Dudu touches but cannot take.

@@ -198,6 +198,8 @@ public sealed class DuduHomingShooter : MonoBehaviour
             spawnPosition,
             LightningVisualOffset);
         homingProjectile.SetMaxHorizontalReach(projectileMaxHorizontalReach);
+        // A bolt leaving the cloud's attack range disappears instead of chasing Dudu on.
+        homingProjectile.SetMaxRange(attackRange);
         PlayFireSound();
     }
 

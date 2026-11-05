@@ -99,7 +99,7 @@ MonoBehaviour:
   surface: {fileID: 0}
   target: {fileID: 0}
   aimDuration: 2
-  attackRange: 7
+  attackRange: 6.3
   moveSpeed: 5
   eraseRadius: 0.22
   visualOffset: 0.025

@@ -133,7 +133,7 @@ MonoBehaviour:
   surfacePosition: {x: -1, y: 1.5}
   fireInterval: 2.5
   firstShotDelay: 1
-  attackRange: 9
+  attackRange: 4
   fireSound: {fileID: 0}
   fireSoundVolume: 0.85
   projectilePrefab: {fileID: 100000, guid: 7a6f8b69af674d13aa58a7ec34104e76, type: 3}
@@ -143,3 +143,4 @@ MonoBehaviour:
   projectileScale: {x: 0.12, y: 0.12, z: 0.12}
   projectileMaterial: {fileID: 2100000, guid: 7df8e190159d34c48803da18ceb3d8a7, type: 2}
   lightningSpawnPoint: {fileID: 0}
+  projectileMaxHorizontalReach: 0

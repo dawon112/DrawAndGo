@@ -6,7 +6,8 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(Rigidbody), typeof(Collider))]
 public sealed class DuduSurfaceMovement : MonoBehaviour
 {
-    private const float CornerSeamInset = 0.14f;
+    // Just inside the next wall after a corner, so the same step does not cross straight back.
+    private const float CornerEntryInset = 0.01f;
     private const float FinalSurfaceVisualOffset = 0.1f;
     [Header("Surface")]
     [SerializeField] private DuduSurface currentSurface;
@@ -74,7 +75,6 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
     public bool IsControlsReversed => reverseEffectActive;
     public DuduSurface CurrentSurface => currentSurface;
     public bool FacingLeft => spriteRenderer != null && spriteRenderer.flipX;
-    public float VisualSeamOverlap => 2f * (characterHalfSize.x + CornerSeamInset);
 
     public void SetSurface(DuduSurface surface)
     {
@@ -340,8 +340,8 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         }
         UpdateVisualSurfaceOffset();
         float horizontalPosition = Vector3.Dot(relativePosition, right);
-        float horizontalMinimum = currentSurface.GetMinimumX(characterHalfSize.x);
-        float horizontalMaximum = currentSurface.GetMaximumX(characterHalfSize.x);
+        float horizontalMinimum = GetMinimumX(currentSurface);
+        float horizontalMaximum = GetMaximumX(currentSurface);
         float clampedHorizontal = Mathf.Clamp(horizontalPosition, horizontalMinimum, horizontalMaximum);
         float normalPosition = Vector3.Dot(relativePosition, normal);
         Vector3 constraintCorrection = right * (clampedHorizontal - horizontalPosition) +
@@ -502,25 +502,33 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
             Physics.GetIgnoreCollision(duduCollider, other);
     }
 
+    // Where Dudu's centre may go on a wall: up to the very edge where a neighbouring wall
+    // continues the route, but only until his body touches a dead end.
+    private float GetMinimumX(DuduSurface surface) =>
+        surface.previousSurface != null ? surface.GetMinimumX(0f) : surface.GetMinimumX(characterHalfSize.x);
+
+    private float GetMaximumX(DuduSurface surface) =>
+        surface.nextSurface != null ? surface.GetMaximumX(0f) : surface.GetMaximumX(characterHalfSize.x);
+
     private bool TryCrossCorner()
     {
         Vector2 position = currentSurface.WorldToSurface(body.position);
         float speed = Time.time < bounceControlUntil ? bounceHorizontalSpeed : horizontalInput * moveSpeed * stainSpeedMultiplier;
         int direction = dialogueInputLocked ? 0 : speed > 0f ? 1 : speed < 0f ? -1 : 0;
-        float boundary = direction > 0
-            ? currentSurface.GetMaximumX(characterHalfSize.x)
-            : -currentSurface.GetMinimumX(characterHalfSize.x);
-        if (direction == 0 ||
-            position.x * direction + Mathf.Abs(speed) * Time.fixedDeltaTime < boundary - CornerSeamInset)
-            return false;
-        DuduSurface next = direction > 0 ? currentSurface.nextSurface : currentSurface.previousSurface;
+        DuduSurface next = direction > 0 ? currentSurface.nextSurface : direction < 0 ? currentSurface.previousSurface : null;
         if (next == null) return false;
+        // Dudu walks right up to the corner (walls do not collide with him) and carries on
+        // from the same spot on the next wall: the route stays continuous, no jump.
+        float boundary = direction > 0 ? GetMaximumX(currentSurface) : -GetMinimumX(currentSurface);
+        float overshoot = position.x * direction + Mathf.Abs(speed) * Time.fixedDeltaTime - boundary;
+        if (overshoot < 0f)
+            return false;
         float verticalSpeed = Vector3.Dot(body.linearVelocity, currentSurface.Up);
         currentSurface = next;
         surfaceDepth = next.SurfaceOffset;
         float entryX = direction > 0
-            ? next.GetMinimumX(characterHalfSize.x) + CornerSeamInset
-            : next.GetMaximumX(characterHalfSize.x) - CornerSeamInset;
+            ? -next.Width * 0.5f + CornerEntryInset
+            : next.Width * 0.5f - CornerEntryInset;
         body.position = next.SurfaceToWorld(new Vector2(entryX, position.y));
         body.rotation = next.transform.rotation;
         body.linearVelocity = next.Right * speed + next.Up * verticalSpeed;

@@ -15,15 +15,24 @@ public sealed class DuduHomingProjectile : MonoBehaviour
     private float visualOffset;
     private BoxCollider targetBody;
     private Vector3 tipLocalPosition;
-    private float tipHitRadius = 0.1f;
+    // Share of Dudu's collider (width, height) a bolt tip must reach into to hit him.
+    private static readonly Vector2 ForgivingBodyScale = new Vector2(0.6f, 0.75f);
     private float maxHorizontalReach;
-    private float horizontalTravel;
+    private float maxRange;
+    private Vector2 travel;
 
     // Optional cap on how far the bolt may travel sideways from where it was fired (0 = none).
     public void SetMaxHorizontalReach(float reach) => maxHorizontalReach = Mathf.Max(0f, reach);
 
-    // A position on a neighbouring wall, in this wall's unwrapped coordinates (the 2D view
-    // lays the walls side by side), so homing and hits work across a room corner.
+    // The bolt disappears once it is farther than this from where it was fired (0 = no limit).
+    public void SetMaxRange(float range) => maxRange = Mathf.Max(0f, range);
+
+    // Extra distance past the switch point before the bolt changes walls, in either direction,
+    // so a bolt homing right at a corner cannot flip between the two walls every tick.
+    private const float SeamHysteresis = 0.15f;
+
+    // A position on a neighbouring wall, in this wall's unwrapped coordinates, laid out like
+    // Dudu's 2D view (walls end to end), so homing and hits work across a room corner.
     public static bool TryMapToSurface(DuduSurface surface, DuduSurface other, Vector3 worldPosition, out Vector2 position)
     {
         position = Vector2.zero;
@@ -40,16 +49,18 @@ public sealed class DuduHomingProjectile : MonoBehaviour
     private bool TryGetTargetSurfacePosition(out Vector2 position)
         => TryMapToSurface(surface, target.CurrentSurface, target.transform.position, out position);
 
-    // Past the wall's edge the bolt moves onto the neighbouring wall.
+    // Past a wall's edge the bolt moves onto the neighbouring wall. Its spot in Dudu's 2D view
+    // (walls end to end) stays exactly the same.
     private void CrossSeam(ref Vector2 position)
     {
         float half = surface.Width * 0.5f;
-        if (position.x > half && surface.nextSurface != null)
+        float switchAt = half + SeamHysteresis;
+        if (position.x > switchAt && surface.nextSurface != null)
         {
             position.x -= half + surface.nextSurface.Width * 0.5f;
             surface = surface.nextSurface;
         }
-        else if (position.x < -half && surface.previousSurface != null)
+        else if (position.x < -switchAt && surface.previousSurface != null)
         {
             position.x += half + surface.previousSurface.Width * 0.5f;
             surface = surface.previousSurface;
@@ -79,7 +90,6 @@ public sealed class DuduHomingProjectile : MonoBehaviour
         {
             Bounds spriteBounds = art.sprite.bounds;
             tipLocalPosition = spriteBounds.center - Vector3.up * spriteBounds.extents.y * 0.85f;
-            tipHitRadius = spriteBounds.extents.x * 0.3f * Mathf.Abs(transform.lossyScale.x);
         }
         movementDirection = GetDirectionToTarget();
         transform.SetPositionAndRotation(SurfaceToWorld(surfacePosition), GetMovementRotation());
@@ -127,8 +137,10 @@ public sealed class DuduHomingProjectile : MonoBehaviour
 
         // Direction changes must never change the projectile's travel speed.
         Vector2 step = movementDirection.normalized * moveSpeed * Time.fixedDeltaTime;
-        horizontalTravel += step.x;
-        if (maxHorizontalReach > 0f && Mathf.Abs(horizontalTravel) > maxHorizontalReach)
+        // Distance from the firing point, kept across corners (walls lie side by side unwrapped).
+        travel += step;
+        if ((maxHorizontalReach > 0f && Mathf.Abs(travel.x) > maxHorizontalReach) ||
+            (maxRange > 0f && travel.magnitude > maxRange))
         {
             Destroy(gameObject);
             return;
@@ -165,12 +177,12 @@ public sealed class DuduHomingProjectile : MonoBehaviour
         Vector2 tip2D = surface.WorldToSurface(transform.TransformPoint(tipLocalPosition) + displacement);
         if (!TryMapToSurface(surface, target.CurrentSurface, targetBody.transform.TransformPoint(targetBody.center), out Vector2 body2D))
             return false;
+        // Forgiving: the tip must reach well inside Dudu's box (shrunk to his drawn body),
+        // so a near miss that only grazes the edge of his collider does not count.
         Vector3 bodyScale = targetBody.transform.lossyScale;
-        Vector2 halfSize = new Vector2(Mathf.Abs(targetBody.size.x * bodyScale.x), Mathf.Abs(targetBody.size.y * bodyScale.y)) * 0.5f;
-        Vector2 outside = new Vector2(
-            Mathf.Max(0f, Mathf.Abs(tip2D.x - body2D.x) - halfSize.x),
-            Mathf.Max(0f, Mathf.Abs(tip2D.y - body2D.y) - halfSize.y));
-        return outside.magnitude <= tipHitRadius;
+        Vector2 halfSize = Vector2.Scale(new Vector2(Mathf.Abs(targetBody.size.x * bodyScale.x),
+            Mathf.Abs(targetBody.size.y * bodyScale.y)) * 0.5f, ForgivingBodyScale);
+        return Mathf.Abs(tip2D.x - body2D.x) <= halfSize.x && Mathf.Abs(tip2D.y - body2D.y) <= halfSize.y;
     }
 
     private Quaternion GetMovementRotation()

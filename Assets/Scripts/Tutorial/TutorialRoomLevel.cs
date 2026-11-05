@@ -15,11 +15,14 @@ public sealed class TutorialRoomLevel : MonoBehaviour
 
     private Text starCounter;
     private int collectedStars;
+    // Which stars are taken, one bit per entry of stars.
+    private int collectedMask;
     private bool doorOpened;
     private bool doorSequenceStarted;
     public event System.Action<int> StarCollected;
 
     public int CollectedStars => collectedStars;
+    public int CollectedStarMask => collectedMask;
     public bool DoorOpened => doorOpened;
     public bool IsStarCounterVisible => starCounter != null && starCounter.transform.parent.gameObject.activeSelf;
     public DuduSurface[] Sections => sections;
@@ -37,6 +40,7 @@ public sealed class TutorialRoomLevel : MonoBehaviour
         lockedDoor = door;
         dudu = player;
         collectedStars = 0;
+        collectedMask = 0;
         doorOpened = false;
         doorSequenceStarted = false;
         UpdateStarCounter();
@@ -78,10 +82,12 @@ public sealed class TutorialRoomLevel : MonoBehaviour
 
     public bool CollectStar(TutorialStarCollectible star)
     {
+        int index = stars != null ? System.Array.IndexOf(stars, star) : -1;
         if (star == null || doorOpened || doorSequenceStarted || stars == null ||
-            stars.Length != RequiredStars || System.Array.IndexOf(stars, star) < 0)
+            stars.Length != RequiredStars || index < 0 || (collectedMask & (1 << index)) != 0)
             return false;
 
+        collectedMask |= 1 << index;
         collectedStars = Mathf.Min(RequiredStars, collectedStars + 1);
         Debug.Log($"Tutorial: {star.name} collected ({collectedStars}/{RequiredStars}).", star);
         UpdateStarCounter();
@@ -91,18 +97,21 @@ public sealed class TutorialRoomLevel : MonoBehaviour
         return true;
     }
 
-    // Online client: the host decides pickups. Stars are collected in course order,
-    // so the host's count is enough to hide the same stars here.
-    public void ApplyNetworkStars(int count, bool doorIsOpen)
+    // Online client: the host decides pickups. Stars can be taken in any order, so the
+    // host sends which ones (one bit per star) and the same stars are hidden here.
+    public void ApplyNetworkStars(int mask, bool doorIsOpen)
     {
         if (stars == null) return;
-        count = Mathf.Clamp(count, 0, stars.Length);
-        if (count != collectedStars)
+        mask &= (1 << stars.Length) - 1;
+        if (mask != collectedMask)
         {
+            int count = 0;
+            for (int i = 0; i < stars.Length; i++) if ((mask & (1 << i)) != 0) count++;
             bool gained = count > collectedStars;
+            collectedMask = mask;
             collectedStars = count;
             for (int i = 0; i < stars.Length; i++)
-                if (stars[i] != null) stars[i].gameObject.SetActive(i >= count);
+                if (stars[i] != null) stars[i].gameObject.SetActive((mask & (1 << i)) == 0);
             UpdateStarCounter();
             if (gained) StarCollected?.Invoke(collectedStars);
         }
