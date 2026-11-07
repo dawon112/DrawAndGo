@@ -7,7 +7,7 @@ using UnityEngine.SceneManagement;
 [DisallowMultipleComponent]
 public sealed class PlayerPoseSync : MonoBehaviour
 {
-    private const string HaruMessage = "HaruPoseV3";
+    private const string HaruMessage = "HaruPoseV4";
     private const string DuduMessage = "DuduPoseV2";
     private const float SendInterval = 0.05f;
 
@@ -25,6 +25,27 @@ public sealed class PlayerPoseSync : MonoBehaviour
     private HaruDrawingController haruDrawing;
     private HaruHeldTool haruHeldTool;
     private int sceneIndex;
+
+    // On Dudu's PC: where Haru's crayon or eraser touches the wall, as the host last sent it.
+    private static PlayerPoseSync remoteAimOwner;
+    private static bool remoteAimVisible;
+    private static Vector3 remoteAimPosition;
+    private static Vector3 remoteAimNormal;
+    private static DrawingTool remoteAimTool;
+    private static float remoteAimTime;
+
+    // True when this PC is the online client; the out values are then Haru's live cursor.
+    public static bool TryGetRemoteHaruCursor(
+        out bool visible, out Vector3 position, out Vector3 normal, out DrawingTool tool)
+    {
+        bool remote = remoteAimOwner != null;
+        // A cursor not heard of for a while (lag, stage change) is hidden, not left behind.
+        visible = remote && remoteAimVisible && Time.unscaledTime - remoteAimTime < 0.5f;
+        position = remoteAimPosition;
+        normal = remoteAimNormal;
+        tool = remoteAimTool;
+        return remote;
+    }
 
     public void Configure(Transform haruTransform, DuduSurfaceMovement duduMovement, DuduSurface[] mapSurfaces)
     {
@@ -56,6 +77,11 @@ public sealed class PlayerPoseSync : MonoBehaviour
             surfaces = FindObjectsByType<DuduSurface>(FindObjectsInactive.Include);
             Array.Sort(surfaces, (a, b) => string.CompareOrdinal(PathOf(a.transform), PathOf(b.transform)));
         }
+        if (!isHost)
+        {
+            remoteAimOwner = this;
+            remoteAimVisible = false;
+        }
         manager.CustomMessagingManager.RegisterNamedMessageHandler(
             isHost ? DuduMessage : HaruMessage,
             isHost ? OnDuduPose : OnHaruPose);
@@ -63,6 +89,11 @@ public sealed class PlayerPoseSync : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (remoteAimOwner == this)
+        {
+            remoteAimOwner = null;
+            remoteAimVisible = false;
+        }
         if (manager == null || manager.CustomMessagingManager == null) return;
         manager.CustomMessagingManager.UnregisterNamedMessageHandler(isHost ? DuduMessage : HaruMessage);
     }
@@ -105,11 +136,15 @@ public sealed class PlayerPoseSync : MonoBehaviour
 
     private void SendHaruPose()
     {
-        using var writer = new FastBufferWriter(64, Allocator.Temp);
+        bool showCursor = haruDrawing != null && haruDrawing.ShowsDrawCursor;
+        using var writer = new FastBufferWriter(96, Allocator.Temp);
         writer.WriteValueSafe(sceneIndex);
         writer.WriteValueSafe(haru.position);
         writer.WriteValueSafe(haru.rotation);
         writer.WriteValueSafe((byte)(haruDrawing != null ? haruDrawing.CurrentTool : DrawingTool.Pen));
+        writer.WriteValueSafe(showCursor);
+        writer.WriteValueSafe(showCursor ? haruDrawing.CurrentSurfaceAimPosition : Vector3.zero);
+        writer.WriteValueSafe(showCursor ? haruDrawing.CurrentSurfaceAimNormal : Vector3.zero);
         foreach (ulong clientId in manager.ConnectedClientsIds)
         {
             if (clientId != manager.LocalClientId)
@@ -133,7 +168,8 @@ public sealed class PlayerPoseSync : MonoBehaviour
 
     private void OnHaruPose(ulong sender, FastBufferReader reader)
     {
-        if (isHost || sender != NetworkManager.ServerClientId || !reader.TryBeginRead(33)) return;
+        // scene 4, position 12, rotation 16, tool 1, cursor shown 1, aim point 12, aim normal 12.
+        if (isHost || sender != NetworkManager.ServerClientId || !reader.TryBeginRead(58)) return;
         // During a stage change the peer may still be in the previous scene.
         reader.ReadValueSafe(out int remoteScene);
         if (remoteScene != sceneIndex) return;
@@ -141,6 +177,11 @@ public sealed class PlayerPoseSync : MonoBehaviour
         reader.ReadValueSafe(out remoteRotation);
         reader.ReadValueSafe(out byte tool);
         if (haruHeldTool != null && tool <= (byte)DrawingTool.Eraser) haruHeldTool.Tool = (DrawingTool)tool;
+        reader.ReadValueSafe(out remoteAimVisible);
+        reader.ReadValueSafe(out remoteAimPosition);
+        reader.ReadValueSafe(out remoteAimNormal);
+        remoteAimTime = Time.unscaledTime;
+        remoteAimTool = tool == (byte)DrawingTool.Eraser ? DrawingTool.Eraser : DrawingTool.Pen;
         hasRemotePose = true;
     }
 

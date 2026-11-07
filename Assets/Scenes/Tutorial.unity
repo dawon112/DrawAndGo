@@ -17247,10 +17247,9 @@ MonoBehaviour:
   orthographicSize: 3.5
   followSmoothTime: 0.15
   horizontalOffset: 1
-  silhouetteStartDistance: 3
-  silhouetteFullDistance: 0.75
-  silhouetteMaxAlpha: 0.35
-  silhouetteFadeSpeed: 5
+  haruCrayonCursor: {fileID: 21300000, guid: 3e675803e4e1448469ab7d435c379324, type: 3}
+  haruEraserCursor: {fileID: 21300000, guid: 314a2e1242a81374c8d92dec118e7878, type: 3}
+  haruCursorScale: 0.28
   slowOverlayFrames:
   - {fileID: -1162024766, guid: 950faf33177e3cf42982e3a97ff9835d, type: 3}
   - {fileID: -604730171, guid: 950faf33177e3cf42982e3a97ff9835d, type: 3}

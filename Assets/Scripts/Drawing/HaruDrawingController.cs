@@ -56,6 +56,10 @@ public sealed class HaruDrawingController : MonoBehaviour
     public bool HasValidSurfaceAim { get; private set; }
     public Vector3 CurrentSurfaceAimPosition { get; private set; }
     public bool CanDrawAtCurrentAim { get; private set; }
+    public Vector3 CurrentSurfaceAimNormal { get; private set; }
+    // Where Haru's crayon or eraser would touch the wall right now; false while it can't draw.
+    // Dudu's 2D view shows Haru's cursor only while this is true.
+    public bool ShowsDrawCursor => isActiveAndEnabled && HasValidSurfaceAim && CanDrawAtCurrentAim;
     public bool IsDrawing => isActiveAndEnabled && currentStroke != null && CanDrawAtCurrentAim;
     // Crayon is unlimited. Keep these public values full as well so the arm,
     // gauges and any other external consumers never display depletion.
@@ -214,6 +218,7 @@ public sealed class HaruDrawingController : MonoBehaviour
     {
         HasValidSurfaceAim = true;
         CurrentSurfaceAimPosition = hitPoint;
+        CurrentSurfaceAimNormal = hitNormal;
         if (surfaceAimMarker != null)
             surfaceAimMarker.SetAim(
                 hitPoint,
@@ -381,6 +386,7 @@ public sealed class HaruDrawingController : MonoBehaviour
     private void OnDisable()
     {
         EndStroke();
+        ClearSurfaceAim();
         ForceDisableCameraLock();
     }
 

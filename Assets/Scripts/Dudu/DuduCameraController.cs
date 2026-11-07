@@ -14,11 +14,12 @@ public sealed class DuduCameraController : MonoBehaviour
     [SerializeField, Min(0.1f)] private float orthographicSize = 3.5f;
     [SerializeField, Min(0.01f)] private float followSmoothTime = 0.15f;
     [SerializeField] private float horizontalOffset = 1f;
-    [Header("Haru Silhouette")]
-    [SerializeField, Min(0.1f)] private float silhouetteStartDistance = 3f;
-    [SerializeField, Min(0f)] private float silhouetteFullDistance = 0.75f;
-    [SerializeField, Range(0f, 1f)] private float silhouetteMaxAlpha = 0.35f;
-    [SerializeField, Min(0.01f)] private float silhouetteFadeSpeed = 5f;
+    [Header("Haru Cursor")]
+    [Tooltip("Shown where Haru's crayon touches the wall while Haru can draw there.")]
+    [SerializeField] private Sprite haruCrayonCursor;
+    [Tooltip("Shown where Haru's eraser touches the wall while Haru can erase there.")]
+    [SerializeField] private Sprite haruEraserCursor;
+    [SerializeField, Min(0.01f)] private float haruCursorScale = 0.28f;
     [Header("Dudu Debuff Overlay")]
     [SerializeField] private Sprite[] slowOverlayFrames;
     [SerializeField] private Sprite[] reverseOverlayFrames;
@@ -33,12 +34,10 @@ public sealed class DuduCameraController : MonoBehaviour
     private readonly List<Vector3> clippedLinePoints = new List<Vector3>();
     private float horizontalVelocity;
     private float nextProxyRefresh;
-    private Player3DMovement player3D;
-    private Transform silhouetteRoot;
-    private Transform[] sourceHaruBones;
-    private Transform[] silhouetteBones;
-    private Material[] silhouetteMaterials;
-    private float silhouetteAlpha;
+    private HaruDrawingController localHaruDrawing;
+    private Transform haruCursorRoot;
+    private SpriteRenderer haruCursor;
+    private bool haruCursorShown;
     private MaterialPropertyBlock proxyPropertyBlock;
     private DuduSurfaceMovement duduMovement;
     private Image debuffOverlay;
@@ -106,8 +105,8 @@ public sealed class DuduCameraController : MonoBehaviour
 
         proxyRoot = new GameObject("Dudu Unwrapped View").transform;
         proxyRoot.gameObject.layer = UnwrappedLayer;
-        player3D = FindAnyObjectByType<Player3DMovement>(FindObjectsInactive.Include);
-        CreateHaruSilhouette();
+        localHaruDrawing = FindAnyObjectByType<HaruDrawingController>(FindObjectsInactive.Include);
+        CreateHaruCursor();
         ConfigureCameraMasks();
         RefreshVisualProxies();
         SnapToTarget();
@@ -129,7 +128,7 @@ public sealed class DuduCameraController : MonoBehaviour
             targetSurface = movement.CurrentSurface;
         if (Time.unscaledTime >= nextProxyRefresh) RefreshVisualProxies();
         UpdateVisualProxies();
-        UpdateHaruSilhouette();
+        UpdateHaruCursor();
 
         float targetX = GetUnwrappedX(targetDudu.position, targetSurface) + horizontalOffset;
         float viewHalfWidth = orthographicSize * cameraComponent.aspect;
@@ -228,89 +227,75 @@ public sealed class DuduCameraController : MonoBehaviour
         debuffOverlay.enabled = debuffOverlay.sprite != null;
     }
 
-    private void CreateHaruSilhouette()
+    // The crayon's tip and the middle of the eraser are where the tool touches the wall,
+    // as fractions of each picture.
+    private static readonly Vector2 CrayonCursorTip = new Vector2(0.02f, 0.4f);
+    private static readonly Vector2 EraserCursorTip = new Vector2(0.5f, 0.5f);
+
+    private void CreateHaruCursor()
     {
-        if (player3D == null) return;
-        Transform source = player3D.transform.Find("Haru Visual");
-        if (source == null) return;
+        haruCursorRoot = new GameObject("Haru Cursor [2D View]").transform;
+        haruCursorRoot.SetParent(proxyRoot, false);
+        haruCursorRoot.gameObject.layer = UnwrappedLayer;
+        haruCursorRoot.localScale = Vector3.one * haruCursorScale;
+        GameObject picture = new GameObject("Picture");
+        picture.layer = UnwrappedLayer;
+        picture.transform.SetParent(haruCursorRoot, false);
+        haruCursor = picture.AddComponent<SpriteRenderer>();
+        haruCursor.sortingOrder = 200;
+        haruCursor.shadowCastingMode = ShadowCastingMode.Off;
+        haruCursor.receiveShadows = false;
+        haruCursorRoot.gameObject.SetActive(false);
+    }
 
-        silhouetteRoot = Instantiate(source.gameObject, proxyRoot).transform;
-        silhouetteRoot.name = "Haru Silhouette [2D View]";
-        foreach (Animator animator in silhouetteRoot.GetComponentsInChildren<Animator>(true)) animator.enabled = false;
-        SetLayerRecursively(silhouetteRoot, UnwrappedLayer);
-        sourceHaruBones = source.GetComponentsInChildren<Transform>(true);
-        silhouetteBones = silhouetteRoot.GetComponentsInChildren<Transform>(true);
+    // Haru's live aim, mapped onto the unwrapped walls. Hidden (not left where it was)
+    // whenever Haru can't draw: too far from the wall, aiming off it, or blocked.
+    private void UpdateHaruCursor()
+    {
+        if (haruCursorRoot == null) return;
 
-        Shader shader = Shader.Find("DrawAndGo/HaruSilhouette");
-        if (shader == null) shader = Shader.Find("Universal Render Pipeline/Unlit");
-        Renderer[] renderers = silhouetteRoot.GetComponentsInChildren<Renderer>(true);
-        List<Material> materials = new List<Material>();
-        foreach (Renderer renderer in renderers)
+        bool remote = PlayerPoseSync.TryGetRemoteHaruCursor(
+            out bool visible, out Vector3 point, out Vector3 normal, out DrawingTool tool);
+        if (!remote)
         {
-            Material[] replacements = new Material[renderer.sharedMaterials.Length];
-            for (int i = 0; i < replacements.Length; i++)
+            if (localHaruDrawing == null)
+                localHaruDrawing = FindAnyObjectByType<HaruDrawingController>(FindObjectsInactive.Include);
+            visible = localHaruDrawing != null && localHaruDrawing.ShowsDrawCursor;
+            if (visible)
             {
-                replacements[i] = new Material(shader) { name = "Haru Silhouette Material" };
-                materials.Add(replacements[i]);
+                point = localHaruDrawing.CurrentSurfaceAimPosition;
+                normal = localHaruDrawing.CurrentSurfaceAimNormal;
+                tool = localHaruDrawing.CurrentTool;
             }
-            renderer.sharedMaterials = replacements;
-            renderer.sortingOrder = 5;
-            renderer.shadowCastingMode = ShadowCastingMode.Off;
-            renderer.receiveShadows = false;
         }
-        silhouetteMaterials = materials.ToArray();
-        silhouetteRoot.gameObject.SetActive(false);
-    }
 
-    private void UpdateHaruSilhouette()
-    {
-        if (silhouetteRoot == null || player3D == null || targetSurface == null) return;
-
-        Vector2 local = targetSurface.WorldToSurface(player3D.transform.position);
-        float planeDistance = Mathf.Abs(Vector3.Dot(
-            player3D.transform.position - targetSurface.transform.position,
-            targetSurface.Normal.normalized));
-        bool insideCurrentSection = Mathf.Abs(local.x) <= targetSurface.Width * 0.5f + 0.5f &&
-            Mathf.Abs(local.y) <= targetSurface.Height * 0.5f + 1f;
-        float distanceFade = 1f - Mathf.InverseLerp(silhouetteFullDistance, silhouetteStartDistance, planeDistance);
-        float targetAlpha = insideCurrentSection ? Mathf.Clamp01(distanceFade) * silhouetteMaxAlpha : 0f;
-        silhouetteAlpha = Mathf.MoveTowards(
-            silhouetteAlpha, targetAlpha, silhouetteFadeSpeed * silhouetteMaxAlpha * Time.deltaTime);
-
-        int surfaceIndex = System.Array.IndexOf(surfaces, targetSurface);
-        if (surfaceIndex < 0) silhouetteAlpha = 0f;
-        silhouetteRoot.gameObject.SetActive(silhouetteAlpha > 0.002f);
-        if (!silhouetteRoot.gameObject.activeSelf) return;
-
-        int boneCount = Mathf.Min(sourceHaruBones.Length, silhouetteBones.Length);
-        for (int i = 1; i < boneCount; i++)
+        Sprite sprite = tool == DrawingTool.Eraser ? haruEraserCursor : haruCrayonCursor;
+        DuduSurface surface = visible && sprite != null
+            ? FindSurface(point, normal) ?? FindSurface(point) : null;
+        int surfaceIndex = surface != null ? System.Array.IndexOf(surfaces, surface) : -1;
+        if (surfaceIndex < 0)
         {
-            silhouetteBones[i].localPosition = sourceHaruBones[i].localPosition;
-            silhouetteBones[i].localRotation = sourceHaruBones[i].localRotation;
-            silhouetteBones[i].localScale = sourceHaruBones[i].localScale;
+            haruCursorShown = false;
+            haruCursorRoot.gameObject.SetActive(false);
+            return;
         }
-        silhouetteRoot.position = new Vector3(surfaceCenters[surfaceIndex] + local.x, local.y, -0.05f);
-        silhouetteRoot.rotation = MapRotation(player3D.transform, targetSurface);
-        float clipMinX = surfaceIndex == 0
-            ? surfaceCenters[surfaceIndex] - targetSurface.Width * 0.5f
-            : (surfaceCenters[surfaceIndex - 1] + surfaceCenters[surfaceIndex]) * 0.5f;
-        float clipMaxX = surfaceIndex == surfaces.Length - 1
-            ? surfaceCenters[surfaceIndex] + targetSurface.Width * 0.5f
-            : (surfaceCenters[surfaceIndex] + surfaceCenters[surfaceIndex + 1]) * 0.5f;
-        foreach (Material material in silhouetteMaterials)
-        {
-            Color color = new Color(0.05f, 0.06f, 0.08f, silhouetteAlpha);
-            if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", color);
-            if (material.HasProperty("_Color")) material.SetColor("_Color", color);
-            if (material.HasProperty("_ClipMinX")) material.SetFloat("_ClipMinX", clipMinX);
-            if (material.HasProperty("_ClipMaxX")) material.SetFloat("_ClipMaxX", clipMaxX);
-        }
-    }
 
-    private static void SetLayerRecursively(Transform root, int layer)
-    {
-        root.gameObject.layer = layer;
-        foreach (Transform child in root) SetLayerRecursively(child, layer);
+        Vector2 local = surface.WorldToSurface(point);
+        Vector3 target = new Vector3(surfaceCenters[surfaceIndex] + local.x, local.y, -0.3f);
+        // The host sends the aim 20 times a second; ease between those so it doesn't step.
+        haruCursorRoot.position = haruCursorShown && remote
+            ? Vector3.Lerp(haruCursorRoot.position, target, 1f - Mathf.Exp(-25f * Time.unscaledDeltaTime))
+            : target;
+        haruCursorRoot.localScale = Vector3.one * haruCursorScale;
+        if (haruCursor.sprite != sprite)
+        {
+            haruCursor.sprite = sprite;
+            Vector2 pivot = sprite.pivot / sprite.rect.size;
+            Vector2 tip = tool == DrawingTool.Eraser ? EraserCursorTip : CrayonCursorTip;
+            haruCursor.transform.localPosition = Vector2.Scale(pivot - tip, sprite.bounds.size);
+        }
+        haruCursorShown = true;
+        haruCursorRoot.gameObject.SetActive(true);
     }
 
     public void SnapToTarget()
@@ -349,6 +334,10 @@ public sealed class DuduCameraController : MonoBehaviour
             visualProxies.Exists(item => item.source == source) ||
             sourceName == "Room Wall 6 - Closure" || sourceName.StartsWith("START") ||
             sourceName.StartsWith("SECTION") || source.GetComponentInParent<RoomOnlyDecor>() != null) return;
+        // Haru's aim cross on the wall: Dudu sees Haru's crayon/eraser cursor there instead.
+        // (Strokes are drawn under the same root, so only its two cross lines are left out.)
+        if ((sourceName == "Horizontal" || sourceName == "Vertical") && source.transform.parent != null &&
+            source.transform.parent.GetComponent<HaruSurfaceAimMarker>() != null) return;
 
         LineMagnet magnet = source.GetComponentInParent<LineMagnet>();
         DuduSurface sourceSurface = magnet != null && magnet.Surface != null
@@ -567,8 +556,6 @@ public sealed class DuduCameraController : MonoBehaviour
     private void OnDestroy()
     {
         if (activeInstance == this) activeInstance = null;
-        if (silhouetteMaterials != null)
-            foreach (Material material in silhouetteMaterials) if (material != null) Destroy(material);
         if (proxyRoot != null) Destroy(proxyRoot.gameObject);
     }
 
