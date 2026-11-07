@@ -33,6 +33,8 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
     [Header("Visuals")]
     [SerializeField] private Animator animator;
     [SerializeField] private SpriteRenderer spriteRenderer;
+    [Tooltip("Doodle dust kicked up when Dudu walks and lands (DuduMoveFeedback).")]
+    [SerializeField] private Sprite moveDust;
 
     [Header("Hit Feedback")]
     [Tooltip("Dudu opacity while showing a projectile hit.")]
@@ -75,6 +77,7 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
     public bool IsControlsReversed => reverseEffectActive;
     public DuduSurface CurrentSurface => currentSurface;
     public bool FacingLeft => spriteRenderer != null && spriteRenderer.flipX;
+    public bool IsGrounded => Time.time - lastGroundedTime < 0.1f;
 
     public void SetSurface(DuduSurface surface)
     {
@@ -92,6 +95,7 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         animator = newAnimator;
         spriteRenderer = newSpriteRenderer;
         CacheNormalSpriteColor();
+        BindMoveFeedback();
         surfacePosition.y = -1.65f;
         ApplySurfaceTransform();
         UpdateVisualSurfaceOffset();
@@ -254,6 +258,7 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
             body = gameObject.AddComponent<Rigidbody>();
         duduCollider = GetComponent<Collider>();
         CacheNormalSpriteColor();
+        BindMoveFeedback();
         startSurface = currentSurface;
         startSurfacePosition = surfacePosition;
         if (stageStartPoint == null)
@@ -270,6 +275,13 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         body.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
         body.constraints = RigidbodyConstraints.FreezeRotation;
         InitializeSurfacePhysics();
+    }
+
+    private void BindMoveFeedback()
+    {
+        DuduMoveFeedback feedback = GetComponent<DuduMoveFeedback>();
+        if (feedback == null) feedback = gameObject.AddComponent<DuduMoveFeedback>();
+        feedback.Bind(spriteRenderer, animator, moveDust);
     }
 
     private void OnDisable()

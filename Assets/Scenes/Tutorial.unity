@@ -16694,6 +16694,7 @@ MonoBehaviour:
   drawnLineStepHeight: 0.04
   animator: {fileID: 1138201085}
   spriteRenderer: {fileID: 1138201086}
+  moveDust: {fileID: 21300000, guid: 120eedc18c202074793fe9e748230426, type: 3}
   hitOpacity: 0.5
   hitFeedbackDuration: 0.5
 --- !u!65 &2047065435
