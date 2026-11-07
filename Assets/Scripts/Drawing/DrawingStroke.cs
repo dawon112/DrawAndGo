@@ -25,6 +25,15 @@ public sealed class DrawingStroke : MonoBehaviour
     private static int nextNetworkId;
     public int NetworkStrokeId { get; private set; }
     private readonly List<BoxCollider> colliderSegments = new List<BoxCollider>();
+    private const float BlobLength = 0.045f;
+    private const float BlobWidth = 1.3f;
+    private const float BlobShade = 0.72f;
+    private const float WobbleSpacing = 0.05f;
+    private const float WidthWobble = 0.12f;
+    private float length;
+    private float crayonSeed;
+    // Erased pieces are cut, not lifted: no wax pile at their ends.
+    private bool crayonEnds = true;
 
     private bool isErased;
 
@@ -101,8 +110,15 @@ public sealed class DrawingStroke : MonoBehaviour
         lineRenderer.startWidth = width;
         lineRenderer.endWidth = width;
         lineRenderer.positionCount = points.Count;
+        length = 0f;
         for (int i = 0; i < points.Count; i++)
+        {
             lineRenderer.SetPosition(i, points[i]);
+            if (i > 0) length += Vector3.Distance(points[i - 1], points[i]);
+        }
+        // Same on every peer: the wobble follows where the line was started.
+        crayonSeed = (points[0].x * 12.9898f + points[0].y * 78.233f + points[0].z * 37.719f) % 97f;
+        ApplyCrayonShape();
         for (int i = 1; i < points.Count; i++)
             CreateColliderSegment(GetPhysicsPoint(i - 1), GetPhysicsPoint(i), i - 1);
         TryStartHotZoneFade(firstPoint: points[0]);
@@ -111,8 +127,10 @@ public sealed class DrawingStroke : MonoBehaviour
     public void AddPoint(Vector3 point)
     {
         int index = lineRenderer.positionCount;
+        if (index > 0) length += Vector3.Distance(lineRenderer.GetPosition(index - 1), point);
         lineRenderer.positionCount = index + 1;
         lineRenderer.SetPosition(index, point);
+        ApplyCrayonShape();
         // Only the former endpoint gains a new neighbour. Update its two segments
         // in place, keeping the rendered points and the rest of the stroke intact.
         if (index >= 2)
@@ -124,6 +142,51 @@ public sealed class DrawingStroke : MonoBehaviour
     public void FinishDrawing()
     {
         isFinished = true;
+    }
+
+    // A real crayon line is not perfectly even: its width drifts a little along the line,
+    // and where the crayon was pressed down and lifted the wax piles up thicker and darker.
+    // The very first and last points keep the plain width and colour, because network sync
+    // and Dudu's 2D view read the line's start width and colour as its base values.
+    private void ApplyCrayonShape()
+    {
+        if (lineRenderer == null || isFading) return;
+        lineRenderer.widthMultiplier = strokeWidth;
+        if (length < 0.005f)
+        {
+            lineRenderer.widthCurve = AnimationCurve.Constant(0f, 1f, 1f);
+            lineRenderer.startColor = strokeColor;
+            lineRenderer.endColor = strokeColor;
+            return;
+        }
+
+        float blob = crayonEnds ? Mathf.Min(BlobLength, length * 0.3f) / length : 0f;
+        var keys = new List<Keyframe> { new Keyframe(0f, 1f) };
+        if (blob > 0f) keys.Add(new Keyframe(blob * 0.5f, BlobWidth));
+        for (float along = WobbleSpacing; along < length - WobbleSpacing * 0.5f; along += WobbleSpacing)
+        {
+            float t = along / length;
+            if (t <= blob || t >= 1f - blob) continue;
+            keys.Add(new Keyframe(t, 1f + (Mathf.PerlinNoise(crayonSeed + along * 9f, crayonSeed) - 0.5f) * 2f * WidthWobble));
+        }
+        if (blob > 0f) keys.Add(new Keyframe(1f - blob * 0.5f, BlobWidth));
+        keys.Add(new Keyframe(1f, 1f));
+        AnimationCurve curve = new AnimationCurve(keys.ToArray());
+        for (int i = 0; i < curve.length; i++) curve.SmoothTangents(i, 0f);
+        lineRenderer.widthCurve = curve;
+
+        Color dark = new Color(strokeColor.r * BlobShade, strokeColor.g * BlobShade, strokeColor.b * BlobShade, strokeColor.a);
+        Gradient gradient = new Gradient();
+        gradient.SetKeys(blob > 0f
+            ? new[]
+            {
+                new GradientColorKey(strokeColor, 0f), new GradientColorKey(dark, blob * 0.5f),
+                new GradientColorKey(strokeColor, blob), new GradientColorKey(strokeColor, 1f - blob),
+                new GradientColorKey(dark, 1f - blob * 0.5f), new GradientColorKey(strokeColor, 1f)
+            }
+            : new[] { new GradientColorKey(strokeColor, 0f), new GradientColorKey(strokeColor, 1f) },
+            new[] { new GradientAlphaKey(strokeColor.a, 0f), new GradientAlphaKey(strokeColor.a, 1f) });
+        lineRenderer.colorGradient = gradient;
     }
 
     private void Update()
@@ -295,6 +358,8 @@ public sealed class DrawingStroke : MonoBehaviour
         List<List<Vector3>> sections = BuildOutsideSections(center, radius);
         if (sections == null)
             return false;
+        // The rubbed-out bit smears and fades instead of vanishing at once.
+        ErasedLineFade.Spawn(lineRenderer, center, radius);
 
         Transform parent = transform.parent;
         foreach (List<Vector3> section in sections)
@@ -307,6 +372,7 @@ public sealed class DrawingStroke : MonoBehaviour
             partObject.transform.SetParent(parent, true);
             partObject.AddComponent<LineRenderer>();
             DrawingStroke part = partObject.AddComponent<DrawingStroke>();
+            part.crayonEnds = false;
             part.Initialize(
                 strokeMaterial,
                 strokeWidth,

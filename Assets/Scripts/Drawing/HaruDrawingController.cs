@@ -47,6 +47,7 @@ public sealed class HaruDrawingController : MonoBehaviour
     private bool pressStartedOnUi;
     private int strokeLayer;
     private float currentCrayon;
+    private HaruDrawFeedback feedback;
 
     public DrawingTool CurrentTool => currentTool;
     public System.Func<DrawingSurface, Vector3, bool> PenPointAllowed { get; set; }
@@ -65,6 +66,8 @@ public sealed class HaruDrawingController : MonoBehaviour
     {
         drawingCamera = GetComponent<Camera>();
         if (GetComponent<HaruDrawingArm>() == null) gameObject.AddComponent<HaruDrawingArm>();
+        feedback = GetComponent<HaruDrawFeedback>();
+        if (feedback == null) feedback = gameObject.AddComponent<HaruDrawFeedback>();
         currentCrayon = maxCrayon;
         ConfigurePhysicsLayers();
         lineMaterial = CreateLineMaterial(lineMaterialTemplate);
@@ -157,6 +160,7 @@ public sealed class HaruDrawingController : MonoBehaviour
             {
                 Vector3 consumedPoint = Vector3.Lerp(lastPoint, point, drawableDistance / distance);
                 currentStroke.AddPoint(consumedPoint);
+                feedback.StrokeMoved(lastPoint, consumedPoint);
                 lastPoint = consumedPoint;
                 ConsumeCrayon(drawableDistance * consumptionPerWorldUnit);
             }
@@ -268,6 +272,7 @@ public sealed class HaruDrawingController : MonoBehaviour
             surface.Normal,
             strokeLayer);
         lastPoint = point;
+        feedback.StrokeStarted(point, surface.Normal, penColor);
     }
 
     private void EraseStrokeParts(DrawingSurface surface, Vector3 point)
@@ -277,12 +282,17 @@ public sealed class HaruDrawingController : MonoBehaviour
             return;
 
         DrawingStroke[] strokes = root.GetComponentsInChildren<DrawingStroke>(false);
+        bool removed = false;
         foreach (DrawingStroke stroke in strokes)
         {
             if (stroke != null && stroke.TryGetSqrDistance(point, eraserRadius, out _) &&
                 stroke.Erase(point, eraserRadius))
+            {
+                removed = true;
                 StrokeErased?.Invoke(stroke.SourceStrokeId);
+            }
         }
+        feedback.Erasing(point, surface.Normal, removed, penColor);
     }
 
     private void SetTool(DrawingTool tool)
@@ -362,6 +372,7 @@ public sealed class HaruDrawingController : MonoBehaviour
                 Destroy(currentStroke.gameObject);
             else
                 currentStroke.FinishDrawing();
+            if (feedback != null) feedback.StrokeEnded();
         }
         currentStroke = null;
         currentSurface = null;
