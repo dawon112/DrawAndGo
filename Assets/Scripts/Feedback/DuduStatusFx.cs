@@ -28,6 +28,7 @@ public sealed class DuduStatusFx : MonoBehaviour
     private SpriteRenderer sprite;
     private Animator animator;
     private SpriteRenderer aura;
+    private SpriteRenderer roomRim, roomDeepen;
     private SpriteRenderer flash;
     private SpriteRenderer threatRing;
     private readonly List<Icon> icons = new List<Icon>();
@@ -65,10 +66,18 @@ public sealed class DuduStatusFx : MonoBehaviour
         body = GetComponent<DuduMoveFeedback>();
         movement = GetComponent<DuduSurfaceMovement>();
         if (aura != null) Destroy(aura.gameObject);
+        if (roomRim != null) Destroy(roomRim.gameObject);
+        if (roomDeepen != null) Destroy(roomDeepen.gameObject);
         if (flash != null) Destroy(flash.gameObject);
         if (sprite == null) return;
         aura = FxArt.NewOverlay(sprite, "Dudu Aura", -1, 1.14f);
         flash = FxArt.NewOverlay(sprite, "Dudu Flash", 1, 1f);
+        // Haru's view only (Dudu's page is plain, and he reads fine on it): a stronger blue
+        // outline around him and a deeper blue over his line.
+        roomRim = FxArt.NewOverlay(sprite, "Dudu Room Rim", -2, 1.045f);
+        roomRim.gameObject.AddComponent<RoomOnlyDecor>();
+        roomDeepen = FxArt.NewOverlay(sprite, "Dudu Room Deepen", 1, 1f);
+        roomDeepen.gameObject.AddComponent<RoomOnlyDecor>();
     }
 
     private void Awake()
@@ -398,6 +407,11 @@ public sealed class DuduStatusFx : MonoBehaviour
 
     private void UpdateOverlays(bool reversed, bool slowed, float dt, float now)
     {
+        if (roomRim != null)
+        {
+            FxArt.Sync(roomRim, sprite, new Color(0.08f, 0.3f, 0.82f, 0.9f * sprite.color.a));
+            FxArt.Sync(roomDeepen, sprite, new Color(0.08f, 0.3f, 0.82f, 0.22f * sprite.color.a));
+        }
         flashAmount = Mathf.MoveTowards(flashAmount, 0f, dt * 5f);
         Color flashNow = flashColor;
         flashNow.a = flashAmount * (Mathf.Sin(now * 60f) > -0.3f ? 1f : 0.35f);

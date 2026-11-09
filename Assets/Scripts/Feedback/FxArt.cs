@@ -4,7 +4,7 @@ using UnityEngine;
 public enum FxShape
 {
     Soft, Crumb, Streak, Spark, Ring, Chevron, Arrow, Bolt, Target, Swirl,
-    SlowFoot, Cross, Lock, Exclaim, Heat, Magnet, Disc, Star, Door, DoorFrame, Box
+    SlowFoot, Cross, Lock, Exclaim, Heat, Magnet, Disc, Star, Door, DoorFrame, Box, ScribbleA, ScribbleB, ScribbleC
 }
 
 // Small crayon-looking pictures for hazard feedback, drawn in code so no scene or prefab
@@ -111,6 +111,23 @@ public static class FxArt
         {
             case FxShape.Soft: c.SoftBlob(0.48f); break;
             case FxShape.Box: c.Box(0f, 0f, 1f, 1f); break;
+            case FxShape.ScribbleA:
+                // A quick zigzag, back and forth.
+                for (int i = 0; i < 9; i++)
+                {
+                    float a = 0.12f + i * 0.085f;
+                    c.Line(a, i % 2 == 0 ? 0.18f : 0.8f, a + 0.085f, i % 2 == 0 ? 0.8f : 0.18f, 0.018f);
+                }
+                break;
+            case FxShape.ScribbleB:
+                c.Spiral(0.5f, 0.5f, 0.06f, 0.4f, 3.2f, 0.016f);
+                break;
+            case FxShape.ScribbleC:
+                // A wobbly loop and a tail, as a child tries out a crayon.
+                c.Arc(0.42f, 0.55f, 0.26f, 20f, 340f, 0.018f);
+                c.Line(0.66f, 0.47f, 0.92f, 0.2f, 0.018f);
+                c.Line(0.92f, 0.2f, 0.74f, 0.14f, 0.018f);
+                break;
             case FxShape.Door:
                 c.Box(0.24f, 0.02f, 0.76f, 0.7f);
                 c.Disc(0.5f, 0.7f, 0.26f);

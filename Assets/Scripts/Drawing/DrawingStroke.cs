@@ -42,6 +42,12 @@ public sealed class DrawingStroke : MonoBehaviour
     public static readonly List<DrawingStroke> Live = new List<DrawingStroke>();
     public LineRenderer Line => lineRenderer;
     public bool IsFading => isFading;
+    // What the crayon's colour really is; a fresh line is drawn a little darker for a moment.
+    public Color BaseColor => strokeColor;
+    private const float FreshDarkness = 0.72f;
+    private const float FreshSettleSeconds = 1.4f;
+    private float settleStartedAt = -1f;
+    private float nextSettleStep;
     public float FadeProgress => isFading ? Mathf.Clamp01((Time.time - fadeStartedAt) / fadeDuration) : 0f;
     private void OnEnable() { if (!Live.Contains(this)) Live.Add(this); }
     private void OnDisable() => Live.Remove(this);
@@ -60,7 +66,12 @@ public sealed class DrawingStroke : MonoBehaviour
     // Erased fragments retain their source identity for scene-local objectives.
     public int SourceStrokeId { get; private set; }
 
-    public void MarkAsNetworkMirror() => IsNetworkMirror = true;
+    public void MarkAsNetworkMirror()
+    {
+        IsNetworkMirror = true;
+        // A mirror is never finished; it simply keeps the crayon's own colour.
+        settleStartedAt = float.NegativeInfinity;
+    }
 
     public void Initialize(
         Material material,
@@ -149,16 +160,26 @@ public sealed class DrawingStroke : MonoBehaviour
     public void FinishDrawing()
     {
         isFinished = true;
+        if (settleStartedAt == -1f) settleStartedAt = Time.time;
     }
 
     // A real crayon line is not perfectly even: its width drifts a little along the line,
     // and where the crayon was pressed down and lifted the wax piles up thicker and darker.
     // The very first and last points keep the plain width and colour, because network sync
     // and Dudu's 2D view read the line's start width and colour as its base values.
+    private Color CurrentCrayonColor()
+    {
+        float settle = settleStartedAt == -1f ? 0f : Mathf.Clamp01((Time.time - settleStartedAt) / FreshSettleSeconds);
+        float shade = Mathf.Lerp(FreshDarkness, 1f, settle * settle);
+        Color color = this.strokeColor;
+        return new Color(color.r * shade, color.g * shade, color.b * shade, color.a);
+    }
+
     private void ApplyCrayonShape()
     {
         if (lineRenderer == null || isFading) return;
         lineRenderer.widthMultiplier = strokeWidth;
+        Color strokeColor = CurrentCrayonColor();
         if (length < 0.005f)
         {
             lineRenderer.widthCurve = AnimationCurve.Constant(0f, 1f, 1f);
@@ -198,6 +219,13 @@ public sealed class DrawingStroke : MonoBehaviour
 
     private void Update()
     {
+        if (settleStartedAt >= 0f && !isFading && Time.time >= nextSettleStep)
+        {
+            nextSettleStep = Time.time + 0.08f;
+            bool settled = Time.time - settleStartedAt >= FreshSettleSeconds;
+            ApplyCrayonShape();
+            if (settled) settleStartedAt = float.NegativeInfinity;
+        }
         if (!isFading || lineRenderer == null) return;
         float progress = Mathf.Clamp01((Time.time - fadeStartedAt) / fadeDuration);
         ApplyHeatStage(progress);
@@ -324,8 +352,8 @@ public sealed class DrawingStroke : MonoBehaviour
         isFading = true;
         fadeStartedAt = Time.time;
         fadeDuration = duration;
-        fadeStartColor = lineRenderer.startColor;
-        fadeEndColor = lineRenderer.endColor;
+        fadeStartColor = strokeColor;
+        fadeEndColor = strokeColor;
         // One colour along the whole line from here on: the blob shading would stay dark
         // under the heat stages otherwise.
         lineRenderer.colorGradient = new Gradient
@@ -439,6 +467,8 @@ public sealed class DrawingStroke : MonoBehaviour
             partObject.AddComponent<LineRenderer>();
             DrawingStroke part = partObject.AddComponent<DrawingStroke>();
             part.crayonEnds = false;
+            // What is left of an old line is not a fresh one.
+            part.settleStartedAt = float.NegativeInfinity;
             part.Initialize(
                 strokeMaterial,
                 strokeWidth,

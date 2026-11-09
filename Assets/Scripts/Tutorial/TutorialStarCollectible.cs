@@ -14,6 +14,7 @@ public sealed class TutorialStarCollectible : MonoBehaviour
     private void Awake()
     {
         transform.localScale = Vector3.one * VisualScale;
+        gameObject.AddComponent<StarShineFx>();
         Collider trigger = GetComponent<Collider>();
         trigger.isTrigger = true;
         Vector3 scale = transform.lossyScale;

@@ -242,7 +242,7 @@ public sealed class StageStateSync : MonoBehaviour
                 int count = Mathf.Min(ChunkPoints, stroke.PointCount - offset);
                 var delta = new StrokeDelta
                 {
-                    id = id, offset = offset, width = line.startWidth, color = line.startColor,
+                    id = id, offset = offset, width = line.startWidth, color = stroke.BaseColor,
                     thickness = stroke.ColliderThickness, depth = stroke.ColliderDepth,
                     normal = stroke.SurfaceNormal, translation = stroke.TotalTranslation,
                     points = new Vector3[count]

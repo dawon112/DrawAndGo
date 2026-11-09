@@ -181,6 +181,7 @@ public sealed class GameViewManager : MonoBehaviour
     private void SetDuduMode(bool enabled)
     {
         duduMode = enabled;
+        StageDressing.SetHaruView(!enabled);
         GameObject player3D = haruMovement != null
             ? haruMovement.transform.root.gameObject
             : null;

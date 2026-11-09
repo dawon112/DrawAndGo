@@ -4,6 +4,8 @@ using UnityEngine;
 [RequireComponent(typeof(Collider))]
 public sealed class SurfaceCoinPickup : MonoBehaviour
 {
+    private void Awake() => gameObject.AddComponent<StarShineFx>();
+
     private void OnTriggerEnter(Collider other)
     {
         if (GameSession.Current != null && GameSession.Current.IsHost) return;

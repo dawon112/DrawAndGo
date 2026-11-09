@@ -28,6 +28,39 @@ public sealed class StageLook : ScriptableObject
     public Color ambientSky = new Color(0.72f, 0.65f, 0.7f);
     public Color ambientEquator = new Color(0.7f, 0.6f, 0.58f);
     public Color ambientGround = new Color(0.44f, 0.34f, 0.3f);
+    [Tooltip("Ambient in Haru's room, as a share of the colours above. Lower means deeper shade between the lights. Dudu's page always uses the full colours.")]
+    [Range(0f, 1.5f)] public float ambientStrength = 0.72f;
+
+    [Header("Ceiling lamps (pools of light)")]
+    public Color lampColor = new Color(1f, 0.8f, 0.58f);
+    [Min(0f)] public float lampIntensity = 52f;
+    [Min(0.1f)] public float lampRange = 9f;
+    [Range(1f, 179f)] public float lampOuterAngle = 132f;
+    [Range(0f, 179f)] public float lampInnerAngle = 60f;
+    public LightShadows lampShadows = LightShadows.Soft;
+    [Tooltip("How the fixture itself looks; above 1 so it catches a little bloom.")]
+    [ColorUsage(false, true)] public Color lampFixtureColor = new Color(2.2f, 1.85f, 1.35f);
+
+    [Header("Light by area")]
+    [Tooltip("Lamps between the start and the goal, as a share of full brightness.")]
+    [Range(0f, 1f)] public float hallwayLevel = 0.62f;
+    [Tooltip("Every other hallway lamp is this much dimmer, for near / middle / far.")]
+    [Range(0f, 1f)] public float alternateLampLevel = 0.72f;
+    [Min(0f)] public float startRoomRadius = 15f;
+    [Tooltip("The lamps nearest the door; above 1 makes the goal the brightest place.")]
+    [Min(0f)] public float goalLevel = 1.25f;
+    [Min(0f)] public float goalRadius = 13f;
+    [Tooltip("Share of its own brightness for the scenes' Sun Patch spot.")]
+    [Range(0f, 2f)] public float sunPatchLevel = 0.8f;
+    public Color hazardSpotColor = new Color(1f, 0.86f, 0.66f);
+    [Min(0f)] public float hazardSpotIntensity = 9f;
+
+    [Header("Floor")]
+    [Min(0f)] public float floorScribblesPerArea = 0.05f;
+    public Color[] floorScribbleColors =
+    {
+        new Color(0.2f, 0.5f, 0.85f), new Color(0.9f, 0.4f, 0.25f), new Color(0.95f, 0.75f, 0.2f), new Color(0.3f, 0.65f, 0.4f)
+    };
 
     [Header("Dudu's 2D view")]
     [Tooltip("Fills the view around the sunlit page; above 1 to match the lit paper. Read by DuduCameraController.")]
@@ -79,9 +112,9 @@ public sealed class StageLook : ScriptableObject
         }
 
         RenderSettings.ambientMode = AmbientMode.Trilight;
-        RenderSettings.ambientSkyColor = ambientSky;
-        RenderSettings.ambientEquatorColor = ambientEquator;
-        RenderSettings.ambientGroundColor = ambientGround;
+        RenderSettings.ambientSkyColor = ambientSky * ambientStrength;
+        RenderSettings.ambientEquatorColor = ambientEquator * ambientStrength;
+        RenderSettings.ambientGroundColor = ambientGround * ambientStrength;
         RenderSettings.fog = fog;
         RenderSettings.fogMode = FogMode.ExponentialSquared;
         RenderSettings.fogColor = fogColor;
@@ -102,5 +135,7 @@ public sealed class StageLook : ScriptableObject
             UniversalAdditionalCameraData data = camera.GetUniversalAdditionalCameraData();
             if (data != null) data.renderPostProcessing = true;
         }
+
+        StageDressing.Dress(this);
     }
 }
