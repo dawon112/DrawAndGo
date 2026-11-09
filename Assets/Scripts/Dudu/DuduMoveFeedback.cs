@@ -5,6 +5,7 @@ using UnityEngine;
 // he lands on. Only looks: physics and the network pose are untouched. It reads what
 // Dudu's pose and sprite do, so it runs the same on both PCs (Haru sees it in 3D too).
 // Added and set up by DuduSurfaceMovement.
+[DefaultExecutionOrder(10)]
 [DisallowMultipleComponent]
 public sealed class DuduMoveFeedback : MonoBehaviour
 {
@@ -60,6 +61,12 @@ public sealed class DuduMoveFeedback : MonoBehaviour
     private Dust[] landDust;
     private int nextStep;
     private int nextLand;
+
+    // Set every frame by DuduStatusFx: how hazards are pushing his body about.
+    public float ExternalLean { get; set; }
+    public float ExternalSquash { get; set; }
+    public Vector2 ExternalOffset { get; set; }
+    public bool Grounded => wasGrounded;
 
     private sealed class Dust
     {
@@ -210,8 +217,8 @@ public sealed class DuduMoveFeedback : MonoBehaviour
     // than shrinking into the air.
     private void ApplySpriteShape()
     {
-        float scaleY = 1f + stretch;
-        float scaleX = 1f - stretch * 0.7f;
+        float scaleY = 1f + stretch + ExternalSquash;
+        float scaleX = 1f - (stretch + ExternalSquash) * 0.7f;
         float lean = 0f;
         if (leanStartedAt >= 0f)
         {
@@ -221,20 +228,20 @@ public sealed class DuduMoveFeedback : MonoBehaviour
             else leanStartedAt = -1f;
         }
         // Leans into the way he now faces.
-        Quaternion tilt = Quaternion.Euler(0f, 0f, -leanSign * TurnLean * lean);
+        Quaternion tilt = Quaternion.Euler(0f, 0f, -leanSign * TurnLean * lean - ExternalLean);
 
         Vector3 scale = new Vector3(baseLocalScale.x * scaleX, baseLocalScale.y * scaleY, baseLocalScale.z);
         float feet = sprite.sprite != null ? -sprite.sprite.bounds.min.y : 0f;
         Vector3 baseFeet = baseLocalRotation * new Vector3(0f, -feet * baseLocalScale.y, 0f);
         Vector3 nowFeet = baseLocalRotation * tilt * new Vector3(0f, -feet * scale.y, 0f);
-        Vector3 local = baseLocalPosition + baseFeet - nowFeet;
+        Vector3 local = baseLocalPosition + baseFeet - nowFeet + (Vector3)ExternalOffset;
         spriteTransform.localScale = scale;
         spriteTransform.localRotation = baseLocalRotation * tilt;
         spriteTransform.localPosition = new Vector3(local.x, local.y, spriteTransform.localPosition.z);
     }
 
     // The bottom of Dudu's picture at rest, just behind the picture so his feet cover it.
-    private Vector3 FeetPoint()
+    public Vector3 FeetPoint()
     {
         float feet = sprite.sprite != null ? -sprite.sprite.bounds.min.y : 0f;
         Vector3 local = baseLocalPosition + baseLocalRotation * new Vector3(0f, -feet * baseLocalScale.y, 0f);

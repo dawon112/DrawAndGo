@@ -24,6 +24,7 @@ public sealed class GameViewManager : MonoBehaviour
     private TutorialRoomLevel tutorialClearLevel;
     public CameraState CurrentCameraState { get; private set; }
     public bool IsHaruGameplayView => CurrentCameraState == CameraState.Gameplay && !duduMode;
+    public bool IsDuduMode => duduMode;
 
     private void Awake()
     {

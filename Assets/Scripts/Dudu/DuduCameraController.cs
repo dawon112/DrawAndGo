@@ -26,6 +26,26 @@ public sealed class DuduCameraController : MonoBehaviour
     [SerializeField, Min(0.02f)] private float overlayFrameDuration = 0.12f;
 
     private readonly List<VisualProxy> visualProxies = new List<VisualProxy>();
+    private readonly HashSet<Renderer> proxiedSources = new HashSet<Renderer>();
+    private Vector3 shakeApplied;
+    private float shakeAmount, shakeUntil, shakeLength, rollAmount, rollUntil, rollLength;
+
+    public static void Shake(float amount, float seconds)
+    {
+        if (activeInstance == null) return;
+        activeInstance.shakeAmount = amount;
+        activeInstance.shakeLength = seconds;
+        activeInstance.shakeUntil = Time.unscaledTime + seconds;
+    }
+
+    // The whole view lurches over and back.
+    public static void Roll(float degrees, float seconds)
+    {
+        if (activeInstance == null) return;
+        activeInstance.rollAmount = degrees;
+        activeInstance.rollLength = seconds;
+        activeInstance.rollUntil = Time.unscaledTime + seconds;
+    }
     private Camera cameraComponent;
     private Transform proxyRoot;
     private DuduSurface[] surfaces;
@@ -134,8 +154,18 @@ public sealed class DuduCameraController : MonoBehaviour
         float viewHalfWidth = orthographicSize * cameraComponent.aspect;
         float limit = Mathf.Max(0f, totalWidth * 0.5f - viewHalfWidth);
         targetX = Mathf.Clamp(targetX, -limit, limit);
-        float x = Mathf.SmoothDamp(transform.position.x, targetX, ref horizontalVelocity, followSmoothTime);
-        transform.SetPositionAndRotation(new Vector3(x, 0f, -cameraDistance), Quaternion.identity);
+        float x = Mathf.SmoothDamp(transform.position.x - shakeApplied.x, targetX, ref horizontalVelocity, followSmoothTime);
+        float now = Time.unscaledTime;
+        shakeApplied = now < shakeUntil
+            ? (Vector3)(Random.insideUnitCircle * (shakeAmount * (shakeUntil - now) / Mathf.Max(0.01f, shakeLength)))
+            : Vector3.zero;
+        Quaternion roll = Quaternion.identity;
+        if (now < rollUntil)
+        {
+            float t = 1f - (rollUntil - now) / Mathf.Max(0.01f, rollLength);
+            roll = Quaternion.Euler(0f, 0f, rollAmount * Mathf.Sin(t * Mathf.PI * 2.5f) * (1f - t));
+        }
+        transform.SetPositionAndRotation(new Vector3(x, 0f, -cameraDistance) + shakeApplied, roll);
     }
 
     private void CreateDebuffOverlay()
@@ -331,7 +361,7 @@ public sealed class DuduCameraController : MonoBehaviour
 
         string sourceName = source.gameObject.name;
         if (source is SkinnedMeshRenderer || source.transform.IsChildOf(proxyRoot) ||
-            visualProxies.Exists(item => item.source == source) ||
+            proxiedSources.Contains(source) ||
             sourceName == "Room Wall 6 - Closure" || sourceName.StartsWith("START") ||
             sourceName.StartsWith("SECTION") || source.GetComponentInParent<RoomOnlyDecor>() != null) return;
         // Haru's aim cross on the wall: Dudu sees Haru's crayon/eraser cursor there instead.
@@ -345,7 +375,9 @@ public sealed class DuduCameraController : MonoBehaviour
             : FindSurface(source);
         if (sourceSurface == null) return;
         Renderer proxy = CreateProxy(source);
-        if (proxy != null) visualProxies.Add(new VisualProxy(source, proxy, sourceSurface));
+        if (proxy == null) return;
+        visualProxies.Add(new VisualProxy(source, proxy, sourceSurface));
+        proxiedSources.Add(source);
     }
 
     // A drawn stroke knows which way its wall faces. Near a corner its points are close to both
@@ -447,6 +479,13 @@ public sealed class DuduCameraController : MonoBehaviour
             {
                 if (item.proxy != null) Destroy(item.proxy.gameObject);
                 visualProxies.RemoveAt(i);
+                proxiedSources.RemoveWhere(source => source == null);
+                continue;
+            }
+            // Unused effect sprites cost nothing.
+            if (!item.source.gameObject.activeInHierarchy)
+            {
+                item.proxy.enabled = false;
                 continue;
             }
             LineMagnet magnet = item.source.GetComponentInParent<LineMagnet>();

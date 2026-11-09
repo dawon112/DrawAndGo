@@ -20,6 +20,7 @@ public sealed class DrawingStroke : MonoBehaviour
     private float fadeDuration;
     private Color fadeStartColor;
     private Color fadeEndColor;
+    private bool crumbledAway;
     private static int splitNumber;
     private static int nextSourceStrokeId;
     private static int nextNetworkId;
@@ -38,6 +39,12 @@ public sealed class DrawingStroke : MonoBehaviour
     private bool isErased;
 
     public int PointCount => lineRenderer != null ? lineRenderer.positionCount : 0;
+    public static readonly List<DrawingStroke> Live = new List<DrawingStroke>();
+    public LineRenderer Line => lineRenderer;
+    public bool IsFading => isFading;
+    public float FadeProgress => isFading ? Mathf.Clamp01((Time.time - fadeStartedAt) / fadeDuration) : 0f;
+    private void OnEnable() { if (!Live.Contains(this)) Live.Add(this); }
+    private void OnDisable() => Live.Remove(this);
     public bool IsFinished => isFinished;
     // Destroy is deferred to the end of the frame. Once erased, a stroke must be
     // ignored by every later query in the same frame or it would be split again.
@@ -193,14 +200,66 @@ public sealed class DrawingStroke : MonoBehaviour
     {
         if (!isFading || lineRenderer == null) return;
         float progress = Mathf.Clamp01((Time.time - fadeStartedAt) / fadeDuration);
-        Color start = fadeStartColor;
-        Color end = fadeEndColor;
-        start.a *= 1f - progress;
-        end.a *= 1f - progress;
-        lineRenderer.startColor = start;
-        lineRenderer.endColor = end;
+        ApplyHeatStage(progress);
+        if (progress >= 1f && !crumbledAway)
+        {
+            crumbledAway = true;
+            CrumbleAway();
+        }
         // A mirror only shows the fade; the host's delete message removes its colliders.
         if (progress >= 1f && !IsNetworkMirror) Destroy(gameObject);
+    }
+
+    // A line in a Hot Zone shows how long it has: its colour, paling, then red and
+    // blinking, then gone. It also softens and spreads like melting wax.
+    private void ApplyHeatStage(float progress)
+    {
+        Color baseColor = fadeStartColor;
+        Color pale = Color.Lerp(baseColor, new Color(1f, 0.82f, 0.62f, baseColor.a), 0.6f);
+        Color warning = new Color(1f, 0.2f, 0.1f, baseColor.a);
+        Color color;
+        float alpha;
+        if (progress < 0.5f)
+        {
+            float t = progress / 0.5f;
+            color = Color.Lerp(baseColor, pale, t);
+            alpha = Mathf.Lerp(1f, 0.72f, t);
+        }
+        else if (progress < 0.82f)
+        {
+            float t = (progress - 0.5f) / 0.32f;
+            color = Color.Lerp(pale, warning, t);
+            alpha = Mathf.Lerp(0.72f, 0.65f, t);
+        }
+        else
+        {
+            float t = (progress - 0.82f) / 0.18f;
+            color = warning;
+            float blink = Mathf.Sin(Time.time * 42f) > 0f ? 1f : 0.3f;
+            alpha = Mathf.Lerp(0.8f, 0.25f, t) * blink;
+        }
+        color.a = baseColor.a * alpha;
+        lineRenderer.startColor = color;
+        lineRenderer.endColor = color;
+        lineRenderer.widthMultiplier = strokeWidth * (1f + progress * 0.35f);
+    }
+
+    private void CrumbleAway()
+    {
+        if (lineRenderer == null) return;
+        Sprite crumb = FxArt.Get(FxShape.Crumb);
+        Quaternion facing = FxWall.FacingAway(surfaceNormal);
+        int count = lineRenderer.positionCount;
+        int every = Mathf.Max(1, count / 18);
+        Color ash = new Color(1f, 0.32f, 0.12f, 1f);
+        for (int i = 0; i < count; i += every)
+        {
+            Vector3 point = lineRenderer.GetPosition(i);
+            FxRunner.Spawn(crumb, point, facing * Quaternion.Euler(0f, 0f, Random.Range(0f, 360f)),
+                Random.insideUnitSphere * 0.4f + Vector3.up * 0.3f, Random.Range(0.45f, 0.75f), 0.1f, 0.03f,
+                Color.Lerp(ash, fadeStartColor, Random.value * 0.5f), FxLayer.Front, 4f, 0f, 300f);
+        }
+        if (count > 0) FxSound.Play(FxClip.Crumble, lineRenderer.GetPosition(count / 2), 0.8f);
     }
 
     private void FixedUpdate()
@@ -267,6 +326,13 @@ public sealed class DrawingStroke : MonoBehaviour
         fadeDuration = duration;
         fadeStartColor = lineRenderer.startColor;
         fadeEndColor = lineRenderer.endColor;
+        // One colour along the whole line from here on: the blob shading would stay dark
+        // under the heat stages otherwise.
+        lineRenderer.colorGradient = new Gradient
+        {
+            colorKeys = new[] { new GradientColorKey(fadeStartColor, 0f), new GradientColorKey(fadeStartColor, 1f) },
+            alphaKeys = new[] { new GradientAlphaKey(fadeStartColor.a, 0f), new GradientAlphaKey(fadeStartColor.a, 1f) }
+        };
         return true;
     }
 
@@ -384,6 +450,8 @@ public sealed class DrawingStroke : MonoBehaviour
                 strokeLayer);
             part.FinishDrawing();
             part.SourceStrokeId = SourceStrokeId;
+            // At once, so a cut line never blinks out of Dudu's view until the next refresh.
+            DuduCameraController.RegisterRuntimeRenderer(part.lineRenderer);
             createdParts?.Add(part);
         }
 

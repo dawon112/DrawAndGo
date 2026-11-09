@@ -6,6 +6,8 @@ public sealed class DuduHomingShooter : MonoBehaviour
     // In front of the wall's face (walls are 0.1 thick) and just behind Dudu's sprite.
     // At 0.02 the bolt sat inside the wall and could vanish from view.
     private const float LightningVisualOffset = 0.12f;
+    // How long the cloud visibly charges before a bolt leaves it.
+    private const float ChargeDuration = 0.45f;
 
     [Header("References")]
     [SerializeField] private DuduSurface surface;
@@ -45,6 +47,20 @@ public sealed class DuduHomingShooter : MonoBehaviour
     private AudioSource audioSource;
     private DuduHomingProjectile activeProjectile;
     public Transform ActiveProjectile => activeProjectile != null ? activeProjectile.transform : null;
+    private float chargeEndsAt = -1f;
+
+    public DuduSurface Surface => surface;
+    // 0 while idle, rising to 1 as the next bolt is about to leave.
+    public float ChargeProgress { get; private set; }
+    public void ApplyRemoteCharge(float charge) => ChargeProgress = charge;
+    public Vector3 EmitterPoint
+    {
+        get
+        {
+            EnsureLightningSpawnPoint();
+            return lightningSpawnPoint != null ? lightningSpawnPoint.position : transform.position;
+        }
+    }
     private static AudioClip defaultFireSound;
     private static Sprite projectileSprite;
 
@@ -52,6 +68,7 @@ public sealed class DuduHomingShooter : MonoBehaviour
     {
         // Online sync matches hazards by hierarchy path, so "StormCloud 2" keeps its own name.
         if (!gameObject.name.StartsWith("StormCloud")) gameObject.name = "StormCloud";
+        gameObject.AddComponent<StormCloudFx>();
         EnsureLightningSpawnPoint();
     }
 
@@ -76,6 +93,8 @@ public sealed class DuduHomingShooter : MonoBehaviour
         if (!targetIsActive)
         {
             targetWasActive = false;
+            chargeEndsAt = -1f;
+            ChargeProgress = 0f;
             return;
         }
 
@@ -85,12 +104,29 @@ public sealed class DuduHomingShooter : MonoBehaviour
             nextShotTime = Time.time + firstShotDelay;
         }
 
-        if (Time.time < nextShotTime)
-            return;
-
         if (activeProjectile != null)
+        {
+            chargeEndsAt = -1f;
+            ChargeProgress = 0f;
+            return;
+        }
+
+        // Every bolt is announced: the cloud charges first, then it fires.
+        if (chargeEndsAt < 0f)
+        {
+            ChargeProgress = 0f;
+            if (Time.time < nextShotTime - ChargeDuration) return;
+            if (CanRecognizeTarget()) chargeEndsAt = Mathf.Max(nextShotTime, Time.time + ChargeDuration);
+            else if (Time.time >= nextShotTime) nextShotTime = Time.time + fireInterval;
+            return;
+        }
+
+        ChargeProgress = Mathf.Clamp01(1f - (chargeEndsAt - Time.time) / ChargeDuration);
+        if (Time.time < chargeEndsAt)
             return;
 
+        chargeEndsAt = -1f;
+        ChargeProgress = 0f;
         nextShotTime = Time.time + fireInterval;
         if (CanRecognizeTarget())
             FireProjectile();
@@ -101,7 +137,11 @@ public sealed class DuduHomingShooter : MonoBehaviour
         if (!active)
         {
             if (activeProjectile != null)
-            { activeProjectile.gameObject.SetActive(false); Destroy(activeProjectile.gameObject); }
+            {
+                if (activeProjectile.TryGetComponent(out BoltFx fx)) fx.Burst();
+                activeProjectile.gameObject.SetActive(false);
+                Destroy(activeProjectile.gameObject);
+            }
             activeProjectile = null;
             return;
         }
@@ -171,6 +211,7 @@ public sealed class DuduHomingShooter : MonoBehaviour
             ? Instantiate(projectilePrefab)
             : new GameObject("Homing Projectile");
         projectile.name = "Lightning";
+        projectile.AddComponent<BoltFx>();
         projectile.transform.SetPositionAndRotation(
             SurfaceToWorld(spawnPosition),
             surface.transform.rotation);

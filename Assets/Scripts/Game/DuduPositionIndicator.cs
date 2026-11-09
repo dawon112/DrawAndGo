@@ -16,6 +16,16 @@ public sealed class DuduPositionIndicator : MonoBehaviour
     private Canvas canvas;
     private RectTransform canvasRect;
     private RectTransform marker;
+    private Image markerImage;
+    private Color alarmColor = Color.white;
+    private float alarmUntil;
+
+    // Something just happened to Dudu: the marker shakes and takes this colour for a moment.
+    public void Alarm(Color color, float seconds)
+    {
+        alarmColor = color;
+        alarmUntil = Time.unscaledTime + seconds;
+    }
 
     public void Configure(GameViewManager owner, Camera camera, DuduSurfaceMovement target)
     {
@@ -59,6 +69,7 @@ public sealed class DuduPositionIndicator : MonoBehaviour
         image.sprite = sprite;
         image.preserveAspect = true;
         image.raycastTarget = false;
+        markerImage = image;
     }
 
     private void LateUpdate()
@@ -103,6 +114,10 @@ public sealed class DuduPositionIndicator : MonoBehaviour
 
         // Keep the face upright; point the supplied bubble's tail toward the nearest side.
         marker.localScale = new Vector3(direction.x > 0f ? -1f : 1f, 1f, 1f);
+        bool alarmed = Time.unscaledTime < alarmUntil;
+        if (markerImage != null)
+            markerImage.color = alarmed && Mathf.Sin(Time.unscaledTime * 22f) > -0.2f ? alarmColor : Color.white;
+        if (alarmed) marker.anchoredPosition += Random.insideUnitCircle * 7f;
         canvas.enabled = true;
     }
 

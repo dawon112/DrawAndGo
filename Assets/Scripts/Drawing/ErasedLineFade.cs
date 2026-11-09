@@ -40,6 +40,7 @@ public sealed class ErasedLineFade : MonoBehaviour
             fade.width = source.widthMultiplier * source.widthCurve.Evaluate(0.5f);
             fade.color = source.startColor;
             fade.Apply(0f);
+            DuduCameraController.RegisterRuntimeRenderer(copy);
         }
     }
 

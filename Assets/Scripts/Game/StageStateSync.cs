@@ -62,6 +62,7 @@ public sealed class StageStateSync : MonoBehaviour
         public int collected;
         public DuduSurfaceMovement.NetworkVisualState duduVisual;
         public Pose[] movers, erasers, projectiles;
+        public float[] cloudCharge, eraserAim;
         public bool doorOpen, clear;
     }
 
@@ -82,7 +83,7 @@ public sealed class StageStateSync : MonoBehaviour
         Array.Sort(movers, (a, b) => string.CompareOrdinal(Path(a.transform), Path(b.transform)));
         Array.Sort(erasers, (a, b) => string.CompareOrdinal(Path(a.transform), Path(b.transform)));
         Array.Sort(shooters, (a, b) => string.CompareOrdinal(Path(a.transform), Path(b.transform)));
-        layout = "stage-v2|" + SceneManager.GetActiveScene().name;
+        layout = "stage-v3|" + SceneManager.GetActiveScene().name;
         if (level != null)
             foreach (var coin in level.coins) layout += "|coin:" + (coin != null ? Path(coin.transform) : "null");
         foreach (var mover in movers) layout += "|move:" + Path(mover.transform);
@@ -169,13 +170,23 @@ public sealed class StageStateSync : MonoBehaviour
             {
                 movers = new Pose[movers.Length],
                 erasers = new Pose[erasers.Length],
-                projectiles = new Pose[shooters.Length]
+                projectiles = new Pose[shooters.Length],
+                cloudCharge = new float[shooters.Length],
+                eraserAim = new float[erasers.Length]
             };
             if (dudu != null) state.duduVisual = dudu.CaptureNetworkVisual();
             state.collected = CollectedMask();
             for (int i = 0; i < movers.Length; i++) state.movers[i] = Pose.Capture(movers[i].transform);
-            for (int i = 0; i < erasers.Length; i++) state.erasers[i] = Pose.Capture(erasers[i] != null ? erasers[i].transform : null);
-            for (int i = 0; i < shooters.Length; i++) state.projectiles[i] = Pose.Capture(shooters[i].ActiveProjectile);
+            for (int i = 0; i < erasers.Length; i++)
+            {
+                state.erasers[i] = Pose.Capture(erasers[i] != null ? erasers[i].transform : null);
+                state.eraserAim[i] = erasers[i] != null ? erasers[i].FxAim : 0f;
+            }
+            for (int i = 0; i < shooters.Length; i++)
+            {
+                state.projectiles[i] = Pose.Capture(shooters[i].ActiveProjectile);
+                state.cloudCharge[i] = shooters[i].ChargeProgress;
+            }
             Send(WorldMessage, NetworkManager.ServerClientId, JsonUtility.ToJson(state));
         }
     }
@@ -308,11 +319,17 @@ public sealed class StageStateSync : MonoBehaviour
         for (int i = 0; i < movers.Length; i++)
             movers[i].ApplyRemotePose(state.movers[i].position, state.movers[i].rotation);
         for (int i = 0; i < erasers.Length; i++)
+        {
             erasers[i].ApplyRemotePose(state.erasers[i].active,
                 state.erasers[i].position, state.erasers[i].rotation);
+            if (state.eraserAim != null && i < state.eraserAim.Length) erasers[i].ApplyRemoteAim(state.eraserAim[i]);
+        }
         for (int i = 0; i < shooters.Length; i++)
+        {
             shooters[i].ApplyRemoteProjectile(state.projectiles[i].active,
                 state.projectiles[i].position, state.projectiles[i].rotation);
+            if (state.cloudCharge != null && i < state.cloudCharge.Length) shooters[i].ApplyRemoteCharge(state.cloudCharge[i]);
+        }
     }
 
     public void BroadcastCinematicSkip()

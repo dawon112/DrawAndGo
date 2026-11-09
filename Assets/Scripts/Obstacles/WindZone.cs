@@ -13,6 +13,27 @@ public sealed class WindZone : MonoBehaviour
     private BoxCollider zoneCollider;
     private static readonly List<WindZone> ActiveZones = new List<WindZone>();
 
+    public DuduSurface Surface => surface;
+    public Vector2 Direction => windDirection.sqrMagnitude > 0f ? windDirection.normalized : Vector2.right;
+    public float Force => windForce;
+
+    // Is any part of this line being blown? Gives a point of it inside the zone.
+    public bool TouchesStroke(DrawingStroke stroke, out Vector3 inside)
+    {
+        inside = default;
+        if (surface == null || Mathf.Abs(Vector3.Dot(stroke.SurfaceNormal.normalized, surface.Normal.normalized)) < 0.9f)
+            return false;
+        LineRenderer line = stroke.Line;
+        int step = Mathf.Max(1, line.positionCount / 12);
+        for (int i = 0; i < line.positionCount; i += step)
+        {
+            Vector3 point = line.GetPosition(i);
+            if (Mathf.Abs(Vector3.Dot(point - surface.transform.position, surface.Normal.normalized)) > 0.35f) continue;
+            if (Contains(point)) { inside = point; return true; }
+        }
+        return false;
+    }
+
     public void Configure(DuduSurface targetSurface, Vector2 direction, float force)
     {
         surface = targetSurface;
@@ -24,6 +45,7 @@ public sealed class WindZone : MonoBehaviour
     {
         zoneCollider = GetComponent<BoxCollider>();
         ResolveSurface();
+        gameObject.AddComponent<WindZoneFx>();
     }
 
     private void OnEnable()

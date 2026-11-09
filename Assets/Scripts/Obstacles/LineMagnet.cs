@@ -30,6 +30,20 @@ public sealed class LineMagnet : MonoBehaviour
 
     public bool IsActive => isActive;
     public DuduSurface Surface => surface;
+    public float AttractionRange => attractionRange;
+    public float VerticalRangeMultiplier => verticalRangeMultiplier;
+
+    // Has this magnet got hold of something at this point? Proximity: 1 right at the magnet.
+    public bool IsPulling(DuduSurface targetSurface, Vector3 worldPoint, out float proximity)
+    {
+        proximity = 0f;
+        if (!isActive || targetSurface != surface || surface == null) return false;
+        Vector2 offset = surface.WorldToSurface(transform.position) - surface.WorldToSurface(worldPoint);
+        float distance = new Vector2(offset.x, offset.y / verticalRangeMultiplier).magnitude;
+        if (distance >= attractionRange) return false;
+        proximity = 1f - distance / attractionRange;
+        return true;
+    }
 
     public void Configure(DuduSurface targetSurface)
     {
@@ -39,6 +53,7 @@ public sealed class LineMagnet : MonoBehaviour
     private void Awake()
     {
         propertyBlock = new MaterialPropertyBlock();
+        gameObject.AddComponent<MagnetFx>();
         Transform visualRoot = transform.Find("Visual");
         if (visualRoot != null)
         {

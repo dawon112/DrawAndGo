@@ -15,6 +15,8 @@ public sealed class HotZone : MonoBehaviour
     private static readonly List<HotZone> ActiveZones = new List<HotZone>();
     private BoxCollider zoneCollider;
 
+    public DuduSurface Surface => surface;
+
     public void Configure(DuduSurface targetSurface, float duration = 2f)
     {
         surface = targetSurface;
@@ -24,6 +26,7 @@ public sealed class HotZone : MonoBehaviour
     private void Awake()
     {
         zoneCollider = GetComponent<BoxCollider>();
+        gameObject.AddComponent<HotZoneFx>();
         if (visualRenderer == null) visualRenderer = GetComponent<Renderer>();
         // Preserve authored sprite colors. The tint is only for the legacy mesh visual.
         if (visualRenderer != null && visualRenderer is not SpriteRenderer)

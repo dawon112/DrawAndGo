@@ -31,8 +31,15 @@ public sealed class HaruSurfaceAimMarker : MonoBehaviour
         SetVisible(false);
     }
 
-    public void SetAim(Vector3 hitPoint, Vector3 hitNormal, Vector3 surfaceRight, Vector3 surfaceUp, DrawingTool tool)
+    public void SetAim(Vector3 hitPoint, Vector3 hitNormal, Vector3 surfaceRight, Vector3 surfaceUp, DrawingTool tool, bool refused = false)
     {
+        if (refused)
+        {
+            // A No Draw Zone: an X on the wall instead of the cross.
+            Vector3 right = surfaceRight.normalized, up = surfaceUp.normalized;
+            surfaceRight = right + up;
+            surfaceUp = right - up;
+        }
         HasValidAim = true;
         SurfaceAimPosition = hitPoint;
         Vector3 markerPosition = hitPoint + hitNormal.normalized * markerSurfaceOffset;

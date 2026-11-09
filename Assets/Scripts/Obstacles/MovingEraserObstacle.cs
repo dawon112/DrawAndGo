@@ -30,6 +30,14 @@ public sealed class MovingEraserObstacle : MonoBehaviour
     private bool launched;
     private Vector2 eraserArtHalf, eraserArtCenter;
 
+    private float remoteAim = -1f;
+
+    public DuduSurface Surface => surface;
+    public float EraseRadius => eraseRadius;
+    // For effects: 0 idle, up to 1 while taking aim, 2 once launched.
+    public float FxAim => remoteAim >= 0f ? remoteAim : launched ? 2f : aimElapsed / Mathf.Max(0.01f, aimDuration);
+    public void ApplyRemoteAim(float aim) => remoteAim = aim;
+
     public void SetSurfaceNormalOffset(float offset)
     {
         visualOffset = offset;
@@ -48,6 +56,7 @@ public sealed class MovingEraserObstacle : MonoBehaviour
         // Rotation is driven explicitly around each surface's normal while aiming and flying.
         body.constraints = RigidbodyConstraints.None;
         eraserCollider.isTrigger = true;
+        gameObject.AddComponent<EraserFx>();
         ResolveReferencesAndPlacement();
     }
 
@@ -70,7 +79,9 @@ public sealed class MovingEraserObstacle : MonoBehaviour
             Vector2 direction = surface.WorldToSurface(target.transform.position) - surfacePosition;
             if (direction.sqrMagnitude > 0.0001f)
                 launchDirection = direction.normalized;
-            body.MoveRotation(GetDirectionRotation(launchDirection));
+            // Trembles more and more as it is about to go.
+            float tremble = Mathf.InverseLerp(0.45f, 1f, aimElapsed / aimDuration);
+            body.MoveRotation(GetDirectionRotation(launchDirection) * Quaternion.Euler(0f, 0f, Mathf.Sin(Time.time * 70f) * 8f * tremble));
             aimElapsed += Time.fixedDeltaTime;
             if (aimElapsed >= aimDuration)
                 launched = true;
@@ -81,7 +92,7 @@ public sealed class MovingEraserObstacle : MonoBehaviour
         Vector3 nextWorldPosition = SurfaceToWorld(nextSurfacePosition);
         EraseAlongMove(body.position, nextWorldPosition);
         if (TouchesDuduAlongMove(surfacePosition, nextSurfacePosition))
-            target.Die();
+            target.Die(DuduStatusFx.Hit.Eraser);
 
         body.MoveRotation(GetDirectionRotation(launchDirection));
         body.MovePosition(nextWorldPosition);

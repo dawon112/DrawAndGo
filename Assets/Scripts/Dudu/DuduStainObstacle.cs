@@ -27,6 +27,9 @@ public sealed class DuduStainObstacle : MonoBehaviour
     [Tooltip("Seconds the debuff remains active after Dudu first steps on the stain.")]
     [SerializeField, Min(0f)] private float effectDuration = 3f;
 
+    public DuduSurface Surface => surface;
+    public EffectType Effect => effectType;
+
     public void Configure(DuduSurface targetSurface, Vector2 position, EffectType type)
     {
         surface = targetSurface;
@@ -49,6 +52,7 @@ public sealed class DuduStainObstacle : MonoBehaviour
     private void Awake()
     {
         GetComponent<Collider>().isTrigger = true;
+        gameObject.AddComponent<StainFx>();
         ResolveSurface();
     }
 

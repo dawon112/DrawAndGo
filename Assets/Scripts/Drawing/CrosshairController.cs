@@ -17,6 +17,8 @@ public sealed class CrosshairController : MonoBehaviour
     private bool eraserMode;
     private bool canDrawAtAim;
     private bool cameraLock;
+    private bool refused;
+    private float punch;
 
     private void Awake()
     {
@@ -42,6 +44,39 @@ public sealed class CrosshairController : MonoBehaviour
         BuildCrosshair();
         canDrawAtAim = canDraw;
         RefreshCrosshairColor();
+    }
+
+    // Aiming into a No Draw Zone: the cross turns into an X.
+    public void SetRefused(bool value)
+    {
+        BuildCrosshair();
+        refused = value;
+        ApplyShape();
+    }
+
+    // Tried to draw there anyway: a little jolt.
+    public void Punch()
+    {
+        punch = 1f;
+        ApplyShape();
+    }
+
+    private void Update()
+    {
+        if (punch <= 0f) return;
+        punch = Mathf.MoveTowards(punch, 0f, Time.unscaledDeltaTime * 5f);
+        ApplyShape();
+    }
+
+    private void ApplyShape()
+    {
+        if (horizontalBar == null || verticalBar == null) return;
+        Quaternion turn = refused ? Quaternion.Euler(0f, 0f, 45f) : Quaternion.identity;
+        float scale = (refused ? 1.5f : 1f) * (1f + punch * 0.7f);
+        horizontalBar.rectTransform.localRotation = turn;
+        verticalBar.rectTransform.localRotation = turn;
+        horizontalBar.rectTransform.localScale = Vector3.one * scale;
+        verticalBar.rectTransform.localScale = Vector3.one * scale;
     }
 
     public void SetCameraLock(bool locked)

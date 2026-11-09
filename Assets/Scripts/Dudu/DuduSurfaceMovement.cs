@@ -78,6 +78,10 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
     public DuduSurface CurrentSurface => currentSurface;
     public bool FacingLeft => spriteRenderer != null && spriteRenderer.flipX;
     public bool IsGrounded => Time.time - lastGroundedTime < 0.1f;
+    public float HorizontalInput => horizontalInput;
+    public float ReverseTimeLeft => reverseEffectActive ? Mathf.Max(0.01f, reverseEffectUntil - Time.time) : 0f;
+    public float SlowTimeLeft => slowEffectActive ? Mathf.Max(0.01f, slowEffectUntil - Time.time) : 0f;
+    private DuduStatusFx statusFx;
 
     public void SetSurface(DuduSurface surface)
     {
@@ -130,6 +134,9 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         public float speed;
         public bool grounded;
         public Color color;
+        // Dudu's PC owns his debuffs and hits; Haru's PC shows them from these.
+        public float reverseLeft, slowLeft;
+        public int thunderHits, eraserHits, knocks;
     }
 
     public NetworkVisualState CaptureNetworkVisual()
@@ -144,6 +151,7 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
             state.speed = animator.GetFloat(SpeedId);
             state.grounded = animator.GetBool(GroundedId);
         }
+        if (statusFx != null) statusFx.WriteNetwork(ref state);
         return state;
     }
 
@@ -151,6 +159,7 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
     {
         if (GameSession.Current == null || !GameSession.Current.IsHost) return;
         if (spriteRenderer != null) spriteRenderer.color = state.color;
+        if (statusFx != null) statusFx.ReadNetwork(state);
         if (animator != null && animator.runtimeAnimatorController != null)
         {
             // Let the remote Animator perform its own transitions. Replaying the
@@ -282,6 +291,9 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         DuduMoveFeedback feedback = GetComponent<DuduMoveFeedback>();
         if (feedback == null) feedback = gameObject.AddComponent<DuduMoveFeedback>();
         feedback.Bind(spriteRenderer, animator, moveDust);
+        statusFx = GetComponent<DuduStatusFx>();
+        if (statusFx == null) statusFx = gameObject.AddComponent<DuduStatusFx>();
+        statusFx.Bind(spriteRenderer, animator);
     }
 
     private void OnDisable()
@@ -548,11 +560,12 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         InitializeSurfacePhysics();
         return true;
     }
-    public void Die()
+    public void Die(DuduStatusFx.Hit cause = DuduStatusFx.Hit.None)
     {
         if (GameSession.Current != null && GameSession.Current.IsHost) return;
         if (isRespawning || Time.time < respawnProtectedUntil)
             return;
+        if (statusFx != null) statusFx.PlayHit(cause);
         StartCoroutine(DeathAndRespawnRoutine());
     }
 
@@ -640,6 +653,20 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         Vector3 localPosition = spriteRenderer.transform.localPosition;
         localPosition.z = -FinalSurfaceVisualOffset;
         spriteRenderer.transform.localPosition = localPosition;
+    }
+
+    // Walking into something solid (a block, not a line underfoot) gives a small knock.
+    private void OnCollisionEnter(Collision collision)
+    {
+        if (statusFx == null || currentSurface == null || Mathf.Abs(horizontalInput) < 0.01f) return;
+        if (collision.collider.GetComponent<SpriteRenderer>() == null || collision.collider.GetComponent<DuduMovingObstacle>() != null) return;
+        Vector3 right = currentSurface.Right.normalized;
+        foreach (ContactPoint contact in collision.contacts)
+        {
+            if (Mathf.Abs(Vector3.Dot(contact.normal, right)) < 0.7f) continue;
+            statusFx.PlayBump(FxWall.OnWall(currentSurface, contact.point, FxWall.Depth + 0.02f), collision.collider);
+            break;
+        }
     }
 
     private void OnCollisionStay(Collision collision)

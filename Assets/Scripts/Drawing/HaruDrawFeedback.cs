@@ -102,6 +102,18 @@ public sealed class HaruDrawFeedback : MonoBehaviour
 
     public void StrokeEnded() => draw.active = false;
 
+    // Tried to draw where it isn't allowed: the tip skips, a pinch of grey dust and no line.
+    public void DrawRefused(Vector3 point, Vector3 normal)
+    {
+        Color grey = new Color(0.55f, 0.55f, 0.58f);
+        for (int i = 0; i < 5; i++)
+            EmitCrumb(point + Random.insideUnitSphere * 0.02f, normal * Random.Range(0.1f, 0.4f), grey, 0.9f);
+        Puff(point, grey, 1);
+        FxSound.Play(FxClip.Fail, point);
+        FxSound.Play(FxClip.Clack, point, 0.7f);
+        if (TryGetComponent(out HaruDrawingArm arm)) arm.Kick();
+    }
+
     // Called every frame the eraser is held on a wall; removed says it rubbed a line away.
     public void Erasing(Vector3 point, Vector3 normal, bool removed, Color color)
     {

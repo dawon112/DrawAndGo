@@ -38,6 +38,8 @@ public sealed class DuduMovingObstacle : MonoBehaviour
     private Rigidbody body;
     private float elapsedTime;
 
+    public DuduSurface Surface => surface;
+
     public void Configure(
         DuduSurface targetSurface,
         MovementAxis axis,
@@ -64,6 +66,7 @@ public sealed class DuduMovingObstacle : MonoBehaviour
     private void Awake()
     {
         body = GetComponent<Rigidbody>();
+        gameObject.AddComponent<KnockBlockFx>();
         body.useGravity = false;
         body.isKinematic = true;
         body.interpolation = RigidbodyInterpolation.Interpolate;
@@ -127,6 +130,7 @@ public sealed class DuduMovingObstacle : MonoBehaviour
             horizontalBounceSpeed,
             upwardBounceSpeed,
             bounceControlDuration);
+        if (DuduStatusFx.Instance != null) DuduStatusFx.Instance.PlayKnock(transform.position);
     }
 
     private Vector2 GetPositionAtProgress(float progress)

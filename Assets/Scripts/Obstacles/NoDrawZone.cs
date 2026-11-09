@@ -12,6 +12,29 @@ public sealed class NoDrawZone : MonoBehaviour
     private BoxCollider zoneCollider;
     private static readonly List<NoDrawZone> ActiveZones = new List<NoDrawZone>();
 
+    public DuduSurface Surface => surface;
+
+    public static bool IsInside(DuduSurface targetSurface, Vector3 worldPoint)
+    {
+        foreach (NoDrawZone zone in ActiveZones)
+            if (zone != null && zone.surface == targetSurface && zone.Contains(worldPoint))
+                return true;
+        return false;
+    }
+
+    // Haru tried to draw here: the zone answers.
+    public static void Refused(DrawingSurface drawingSurface, Vector3 worldPoint)
+    {
+        if (drawingSurface == null) return;
+        DuduSurface targetSurface = drawingSurface.GetComponent<DuduSurface>();
+        foreach (NoDrawZone zone in ActiveZones)
+            if (zone != null && zone.surface == targetSurface && zone.Contains(worldPoint))
+            {
+                if (zone.TryGetComponent(out NoDrawZoneFx fx)) fx.Refused(worldPoint);
+                return;
+            }
+    }
+
     public void Configure(DuduSurface targetSurface)
     {
         surface = targetSurface;
@@ -21,6 +44,7 @@ public sealed class NoDrawZone : MonoBehaviour
     {
         zoneCollider = GetComponent<BoxCollider>();
         ResolveSurface();
+        gameObject.AddComponent<NoDrawZoneFx>();
     }
 
     private void OnEnable()

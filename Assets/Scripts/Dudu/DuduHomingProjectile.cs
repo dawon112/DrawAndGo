@@ -120,7 +120,7 @@ public sealed class DuduHomingProjectile : MonoBehaviour
         remainingLifetime -= Time.fixedDeltaTime;
         if (remainingLifetime <= 0f || IsOutsideSurface())
         {
-            Destroy(gameObject);
+            EndWithBurst();
             return;
         }
 
@@ -142,7 +142,7 @@ public sealed class DuduHomingProjectile : MonoBehaviour
         if ((maxHorizontalReach > 0f && Mathf.Abs(travel.x) > maxHorizontalReach) ||
             (maxRange > 0f && travel.magnitude > maxRange))
         {
-            Destroy(gameObject);
+            EndWithBurst();
             return;
         }
         Vector2 nextSurfacePosition = surfacePosition + step;
@@ -151,13 +151,13 @@ public sealed class DuduHomingProjectile : MonoBehaviour
         Vector3 displacement = nextWorldPosition - body.position;
         if (TouchesDrawnLineAlongMove(displacement))
         {
-            Destroy(gameObject);
+            EndWithBurst();
             return;
         }
         if (TouchesTargetAlongMove(displacement))
         {
-            target.Die();
-            Destroy(gameObject);
+            target.Die(DuduStatusFx.Hit.Thunder);
+            EndWithBurst();
             return;
         }
 
@@ -201,7 +201,13 @@ public sealed class DuduHomingProjectile : MonoBehaviour
     private void OnTriggerEnter(Collider other)
     {
         if (other.GetComponentInParent<DrawingStroke>() != null)
-            Destroy(gameObject);
+            EndWithBurst();
+    }
+
+    private void EndWithBurst()
+    {
+        if (TryGetComponent(out BoltFx fx)) fx.Burst();
+        Destroy(gameObject);
     }
 
     private bool TouchesDrawnLineAlongMove(Vector3 displacement)

@@ -48,6 +48,7 @@ public sealed class HaruDrawingController : MonoBehaviour
     private int strokeLayer;
     private float currentCrayon;
     private HaruDrawFeedback feedback;
+    private float nextRefusal;
 
     public DrawingTool CurrentTool => currentTool;
     public System.Func<DrawingSurface, Vector3, bool> PenPointAllowed { get; set; }
@@ -116,10 +117,14 @@ public sealed class HaruDrawingController : MonoBehaviour
             !IsDrawingBlocked(aimDistance) &&
             !NoDrawZone.Blocks(surface, hitPoint) &&
             (currentTool != DrawingTool.Pen || PenPointAllowed == null || PenPointAllowed(surface, hitPoint));
+        bool refusedHere = hasSurfaceAim && NoDrawZone.Blocks(surface, hitPoint);
         if (crosshair != null)
+        {
             crosshair.SetDrawAvailability(CanDrawAtCurrentAim);
+            crosshair.SetRefused(refusedHere);
+        }
         if (hasSurfaceAim)
-            SetSurfaceAim(surface, hitPoint, hitNormal);
+            SetSurfaceAim(surface, hitPoint, hitNormal, refusedHere);
         else
             ClearSurfaceAim();
 
@@ -142,6 +147,14 @@ public sealed class HaruDrawingController : MonoBehaviour
         if (!CanDrawAtCurrentAim)
         {
             EndStroke();
+            if (refusedHere && Time.time >= nextRefusal)
+            {
+                // Held down it keeps trying, but not every frame.
+                nextRefusal = Time.time + 0.28f;
+                feedback.DrawRefused(hitPoint, hitNormal);
+                NoDrawZone.Refused(surface, hitPoint);
+                if (crosshair != null) crosshair.Punch();
+            }
             return;
         }
 
@@ -214,7 +227,7 @@ public sealed class HaruDrawingController : MonoBehaviour
         return false;
     }
 
-    private void SetSurfaceAim(DrawingSurface surface, Vector3 hitPoint, Vector3 hitNormal)
+    private void SetSurfaceAim(DrawingSurface surface, Vector3 hitPoint, Vector3 hitNormal, bool refused)
     {
         HasValidSurfaceAim = true;
         CurrentSurfaceAimPosition = hitPoint;
@@ -225,7 +238,8 @@ public sealed class HaruDrawingController : MonoBehaviour
                 hitNormal,
                 surface.transform.right,
                 surface.transform.up,
-                currentTool);
+                currentTool,
+                refused);
     }
 
     private bool IsDrawingBlocked(float surfaceDistance)
@@ -248,7 +262,10 @@ public sealed class HaruDrawingController : MonoBehaviour
         HasValidSurfaceAim = false;
         CanDrawAtCurrentAim = false;
         if (crosshair != null)
+        {
             crosshair.SetDrawAvailability(false);
+            crosshair.SetRefused(false);
+        }
         if (surfaceAimMarker != null)
             surfaceAimMarker.ClearAim();
     }

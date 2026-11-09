@@ -37,6 +37,9 @@ public sealed class HaruDrawingArm : MonoBehaviour
     private Vector2 handVelocity;
     private bool cameraRendering;
 
+    // The crayon knocked back against something it can't draw on.
+    public void Kick() => smoothedHandViewport += new Vector2(-0.012f, -0.035f);
+
     private void OnEnable()
     {
         RenderPipelineManager.beginCameraRendering += BeforeCamera;
