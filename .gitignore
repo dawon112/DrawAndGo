@@ -82,3 +82,8 @@ crashlytics-build.properties
 /TTT.zip
 /[Bb]uilds/
 *.zip
+
+# Local MCP config (Unity MCP connection)
+.mcp.json
+.claude/unity-mcp/
+.claude/settings.local.json
