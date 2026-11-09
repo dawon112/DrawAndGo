@@ -207,9 +207,9 @@ public sealed partial class TutorialSequenceController
                     stairsLeft + blockWidth * (column + 0.5f), groundSurfaceY + blockHeight * (row + 0.5f), blockWidth, blockHeight);
 
         // No floor between the stairs and the box: jump (or walk a drawn line) from the top step.
-        // The checkpoint sits on the box, so a respawn always lands on it.
+        // The checkpoint sits on the top step, so a death in the wind restarts the jump from there.
         SketchBlock(root, windWall, "Sketch_WindBox", SketchBoxX, groundSurfaceY + 0.6f, 1.2f, 1.2f);
-        SketchCheckpoint(root, windWall, SketchBoxX);
+        SketchCheckpoint(root, stairs, stairsLeft + blockWidth * 2.5f, groundSurfaceY + blockHeight * 3f + 0.5f);
 
         // Wind from the box carries Dudu over the gap onto the danger line.
         WindZone wind = Instantiate(windPrefab, root);
@@ -369,11 +369,12 @@ public sealed partial class TutorialSequenceController
     }
 
     // Later deaths respawn here instead of at the stage start.
-    private void SketchCheckpoint(Transform root, DuduSurface target, float x)
+    private void SketchCheckpoint(Transform root, DuduSurface target, float x, float y = float.NaN)
     {
+        if (float.IsNaN(y)) y = groundSurfaceY + 1f;
         GameObject checkpoint = new GameObject("Sketch_Checkpoint", typeof(BoxCollider));
         checkpoint.transform.SetParent(root, false);
-        checkpoint.transform.SetPositionAndRotation(target.SurfaceToWorld(new Vector2(x, groundSurfaceY + 1f)), target.transform.rotation);
+        checkpoint.transform.SetPositionAndRotation(target.SurfaceToWorld(new Vector2(x, y)), target.transform.rotation);
         checkpoint.GetComponent<BoxCollider>().size = new Vector3(0.6f, 2f, 3f);
         checkpoint.AddComponent<DuduCheckpoint>();
     }

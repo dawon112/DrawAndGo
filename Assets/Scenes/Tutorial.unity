@@ -5780,6 +5780,7 @@ Transform:
   - {fileID: 30422085}
   - {fileID: 1677381797}
   - {fileID: 1717620371}
+  - {fileID: 2001868364}
   m_Father: {fileID: 557916611}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &660120887
@@ -7375,7 +7376,6 @@ MonoBehaviour:
   duduMovement: {fileID: 2047065434}
   haruDrawing: {fileID: 3000000003}
   crosshair: {fileID: 3000000002}
-  splitScreenDuration: 4
 --- !u!4 &911315875
 Transform:
   m_ObjectHideFlags: 0
@@ -15019,7 +15019,6 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 127817435}
-  - {fileID: 2001868364}
   - {fileID: 143476912}
   - {fileID: 1234790659}
   - {fileID: 1929222406}
@@ -16175,12 +16174,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2001868363}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: 1, z: -0, w: 0}
-  m_LocalPosition: {x: 6.1, y: 1.6700001, z: 5.06}
+  m_LocalRotation: {x: -0, y: 0.7071068, z: -0, w: 0.7071067}
+  m_LocalPosition: {x: 9.87, y: 3.3992856, z: 6.850005}
   m_LocalScale: {x: 0.60000014, y: 2, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1769577494}
+  m_Father: {fileID: 653299970}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &2001868365
 MonoBehaviour:

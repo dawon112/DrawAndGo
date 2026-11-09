@@ -30,6 +30,17 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
     private bool drawStarted, crossed, successDialogue, built;
     private DrawingStroke validBridge;
     private GameObject highlight, startTrigger, successTrigger, instructionPanel, dialoguePanel;
+    // Invisible walls that split the course into one zone per step: each opens only once
+    // the step before it is done, so Dudu can never reach a step early, and closes again
+    // behind him once he is through, so he cannot walk back into a finished step.
+    private sealed class ZoneGate
+    {
+        public GameObject Wall;
+        public DuduSurface Surface;
+        public float X;
+        public bool Locked;
+    }
+    private ZoneGate moveGate, drawGate, eraseGate;
     private RectTransform haruViewport;
     private Camera duduCamera;
     private TutorialHintUI instruction;
@@ -65,6 +76,11 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
     private void Update()
     {
         if (!built) return;
+        // Both host and client open the gates from the (synced) step, so Dudu is blocked on
+        // whichever machine simulates him.
+        UpdateGate(moveGate, CurrentStep >= TutorialStep.Tutorial_02_Draw);
+        UpdateGate(drawGate, CurrentStep >= TutorialStep.Tutorial_03_Erase);
+        UpdateGate(eraseGate, CurrentStep >= TutorialStep.Tutorial_04_Obstacle);
         if (!IsAuthority)
         {
             UpdateTutorialClient();
@@ -98,7 +114,10 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
             nextBridgeCheck = Time.time + 0.15f;
             ValidateBridge();
         }
-        if (drawStarted && crossed && HasWalkedOnBridge && HasValidBridge && !dialoguePanel.activeSelf && !successDialogue)
+        // The first gap cannot be crossed without a drawn line, so Dudu standing past it also
+        // proves the bridge; otherwise a missed contact check would leave him stuck at the gate.
+        if (drawStarted && (crossed && HasWalkedOnBridge && HasValidBridge || DuduPastFirstGap()) &&
+            !dialoguePanel.activeSelf && !successDialogue)
         {
             successDialogue = true;
             instructionPanel.SetActive(false);
@@ -368,8 +387,17 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
             surface.SurfaceToWorld(new Vector2(gapRight + 0.3f, groundSurfaceY + 0.35f)) + surface.Normal * 0.06f,
             surface.SurfaceToWorld(new Vector2(gapLeft - 0.3f, groundSurfaceY + 0.35f)) + surface.Normal * 0.06f });
         highlight.SetActive(false);
+        // Zone 1 (move) ends just before the draw start trigger; zone 2 (draw) ends past the
+        // first gap, before the erase start trigger. Later zones are already closed off by the
+        // erasable blocking line, the gaps, and the star-gated door.
+        moveGate = BuildGate(root, "Gate_MoveZone", surface, gapLeft - 1.8f);
+        drawGate = BuildGate(root, "Gate_DrawZone", surface, gapRight + 2.2f);
         BuildEraseCourse(root, triggers);
         BuildLateCourse(root, triggers);
+        // The erase gap ends right at the first wall's edge, so the gate that closes the erase
+        // zone behind Dudu stands at the start of the next wall, on the floor before the stairs.
+        if (lateSections != null && lateSections.Length > 1 && lateSections[1] != null)
+            eraseGate = BuildGate(root, "Gate_EraseZone", lateSections[1], -lateSections[1].Width * 0.5f + 0.6f);
     }
 
     private void BuildGround(Transform root, string objectName, float from, float to)
@@ -389,6 +417,67 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
             CrayonRouteLine.AddTo(ground, crayon.Material);
         else if (originalStartLine.TryGetComponent(out Renderer look))
             ground.GetComponent<Renderer>().sharedMaterial = look.sharedMaterial;
+    }
+
+    private ZoneGate BuildGate(Transform root, string objectName, DuduSurface on, float x)
+    {
+        // A gate behind Dudu's spawn would shut him out of the course instead of in, and
+        // one past the wall's end would stand where Dudu has already moved to the next wall.
+        float duduX = on == surface ? surface.WorldToSurface(dudu.transform.position).x : float.NegativeInfinity;
+        if (duduX > x - 0.5f || Mathf.Abs(x) > on.Width * 0.5f - 0.3f)
+        {
+            Debug.LogWarning($"Tutorial: {objectName} at {on.name} x={x:F2} does not fit (Dudu x={duduX:F2}, " +
+                $"wall half width {on.Width * 0.5f:F2}), so it is skipped.", this);
+            return null;
+        }
+        GameObject wall = new GameObject(objectName, typeof(BoxCollider));
+        // Off the drawing raycasts, so Haru can still draw across where the gate stands.
+        wall.layer = LayerMask.NameToLayer("Ignore Raycast");
+        wall.transform.SetParent(root, false);
+        wall.transform.SetPositionAndRotation(on.SurfaceToWorld(new Vector2(x, groundSurfaceY + 3f)), on.transform.rotation);
+        wall.GetComponent<BoxCollider>().size = new Vector3(0.2f, 6f, 0.6f);
+        IgnoreHaru(wall);
+        return new ZoneGate { Wall = wall, Surface = on, X = x };
+    }
+
+    // Only Dudu is held back; Haru walks the 3D room in front of the wall. Deactivating a
+    // collider drops its IgnoreCollision pairs, so this runs again each time a gate closes.
+    private void IgnoreHaru(GameObject wall)
+    {
+        Collider box = wall.GetComponent<Collider>();
+        foreach (Collider haruCollider in haru.GetComponentsInChildren<Collider>())
+            Physics.IgnoreCollision(box, haruCollider, true);
+    }
+
+    // Closed until its step is done, open while Dudu walks through, then closed for good
+    // behind him. Locking also moves his respawn point into the new zone, since dying
+    // would otherwise send him back to the start, behind the locked gates.
+    private void UpdateGate(ZoneGate gate, bool stepDone)
+    {
+        if (gate == null || gate.Locked || !stepDone) return;
+        if (gate.Wall.activeSelf) gate.Wall.SetActive(false);
+        if (!DuduPast(gate)) return;
+        gate.Wall.SetActive(true);
+        IgnoreHaru(gate.Wall);
+        gate.Locked = true;
+        dudu.SetCheckpoint();
+    }
+
+    // Dudu is a metre past the gate on its wall, or already on a later wall of the course.
+    private bool DuduPast(ZoneGate gate)
+    {
+        DuduSurface here = dudu.CurrentSurface;
+        if (here == null) return false;
+        if (here == gate.Surface) return here.WorldToSurface(dudu.transform.position).x > gate.X + 1f;
+        if (here == surface) return false;
+        return CurrentStep >= TutorialStep.Tutorial_04_Obstacle;
+    }
+
+    private bool DuduPastFirstGap()
+    {
+        if (CurrentStep != TutorialStep.Tutorial_02_Draw || dudu.CurrentSurface != surface) return false;
+        Vector2 p = surface.WorldToSurface(dudu.transform.position);
+        return p.x >= gapRight + 0.3f && p.x < eraseGapLeft - 0.5f && p.y >= groundSurfaceY;
     }
 
     private GameObject BuildTrigger(Transform root, string objectName, float x, bool isExit)
