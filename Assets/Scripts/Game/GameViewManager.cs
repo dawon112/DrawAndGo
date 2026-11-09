@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 public sealed class GameViewManager : MonoBehaviour
 {
-    public enum CameraState { Gameplay, IntroCinematic, SplitScreen, ClearCinematic }
+    public enum CameraState { Gameplay, IntroCinematic, ClearCinematic }
     [SerializeField] private bool developmentViewSwitch = true;
     [SerializeField] private Camera haruCamera;
     [SerializeField] private Player3DMovement haruMovement;
@@ -14,11 +14,9 @@ public sealed class GameViewManager : MonoBehaviour
     [SerializeField] private DuduSurfaceMovement duduMovement;
     [SerializeField] private HaruDrawingController haruDrawing;
     [SerializeField] private CrosshairController crosshair;
-    [SerializeField, Min(0.1f)] private float splitScreenDuration = 4f;
 
     private bool duduMode;
-    private bool splitSequencePlayed;
-    private bool splitSequenceActive;
+    private bool clearStarted;
     private Canvas exitInstructionCanvas;
     private StageCinematicController stageCinematic;
     private TutorialRoomLevel tutorialClearLevel;
@@ -96,23 +94,23 @@ public sealed class GameViewManager : MonoBehaviour
             return;
 
         Keyboard keyboard = Keyboard.current;
-        if (!splitSequenceActive && developmentViewSwitch && keyboard != null && keyboard.tabKey.wasPressedThisFrame)
+        if (developmentViewSwitch && keyboard != null && keyboard.tabKey.wasPressedThisFrame)
             SetDuduMode(!duduMode);
     }
 
     public void PlayAllCoinsCollectedSequence()
     {
-        if (splitSequencePlayed) return;
-        splitSequencePlayed = true;
-        StartCoroutine(PlaySplitScreenSequence());
+        if (clearStarted) return;
+        clearStarted = true;
+        StartCoroutine(StartClearSequence());
     }
 
     public void PlayAllStarsCollectedSequence(TutorialRoomLevel level)
     {
-        if (splitSequencePlayed || level == null) return;
+        if (clearStarted || level == null) return;
         tutorialClearLevel = level;
-        splitSequencePlayed = true;
-        StartCoroutine(PlaySplitScreenSequence());
+        clearStarted = true;
+        StartCoroutine(StartClearSequence());
     }
 
     public void HideExitInstruction()
@@ -120,47 +118,13 @@ public sealed class GameViewManager : MonoBehaviour
         if (exitInstructionCanvas != null) exitInstructionCanvas.enabled = false;
     }
 
-    private IEnumerator PlaySplitScreenSequence()
+    // The game has decided the stage is clear: each screen plays the clear sequence full-screen.
+    private IEnumerator StartClearSequence()
     {
         while (CurrentCameraState == CameraState.IntroCinematic) yield return null;
-        CurrentCameraState = CameraState.SplitScreen;
-        splitSequenceActive = true;
-        bool restoreDuduMode = duduMode;
-        Rect haruRect = haruCamera.rect;
-        Rect duduRect = duduCamera.rect;
-        AudioListener duduListener = duduCamera.GetComponent<AudioListener>();
-        bool duduListenerEnabled = duduListener != null && duduListener.enabled;
-
-        haruCamera.gameObject.SetActive(true);
-        duduCamera.gameObject.SetActive(true);
-        haruCamera.rect = new Rect(0.5f, 0f, 0.5f, 1f);
-        duduCamera.rect = new Rect(0f, 0f, 0.5f, 1f);
-        if (duduListener != null) duduListener.enabled = false;
-        if (haruDrawing != null) haruDrawing.enabled = false;
-        if (haruMovement != null) haruMovement.enabled = false;
-        if (haruLook != null) haruLook.enabled = false;
-        if (duduMovement != null) duduMovement.SetInputEnabled(false);
-        if (crosshair != null)
-        {
-            crosshair.SetVisible(true);
-            crosshair.SetSplitScreenLayout(true);
-        }
-        yield return new WaitForSecondsRealtime(splitScreenDuration);
-
-        haruCamera.rect = haruRect;
-        duduCamera.rect = duduRect;
-        if (duduListener != null) duduListener.enabled = duduListenerEnabled;
-        if (crosshair != null) crosshair.SetSplitScreenLayout(false);
-        splitSequenceActive = false;
-        SetDuduMode(GameSession.Current != null && !GameSession.Current.IsHost);
         CornerRoomLevel level = FindAnyObjectByType<CornerRoomLevel>();
         if (tutorialClearLevel != null) stageCinematic.PlayTutorialDoorOpen(tutorialClearLevel);
         else if (level != null) stageCinematic.PlayClear(level);
-        else
-        {
-            CurrentCameraState = CameraState.Gameplay;
-            SetDuduMode(restoreDuduMode);
-        }
     }
 
     public void EnterCinematic(CameraState state)
@@ -181,18 +145,6 @@ public sealed class GameViewManager : MonoBehaviour
     {
         CurrentCameraState = CameraState.Gameplay;
         SetDuduMode(GameSession.Current != null && !GameSession.Current.IsHost);
-    }
-
-    public void FinishTutorialDoorSequence()
-    {
-        CurrentCameraState = CameraState.Gameplay;
-        SetDuduMode(false);
-    }
-
-    public void ShowHaruCameraWithoutInput()
-    {
-        if (duduCamera != null) duduCamera.gameObject.SetActive(false);
-        if (haruCamera != null) haruCamera.gameObject.SetActive(true);
     }
 
     private void BuildExitInstruction()

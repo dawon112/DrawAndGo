@@ -12,7 +12,7 @@ public sealed class StageSequence : ScriptableObject
     public string tutorialScene = "Tutorial";
     public string titleScene = "TitleScene";
     [Tooltip("Pause on the faded clear screen before the next stage loads.")]
-    [Min(0f)] public float nextStageDelay = 1f;
+    [Min(0f)] public float nextStageDelay = 0.3f;
 
     private static StageSequence cached;
 

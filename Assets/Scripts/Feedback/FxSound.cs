@@ -6,7 +6,7 @@ public enum FxClip
 {
     Charge, BoltLoop, Crack, Pop, Tok, Thud, Pulse, Knock, Whoosh, WindLoop, Gust, SizzleLoop,
     Crumble, Fail, Clack, Reverse, DizzyLoop, ReleasePuff, Boom, SlowLoop, Disperse,
-    MagnetLoop, Snap, Rumble, Swish, Rub, StarPick, Chime
+    MagnetLoop, Snap, Rumble, Swish, Rub, StarPick, Chime, DoorHum, Absorb
 }
 
 // Hazard sounds. They are synthesised placeholders: to replace one, put a recorded clip named
@@ -139,6 +139,10 @@ public static class FxSound
                     float note = t < 0.13f ? 784f : t < 0.26f ? 988f : t < 0.39f ? 1175f : 1568f;
                     return (Tone(note) + Tone2(note * 2f) * 0.2f) * Mathf.Exp(-3.6f * Mathf.Max(0f, t - 0.39f));
                 });
+            case FxClip.DoorHum:
+                return Bake(id, 1.1f, false, t => (Tone(Mathf.Lerp(62f, 74f, t / 1.1f)) + Tone2(Mathf.Lerp(186f, 222f, t / 1.1f)) * 0.3f + Dull(0.03f) * 0.5f) * Mathf.Sin(Mathf.PI * Mathf.Pow(t / 1.1f, 0.6f)));
+            case FxClip.Absorb:
+                return Bake(id, 0.9f, false, t => (Dull(Mathf.Lerp(0.02f, 0.3f, t / 0.9f)) + Tone(Mathf.Lerp(150f, 50f, t / 0.9f)) * 0.3f) * Mathf.Pow(Mathf.Sin(Mathf.PI * Mathf.Pow(t / 0.9f, 1.5f)), 1.5f));
             case FxClip.Rumble:
                 return Bake(id, 0.7f, false, t => Dull(0.12f) * (0.55f + 0.45f * Mathf.Sin(t * 170f + Mathf.Sin(t * 41f) * 3f)) * Mathf.Sin(Mathf.PI * t / 0.7f));
             default:

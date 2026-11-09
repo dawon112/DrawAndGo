@@ -36,6 +36,17 @@ public sealed class StageFlow : MonoBehaviour
     private GameObject panel;
     private GameObject resultPanel;
     private Text panelText;
+    private GameViewManager view;
+
+    // Not during intros and clears.
+    private bool InPlay
+    {
+        get
+        {
+            if (view == null) view = FindAnyObjectByType<GameViewManager>();
+            return view == null || view.CurrentCameraState == GameViewManager.CameraState.Gameplay;
+        }
+    }
 
     private bool IsNetworked => GameSession.Current != null && manager != null && manager.IsConnectedClient;
     private bool IsAuthority => GameSession.Current == null || GameSession.Current.IsHost;
@@ -197,7 +208,7 @@ public sealed class StageFlow : MonoBehaviour
                 SetLocalVote((VoteKind)i, false);
 
         Keyboard keyboard = Keyboard.current;
-        if (keyboard != null && InStage && !loading && !SettingsPopupController.IsAnyOpen)
+        if (keyboard != null && InStage && !loading && InPlay && !SettingsPopupController.IsAnyOpen)
         {
             if (InTutorial && keyboard[SkipTutorialKey].wasPressedThisFrame)
                 SetLocalVote(VoteKind.SkipTutorial, !localVotes[(int)VoteKind.SkipTutorial]);
@@ -346,7 +357,7 @@ public sealed class StageFlow : MonoBehaviour
 
     private void RefreshUi()
     {
-        bool visible = InStage && !loading;
+        bool visible = InStage && !loading && InPlay;
         if (panel.activeSelf != visible) panel.SetActive(visible);
         if (!visible) return;
         // One short line; a vote in progress takes a line of its own while it lasts.

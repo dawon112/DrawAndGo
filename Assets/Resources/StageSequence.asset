@@ -17,4 +17,4 @@ MonoBehaviour:
   - Player3DScene
   tutorialScene: Tutorial
   titleScene: TitleScene
-  nextStageDelay: 1
+  nextStageDelay: 0.3

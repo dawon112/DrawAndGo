@@ -33,6 +33,8 @@ public sealed class GameHud : MonoBehaviour
     private static readonly Color StarYellow = new Color(1f, 0.82f, 0.2f);
 
     private Canvas canvas;
+    private CanvasGroup hudGroup;
+    private float clearAge;
     private RectTransform canvasRect;
     private GameViewManager view;
     private TutorialRoomLevel room;
@@ -97,6 +99,9 @@ public sealed class GameHud : MonoBehaviour
     {
         canvas = GetComponent<Canvas>();
         canvasRect = (RectTransform)transform;
+        hudGroup = gameObject.AddComponent<CanvasGroup>();
+        hudGroup.blocksRaycasts = false;
+        hudGroup.interactable = false;
         flyingStar.gameObject.SetActive(false);
         plusOne.gameObject.SetActive(false);
         plusRest = plusOne.rectTransform.anchoredPosition;
@@ -108,7 +113,12 @@ public sealed class GameHud : MonoBehaviour
     {
         if (view == null) view = FindAnyObjectByType<GameViewManager>();
         bool inPlay = view == null || view.CurrentCameraState == GameViewManager.CameraState.Gameplay;
-        if (canvas.enabled != inPlay) canvas.enabled = inPlay;
+        // A clear: stars and time stay for a moment, then step aside for the sequence.
+        bool clearing = view != null && view.CurrentCameraState == GameViewManager.CameraState.ClearCinematic;
+        clearAge = clearing ? clearAge + Time.unscaledDeltaTime : 0f;
+        hudGroup.alpha = inPlay ? 1f : clearing ? 1f - Mathf.InverseLerp(0.3f, 0.55f, clearAge) : 0f;
+        bool showing = hudGroup.alpha > 0f;
+        if (canvas.enabled != showing) canvas.enabled = showing;
 
         UpdateTimer();
         UpdateStars(inPlay);

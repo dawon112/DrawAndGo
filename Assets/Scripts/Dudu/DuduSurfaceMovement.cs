@@ -174,6 +174,29 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         }
     }
 
+    public SpriteRenderer Visual => spriteRenderer;
+
+    // The clear sequence walks Dudu from here on; nothing can hurt or move him any more.
+    public void BeginCinematicWalk()
+    {
+        respawnProtectedUntil = float.PositiveInfinity;
+        SetInputEnabled(false);
+        if (body != null && !body.isKinematic)
+        {
+            body.linearVelocity = Vector3.zero;
+            body.isKinematic = true;
+        }
+        enabled = false;
+    }
+
+    public void SetCinematicWalking(bool walking, bool faceLeft)
+    {
+        if (spriteRenderer != null) spriteRenderer.flipX = faceLeft;
+        if (animator == null || animator.runtimeAnimatorController == null) return;
+        animator.SetFloat(SpeedId, walking ? 1f : 0f);
+        animator.SetBool(GroundedId, true);
+    }
+
     public void SetRemoteControlled()
     {
         SetInputEnabled(false);

@@ -37,6 +37,10 @@ public sealed class HaruDrawingArm : MonoBehaviour
     private Vector2 handVelocity;
     private bool cameraRendering;
 
+    // Set during the clear sequence: the hand sinks out of the shot.
+    public bool Lowered { get; set; }
+    private float lowering;
+
     // The crayon knocked back against something it can't draw on.
     public void Kick() => smoothedHandViewport += new Vector2(-0.012f, -0.035f);
 
@@ -248,9 +252,11 @@ public sealed class HaruDrawingArm : MonoBehaviour
         Vector2 desiredViewport = restHand + new Vector2(writingMotion, -writingMotion * 0.5f);
         smoothedHandViewport = Vector2.SmoothDamp(smoothedHandViewport, desiredViewport, ref handVelocity, 0.075f);
 
-        float slideDown = Mathf.Lerp(0.24f, 0f, visibility);
+        lowering = Mathf.MoveTowards(lowering, Lowered ? 1f : 0f, Time.unscaledDeltaTime * 3.6f);
+        float sink = lowering * lowering * 0.9f;
+        float slideDown = Mathf.Lerp(0.24f, 0f, visibility) + sink;
         Vector3 shoulderTarget = ViewportPoint(restShoulder + Vector2.down * slideDown, 0.64f);
-        Vector3 handTarget = ViewportPoint(smoothedHandViewport + Vector2.down * slideDown * 0.35f, 0.72f);
+        Vector3 handTarget = ViewportPoint(smoothedHandViewport + Vector2.down * (slideDown * 0.35f + sink * 0.65f), 0.72f);
         upperArm.localRotation = upperRest;
         forearm.localRotation = forearmRest;
         hand.localRotation = handRest;

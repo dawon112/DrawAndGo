@@ -27,6 +27,9 @@ public sealed class DuduCameraController : MonoBehaviour
 
     private readonly List<VisualProxy> visualProxies = new List<VisualProxy>();
     private readonly HashSet<Renderer> proxiedSources = new HashSet<Renderer>();
+    private bool cinematicFraming;
+    private Vector2 cinematicCenter;
+    private float cinematicSize;
     private Vector3 shakeApplied;
     private float shakeAmount, shakeUntil, shakeLength, rollAmount, rollUntil, rollLength;
 
@@ -72,6 +75,18 @@ public sealed class DuduCameraController : MonoBehaviour
         if (index < 0) return world;
         Vector2 local = surface.WorldToSurface(world);
         return new Vector3(surfaceCenters[index] + local.x, local.y, 0f);
+    }
+
+    // Where to put things that only this view shows (they use its layer and view coordinates).
+    public Transform ViewRoot => proxyRoot;
+
+    // Takes the camera from following Dudu, for a cinematic. Stage scenes end after those,
+    // so there is nothing to hand back.
+    public void SetCinematicFraming(Vector2 center, float size)
+    {
+        cinematicFraming = true;
+        cinematicCenter = center;
+        cinematicSize = size;
     }
 
     public bool TryGetHaruCursorView(out Vector3 position)
@@ -168,6 +183,13 @@ public sealed class DuduCameraController : MonoBehaviour
         if (Time.unscaledTime >= nextProxyRefresh) RefreshVisualProxies();
         UpdateVisualProxies();
         UpdateHaruCursor();
+
+        if (cinematicFraming)
+        {
+            cameraComponent.orthographicSize = cinematicSize;
+            transform.SetPositionAndRotation(new Vector3(cinematicCenter.x, cinematicCenter.y, -cameraDistance), Quaternion.identity);
+            return;
+        }
 
         float targetX = GetUnwrappedX(targetDudu.position, targetSurface) + horizontalOffset;
         float viewHalfWidth = orthographicSize * cameraComponent.aspect;

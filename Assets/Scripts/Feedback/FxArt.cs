@@ -4,7 +4,7 @@ using UnityEngine;
 public enum FxShape
 {
     Soft, Crumb, Streak, Spark, Ring, Chevron, Arrow, Bolt, Target, Swirl,
-    SlowFoot, Cross, Lock, Exclaim, Heat, Magnet, Disc, Star
+    SlowFoot, Cross, Lock, Exclaim, Heat, Magnet, Disc, Star, Door, DoorFrame, Box
 }
 
 // Small crayon-looking pictures for hazard feedback, drawn in code so no scene or prefab
@@ -110,6 +110,17 @@ public static class FxArt
         switch (shape)
         {
             case FxShape.Soft: c.SoftBlob(0.48f); break;
+            case FxShape.Box: c.Box(0f, 0f, 1f, 1f); break;
+            case FxShape.Door:
+                c.Box(0.24f, 0.02f, 0.76f, 0.7f);
+                c.Disc(0.5f, 0.7f, 0.26f);
+                break;
+            case FxShape.DoorFrame:
+                c.Line(0.23f, 0.02f, 0.23f, 0.7f, 0.022f);
+                c.Line(0.77f, 0.02f, 0.77f, 0.7f, 0.022f);
+                c.Arc(0.5f, 0.7f, 0.27f, 0f, 180f, 0.022f);
+                c.Line(0.17f, 0.02f, 0.83f, 0.02f, 0.016f);
+                break;
             case FxShape.Star:
                 for (int i = 0; i < 5; i++)
                 {
@@ -191,7 +202,8 @@ public static class FxArt
                 c.Line(0.77f, 0.56f, 0.77f, 0.88f, 0.1f);
                 break;
         }
-        return c.Bake(shape.ToString());
+        // Solid areas stay solid: wax grain on them would show through as speckles.
+        return c.Bake(shape.ToString(), shape != FxShape.Box && shape != FxShape.Door);
     }
 
     // Procedural pattern for one No Draw zone, sized to it: pencil hatching and a dashed edge.
@@ -336,14 +348,14 @@ public static class FxArt
             }
         }
 
-        public Sprite Bake(string name)
+        public Sprite Bake(string name, bool waxGrain)
         {
             Color32[] pixels = new Color32[n * n];
             for (int y = 0; y < n; y++)
             for (int x = 0; x < n; x++)
             {
                 // Waxy grain: every shape looks rubbed on with a crayon.
-                float grain = 0.8f + 0.2f * Mathf.PerlinNoise(x * 0.45f + seed, y * 0.45f);
+                float grain = waxGrain ? 0.8f + 0.2f * Mathf.PerlinNoise(x * 0.45f + seed, y * 0.45f) : 1f;
                 pixels[y * n + x] = new Color32(255, 255, 255, (byte)(Mathf.Clamp01(alpha[y * n + x] * grain) * 255f));
             }
             Texture2D texture = new Texture2D(n, n, TextureFormat.RGBA32, false)
