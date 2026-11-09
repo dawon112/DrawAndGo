@@ -4,7 +4,7 @@ using UnityEngine;
 public enum FxShape
 {
     Soft, Crumb, Streak, Spark, Ring, Chevron, Arrow, Bolt, Target, Swirl,
-    SlowFoot, Cross, Lock, Exclaim, Heat, Magnet, Disc
+    SlowFoot, Cross, Lock, Exclaim, Heat, Magnet, Disc, Star
 }
 
 // Small crayon-looking pictures for hazard feedback, drawn in code so no scene or prefab
@@ -110,6 +110,15 @@ public static class FxArt
         switch (shape)
         {
             case FxShape.Soft: c.SoftBlob(0.48f); break;
+            case FxShape.Star:
+                for (int i = 0; i < 5; i++)
+                {
+                    float a = Mathf.PI * 0.5f + i * Mathf.PI * 2f / 5f;
+                    c.Tapered(0.5f, 0.5f, 0.5f + Mathf.Cos(a) * 0.46f, 0.5f + Mathf.Sin(a) * 0.46f, 0.001f);
+                    c.Wedge(0.5f, 0.5f, a, 0.46f, 0.17f);
+                }
+                c.Disc(0.5f, 0.5f, 0.17f);
+                break;
             case FxShape.Crumb: c.Crumb(); break;
             case FxShape.Disc: c.Disc(0.5f, 0.5f, 0.46f); break;
             case FxShape.Streak: c.Tapered(0.04f, 0.5f, 0.96f, 0.5f, 0.05f); break;
@@ -281,6 +290,17 @@ public static class FxArt
                 float t = i / (float)steps;
                 float a = t * turns * Mathf.PI * 2f, radius = Mathf.Lerp(from, to, t);
                 Disc(cx + Mathf.Cos(a) * radius, cy + Mathf.Sin(a) * radius, r);
+            }
+        }
+
+        // A point of a star: wide at the centre, sharp at its tip.
+        public void Wedge(float cx, float cy, float angle, float length, float width)
+        {
+            const int Steps = 90;
+            for (int i = 0; i <= Steps; i++)
+            {
+                float t = i / (float)Steps;
+                Disc(cx + Mathf.Cos(angle) * length * t, cy + Mathf.Sin(angle) * length * t, width * (1f - t) * 0.72f + 0.005f);
             }
         }
 

@@ -32,6 +32,7 @@ public sealed class StageFlow : MonoBehaviour
     private readonly float[] localVoteTime = new float[VoteCount];
     private bool loading;
     private float runStartTime = -1f;
+    private float runEndTime = -1f;
     private GameObject panel;
     private GameObject resultPanel;
     private Text panelText;
@@ -41,6 +42,10 @@ public sealed class StageFlow : MonoBehaviour
     private string ActiveScene => SceneManager.GetActiveScene().name;
     private bool InStage => sequence.IsStage(ActiveScene);
     private bool InTutorial => ActiveScene == sequence.tutorialScene;
+
+    // How long this run has been going: from the first stage (the tutorial counts) until the
+    // last stage is cleared. The HUD shows this and the final result reports it.
+    public float PlaySeconds => runStartTime < 0f ? 0f : (runEndTime >= 0f ? runEndTime : Time.unscaledTime) - runStartTime;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Initialize()
@@ -75,7 +80,7 @@ public sealed class StageFlow : MonoBehaviour
         ClearVotes();
         if (resultPanel != null) Destroy(resultPanel);
         // Play time runs from the first stage until the players are back at the title.
-        if (!sequence.IsStage(scene.name)) runStartTime = -1f;
+        if (!sequence.IsStage(scene.name)) runStartTime = runEndTime = -1f;
         else if (runStartTime < 0f) runStartTime = Time.unscaledTime;
     }
 
@@ -125,8 +130,8 @@ public sealed class StageFlow : MonoBehaviour
         loading = true;
         ClearVotes();
         if (GameSession.Current != null) GameSession.Current.ExpectEnd();
-        float seconds = runStartTime >= 0f ? Time.unscaledTime - runStartTime : 0f;
-        int total = (int)seconds;
+        runEndTime = Time.unscaledTime;
+        int total = Mathf.FloorToInt(PlaySeconds);
         string message = "모든 스테이지 클리어!\n\n" +
             $"<size=40>함께한 시간  {total / 60:00}:{total % 60:00}</size>\n" +
             "<size=30>잠시 후 처음 화면으로 돌아갑니다</size>";
@@ -315,10 +320,12 @@ public sealed class StageFlow : MonoBehaviour
         RectTransform rect = panel.GetComponent<RectTransform>();
         rect.SetParent(transform, false);
         rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(1f, 0f);
-        rect.anchoredPosition = new Vector2(-24f, 24f);
-        rect.sizeDelta = new Vector2(470f, 86f);
+        rect.anchoredPosition = new Vector2(-20f, 20f);
+        rect.sizeDelta = new Vector2(300f, 44f);
         Image background = panel.GetComponent<Image>();
-        background.color = new Color(0.055f, 0.08f, 0.12f, 0.6f);
+        background.sprite = Resources.Load<Sprite>("UI/Hud/panel_dark");
+        background.type = Image.Type.Sliced;
+        background.color = new Color(1f, 1f, 1f, 0.7f);
         background.raycastTarget = false;
 
         GameObject label = new GameObject("Vote Text", typeof(RectTransform), typeof(Text), typeof(Outline));
@@ -326,13 +333,13 @@ public sealed class StageFlow : MonoBehaviour
         labelRect.SetParent(rect, false);
         labelRect.anchorMin = Vector2.zero;
         labelRect.anchorMax = Vector2.one;
-        labelRect.offsetMin = new Vector2(16f, 6f);
-        labelRect.offsetMax = new Vector2(-16f, -6f);
+        labelRect.offsetMin = new Vector2(14f, 2f);
+        labelRect.offsetMax = new Vector2(-14f, -2f);
         panelText = label.GetComponent<Text>();
         panelText.font = GameFont.Bold;
-        panelText.fontSize = 22;
-        panelText.alignment = TextAnchor.MiddleLeft;
-        panelText.color = Color.white;
+        panelText.fontSize = 20;
+        panelText.alignment = TextAnchor.MiddleRight;
+        panelText.color = new Color(1f, 0.96f, 0.86f);
         panelText.supportRichText = true;
         panelText.raycastTarget = false;
     }
@@ -342,10 +349,16 @@ public sealed class StageFlow : MonoBehaviour
         bool visible = InStage && !loading;
         if (panel.activeSelf != visible) panel.SetActive(visible);
         if (!visible) return;
-        string text = InTutorial ? VoteLine("K", "튜토리얼 건너뛰기", VoteKind.SkipTutorial) + "\n" : string.Empty;
-        text += VoteLine("R", "처음부터 다시", VoteKind.RestartStage);
+        // One short line; a vote in progress takes a line of its own while it lasts.
+        string skip = InTutorial ? VoteLine("K", "건너뛰기", VoteKind.SkipTutorial) : null;
+        string restart = VoteLine("R", "다시", VoteKind.RestartStage);
+        bool voting = IsNetworked && (localVotes[0] || localVotes[1] || remoteVotes[0] || remoteVotes[1]);
+        string text = skip == null ? restart : skip + (voting ? "\n" : "    ") + restart;
+        if (panelText.text == text) return;
         panelText.text = text;
-        panel.GetComponent<RectTransform>().sizeDelta = new Vector2(470f, InTutorial ? 86f : 50f);
+        int lines = voting && skip != null ? 2 : 1;
+        panel.GetComponent<RectTransform>().sizeDelta = new Vector2(
+            Mathf.Max(120f, panelText.preferredWidth + 36f), lines == 2 ? 70f : 44f);
     }
 
     private string VoteLine(string key, string label, VoteKind kind)
@@ -354,7 +367,6 @@ public sealed class StageFlow : MonoBehaviour
         if (!IsNetworked) return $"[{key}] {label}";
         bool theirs = remoteVotes[(int)kind];
         if (theirs && !mine) return $"<color=#FFD54A>[{key}] {label} - 친구가 원해요!</color>";
-        string state = mine ? (theirs ? "둘 다 동의" : "친구 동의 기다리는 중") : "둘 다 동의하면 진행";
-        return $"[{key}] {label}  <size=18>({state})</size>";
+        return mine ? $"[{key}] {label}  <size=15>({(theirs ? "둘 다 동의" : "친구 기다리는 중")})</size>" : $"[{key}] {label}";
     }
 }

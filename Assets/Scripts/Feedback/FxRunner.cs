@@ -25,6 +25,8 @@ public static class FxView
         }
     }
 
+    public static GameViewManager Current => View;
+
     public static DuduSurfaceMovement Dudu
     {
         get

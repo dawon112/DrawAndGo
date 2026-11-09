@@ -9,9 +9,9 @@ public enum HazardAlert { Reversed, Slowed, Thunder, Eraser, Magnet, Wind, Count
 [DefaultExecutionOrder(900)]
 public sealed class HazardAlerts : MonoBehaviour
 {
-    private const float RowHeight = 42f;
-    private const float RowGap = 6f;
-    private const float RowWidth = 330f;
+    private const float RowHeight = 56f;
+    private const float RowGap = 8f;
+    private const float RowWidth = 440f;
 
     private static HazardAlerts instance;
 
@@ -105,7 +105,7 @@ public sealed class HazardAlerts : MonoBehaviour
         canvas.sortingOrder = 19;
         CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1280f, 720f);
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
         scaler.matchWidthOrHeight = 0.5f;
         canvasRect = canvasObject.GetComponent<RectTransform>();
 
@@ -132,14 +132,15 @@ public sealed class HazardAlerts : MonoBehaviour
         rect.pivot = new Vector2(0.5f, 1f);
         rect.sizeDelta = new Vector2(RowWidth, RowHeight);
         Image background = panel.GetComponent<Image>();
-        background.color = new Color(0.1f, 0.09f, 0.13f, 0.78f);
+        background.sprite = Resources.Load<Sprite>("UI/Hud/panel_dark");
+        background.type = Image.Type.Sliced;
         background.raycastTarget = false;
         CanvasGroup group = panel.GetComponent<CanvasGroup>();
         group.blocksRaycasts = false;
         group.interactable = false;
         group.alpha = 0f;
 
-        Image icon = NewImage(panel.transform, "Icon", new Vector2(0f, 0.5f), new Vector2(26f, 0f), new Vector2(32f, 32f));
+        Image icon = NewImage(panel.transform, "Icon", new Vector2(0f, 0.5f), new Vector2(36f, 0f), new Vector2(42f, 42f));
         icon.sprite = FxArt.Get(iconShape);
         icon.color = color;
 
@@ -148,13 +149,13 @@ public sealed class HazardAlerts : MonoBehaviour
         RectTransform labelRect = label.GetComponent<RectTransform>();
         labelRect.anchorMin = Vector2.zero;
         labelRect.anchorMax = Vector2.one;
-        labelRect.offsetMin = new Vector2(50f, 2f);
-        labelRect.offsetMax = new Vector2(-8f, -2f);
+        labelRect.offsetMin = new Vector2(68f, 2f);
+        labelRect.offsetMax = new Vector2(-12f, -2f);
         Text text = label.GetComponent<Text>();
         text.font = GameFont.Bold;
-        text.fontSize = 22;
+        text.fontSize = 28;
         text.alignment = TextAnchor.MiddleLeft;
-        text.color = Color.white;
+        text.color = new Color(1f, 0.96f, 0.86f);
         text.raycastTarget = false;
         text.text = line;
 
@@ -165,7 +166,9 @@ public sealed class HazardAlerts : MonoBehaviour
         barRect.anchorMax = new Vector2(1f, 0f);
         barRect.pivot = new Vector2(0f, 0f);
         barRect.anchoredPosition = Vector2.zero;
-        barRect.sizeDelta = new Vector2(0f, 4f);
+        barRect.anchoredPosition = new Vector2(0f, 6f);
+        barRect.sizeDelta = new Vector2(-24f, 5f);
+        barRect.pivot = new Vector2(0f, 0f);
 
         return new Row { rect = rect, group = group, bar = barRect, text = text, icon = icon };
     }
@@ -195,7 +198,8 @@ public sealed class HazardAlerts : MonoBehaviour
         }
 
         bool show = FxView.HaruGameplay && !SettingsPopupController.IsAnyOpen;
-        float y = -14f;
+        // Below the tutorial hint, which has the top of the screen.
+        float y = -176f;
         y = Layout(ping, show, y);
         foreach (Row row in rows) y = Layout(row, show, y);
     }

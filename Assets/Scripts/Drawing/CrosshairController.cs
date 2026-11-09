@@ -117,6 +117,8 @@ public sealed class CrosshairController : MonoBehaviour
         horizontalBar = CreateBar(canvasObject.transform, "Horizontal", new Vector2(armLength, thickness));
         verticalBar = CreateBar(canvasObject.transform, "Vertical", new Vector2(thickness, armLength));
         statusText = CreateStatusText(canvasObject.transform);
+        // GameHud shows a short toast when the tool or draw mode changes instead.
+        statusText.gameObject.SetActive(false);
         RefreshCrosshairColor();
         RefreshStatus();
     }

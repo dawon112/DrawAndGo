@@ -32,9 +32,9 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 7142133791299062797}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 106, y: -352}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 202, y: 136}
   m_SizeDelta: {x: 200, y: 34}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &3006613726822737154
@@ -169,9 +169,9 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 7142133791299062797}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 106, y: -456}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 202, y: 50}
   m_SizeDelta: {x: 200, y: 34}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &6919381319158411232
@@ -397,6 +397,7 @@ MonoBehaviour:
   micOffMark: {fileID: 9106622347042012995}
   quickChatButton: {fileID: 8536295231309490135}
   quickChatLabel: {fileID: 3054478820141447495}
+  micLabel: {fileID: 2793487159186377294}
 --- !u!1 &5894895111690791305
 GameObject:
   m_ObjectHideFlags: 0
@@ -431,9 +432,9 @@ RectTransform:
   - {fileID: 5156709903109321710}
   m_Father: {fileID: 7142133791299062797}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 106, y: -292}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 70, y: 136}
   m_SizeDelta: {x: 62, y: 86}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &7664665157105608954
@@ -551,9 +552,9 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 7142133791299062797}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 106, y: -408}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 70, y: 50}
   m_SizeDelta: {x: 70, y: 53}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &1395485400669832011

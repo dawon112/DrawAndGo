@@ -43,7 +43,9 @@ public sealed class CoopQuickChat : MonoBehaviour
 
     private static void Setup(Scene scene)
     {
-        if (GameSession.Current == null || !StageSequence.Load().IsStage(scene.name) || FindFirstObjectByType<CoopQuickChat>() != null)
+        // Also offline: the button must always be there. With no friend connected, a phrase
+        // simply shows on this screen.
+        if (!StageSequence.Load().IsStage(scene.name) || FindFirstObjectByType<CoopQuickChat>() != null)
             return;
 
         GameObject root = new GameObject("Quick Chat", typeof(RectTransform),
@@ -161,25 +163,25 @@ public sealed class CoopQuickChat : MonoBehaviour
 
     private void BuildUi()
     {
-        GameObject panel = new GameObject("Quick Chat Choices", typeof(RectTransform), typeof(RawImage));
+        GameObject panel = new GameObject("Quick Chat Choices", typeof(RectTransform), typeof(Image));
         panel.transform.SetParent(transform, false);
         RectTransform panelRect = panel.GetComponent<RectTransform>();
-        panelRect.anchorMin = panelRect.anchorMax = new Vector2(1f, 0f);
-        panelRect.pivot = new Vector2(1f, 0f);
-        panelRect.anchoredPosition = new Vector2(-35f, 35f);
-        panelRect.sizeDelta = new Vector2(510f, 500f);
-        RawImage background = panel.GetComponent<RawImage>();
-        background.texture = Texture2D.whiteTexture;
-        background.color = new Color(1f, 0.97f, 0.88f, 0.94f);
+        panelRect.anchorMin = panelRect.anchorMax = new Vector2(0f, 0f);
+        panelRect.pivot = new Vector2(0f, 0f);
+        panelRect.anchoredPosition = new Vector2(130f, 24f);
+        panelRect.sizeDelta = new Vector2(330f, 390f);
+        Image background = panel.GetComponent<Image>();
+        background.sprite = Resources.Load<Sprite>("UI/Hud/panel_paper");
+        background.type = Image.Type.Sliced;
         background.raycastTarget = false;
 
-        Text choices = CreateText("Choices", panel.transform, 30, TextAnchor.UpperLeft);
+        Text choices = CreateText("Choices", panel.transform, 27, TextAnchor.UpperLeft);
         RectTransform choicesRect = choices.rectTransform;
         choicesRect.anchorMin = Vector2.zero;
         choicesRect.anchorMax = Vector2.one;
-        choicesRect.offsetMin = new Vector2(25f, 15f);
-        choicesRect.offsetMax = new Vector2(-15f, -15f);
-        choices.color = new Color(0.69f, 0.34f, 0.14f);
+        choicesRect.offsetMin = new Vector2(28f, 18f);
+        choicesRect.offsetMax = new Vector2(-18f, -20f);
+        choices.color = new Color(0.36f, 0.23f, 0.14f);
         string list = "퀵채팅  C 닫기\n";
         for (int i = 0; i < Phrases.Length; i++) list += $"\n{i + 1}  {Phrases[i]}";
         choices.text = list;
@@ -190,7 +192,7 @@ public sealed class CoopQuickChat : MonoBehaviour
         RectTransform messageRect = messageText.rectTransform;
         messageRect.anchorMin = messageRect.anchorMax = new Vector2(0.5f, 1f);
         messageRect.pivot = new Vector2(0.5f, 1f);
-        messageRect.anchoredPosition = new Vector2(0f, -140f);
+        messageRect.anchoredPosition = new Vector2(0f, -176f);
         messageRect.sizeDelta = new Vector2(1000f, 70f);
         Outline outline = messageText.gameObject.AddComponent<Outline>();
         outline.effectColor = new Color(0.17f, 0.13f, 0.1f, 0.9f);

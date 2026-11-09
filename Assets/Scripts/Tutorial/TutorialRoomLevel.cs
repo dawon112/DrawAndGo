@@ -1,6 +1,5 @@
 using System.Collections;
 using UnityEngine;
-using UnityEngine.UI;
 
 // Scene-local tutorial progression. It deliberately does not touch the prototype coin flow.
 public sealed class TutorialRoomLevel : MonoBehaviour
@@ -13,7 +12,7 @@ public sealed class TutorialRoomLevel : MonoBehaviour
     [SerializeField] private GameObject lockedDoor;
     [SerializeField] private DuduSurfaceMovement dudu;
 
-    private Text starCounter;
+    private bool starCounterVisible;
     private int collectedStars;
     // Which stars are taken, one bit per entry of stars.
     private int collectedMask;
@@ -24,7 +23,10 @@ public sealed class TutorialRoomLevel : MonoBehaviour
     public int CollectedStars => collectedStars;
     public int CollectedStarMask => collectedMask;
     public bool DoorOpened => doorOpened;
-    public bool IsStarCounterVisible => starCounter != null && starCounter.transform.parent.gameObject.activeSelf;
+    // GameHud shows the count while this is on.
+    public bool IsStarCounterVisible => starCounterVisible;
+    public TutorialStarCollectible[] Stars => stars;
+    public int RequiredStarCount => RequiredStars;
     public DuduSurface[] Sections => sections;
     public GameObject Door => lockedDoor;
     public DuduSurface FinalSurface => sections != null && sections.Length > 0 ? sections[sections.Length - 1] : null;
@@ -43,13 +45,10 @@ public sealed class TutorialRoomLevel : MonoBehaviour
         collectedMask = 0;
         doorOpened = false;
         doorSequenceStarted = false;
-        UpdateStarCounter();
     }
 
     private void Awake()
     {
-        BuildStarCounter();
-        UpdateStarCounter();
         if (lockedDoor != null)
             lockedDoor.SetActive(true);
     }
@@ -90,7 +89,6 @@ public sealed class TutorialRoomLevel : MonoBehaviour
         collectedMask |= 1 << index;
         collectedStars = Mathf.Min(RequiredStars, collectedStars + 1);
         Debug.Log($"Tutorial: {star.name} collected ({collectedStars}/{RequiredStars}).", star);
-        UpdateStarCounter();
         if (collectedStars >= RequiredStars)
             BeginDoorOpeningSequence();
         StarCollected?.Invoke(collectedStars);
@@ -112,7 +110,6 @@ public sealed class TutorialRoomLevel : MonoBehaviour
             collectedStars = count;
             for (int i = 0; i < stars.Length; i++)
                 if (stars[i] != null) stars[i].gameObject.SetActive((mask & (1 << i)) == 0);
-            UpdateStarCounter();
             if (gained) StarCollected?.Invoke(collectedStars);
         }
         if (doorIsOpen && !doorOpened)
@@ -149,64 +146,5 @@ public sealed class TutorialRoomLevel : MonoBehaviour
         Debug.Log("Tutorial: all 3 stars collected; door opened once.", this);
     }
 
-    private void BuildStarCounter()
-    {
-        GameObject canvasObject = new GameObject("Star Counter Canvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler));
-        canvasObject.transform.SetParent(transform, false);
-        Canvas canvas = canvasObject.GetComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 100;
-
-        CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920f, 1080f);
-
-        GameObject textObject = new GameObject("Star Counter", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text), typeof(Outline));
-        textObject.transform.SetParent(canvasObject.transform, false);
-        RectTransform rect = textObject.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0f, 1f);
-        rect.anchorMax = new Vector2(0f, 1f);
-        rect.pivot = new Vector2(0f, 1f);
-        rect.anchoredPosition = new Vector2(36f, -32f);
-        rect.sizeDelta = new Vector2(360f, 72f);
-
-        starCounter = textObject.GetComponent<Text>();
-        starCounter.font = GameFont.Bold;
-        starCounter.fontSize = 40;
-        starCounter.alignment = TextAnchor.MiddleLeft;
-        starCounter.color = new Color(1f, 0.85f, 0.15f);
-        starCounter.raycastTarget = false;
-        Outline outline = textObject.GetComponent<Outline>();
-        outline.effectColor = Color.black;
-        outline.effectDistance = new Vector2(2f, -2f);
-    }
-
-    private void UpdateStarCounter()
-    {
-        if (starCounter != null)
-            starCounter.text = $"★ {collectedStars} / 3";
-    }
-
-    public void ShowStarCounter(bool visible)
-    {
-        if (starCounter != null) starCounter.transform.parent.gameObject.SetActive(visible);
-    }
-
-    public void PulseStarCounter()
-    {
-        if (starCounter != null) StartCoroutine(PulseCounter());
-    }
-
-    private System.Collections.IEnumerator PulseCounter()
-    {
-        RectTransform rect = starCounter.GetComponent<RectTransform>();
-        float elapsed = 0f;
-        while (elapsed < 0.35f)
-        {
-            elapsed += Time.unscaledDeltaTime;
-            rect.localScale = Vector3.one * (1f + 0.2f * Mathf.Sin(Mathf.PI * Mathf.Clamp01(elapsed / 0.35f)));
-            yield return null;
-        }
-        rect.localScale = Vector3.one;
-    }
+    public void ShowStarCounter(bool visible) => starCounterVisible = visible;
 }

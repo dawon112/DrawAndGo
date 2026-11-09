@@ -32,8 +32,8 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
     private GameObject highlight, startTrigger, successTrigger, instructionPanel, dialoguePanel;
     private RectTransform haruViewport;
     private Camera duduCamera;
-    private Text instruction;
-    private TutorialDialogueBox dialogueBox;
+    private TutorialHintUI instruction;
+    private TutorialSpeechBubble dialogueBox;
     private string[] speakers, lines;
     private int dialogueIndex;
     private Material highlightMaterial;
@@ -54,8 +54,7 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
         InitializeErase();
         InitializeLateTutorial();
         TutorialRoomLevel room = FindAnyObjectByType<TutorialRoomLevel>();
-        Transform starCounter = room != null ? room.transform.Find("Star Counter Canvas") : null;
-        if (starCounter != null) starCounter.gameObject.SetActive(false);
+        if (room != null) room.ShowStarCounter(false);
         dudu.gameObject.AddComponent<TutorialBridgeContact>().Owner = this;
         InitializeNetwork();
         built = true;
@@ -336,8 +335,8 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
             return;
         }
         instruction.text = drawStarted
-            ? "마우스 왼쪽 버튼을 누른 채 드래그해서\n선을 그려보세요!\n<Size=21>두두: ← → 이동, Space 점프</Size>"
-            : "[ W ][ A ][ S ][ D ] 키를 눌러 이동해보세요!\n마우스를 움직여 주변을 둘러보세요!";
+            ? "마우스 왼쪽 버튼을 누른 채 드래그해서 선을 그려보세요!\n<size=21>두두: [ ← ][ → ] 이동, [ Space ] 점프</size>"
+            : "[ W ][ A ][ S ][ D ] 이동해보세요!\n<size=21>마우스로 주변 둘러보기</size>";
         instructionPanel.SetActive(true);
     }
 
@@ -414,36 +413,20 @@ public sealed partial class TutorialSequenceController : MonoBehaviour
         scaler.referenceResolution = new Vector2(1920, 1080); scaler.matchWidthOrHeight = 0.5f;
         haruViewport = new GameObject("HaruViewport", typeof(RectTransform)).GetComponent<RectTransform>();
         haruViewport.SetParent(canvasObject.transform, false);
-        instructionPanel = Panel("InstructionPanel", haruViewport, new Vector2(0.08f, 0.74f), new Vector2(0.92f, 0.92f));
-        instruction = Label("InstructionText", instructionPanel.transform, Vector2.zero, Vector2.one, 30, TextAnchor.MiddleCenter);
-        // The speech box's look lives in its prefab so it can be edited in the editor.
-        dialogueBox = Instantiate(Resources.Load<TutorialDialogueBox>("UI/TutorialDialogue"), canvasObject.transform, false);
-        dialoguePanel = dialogueBox.gameObject;
+
+        // Whether a hint or a line is up stays plain state on these two objects, as the steps
+        // and the network expect. The prefabs watch them, so they can fade in and out.
+        instructionPanel = new GameObject("Hint State");
+        instructionPanel.transform.SetParent(canvasObject.transform, false);
+        instructionPanel.SetActive(false);
+        instruction = Instantiate(Resources.Load<TutorialHintUI>("UI/TutorialHint"), haruViewport, false);
+        instruction.Bind(instructionPanel);
+
+        dialoguePanel = new GameObject("Dialogue State");
+        dialoguePanel.transform.SetParent(canvasObject.transform, false);
         dialoguePanel.SetActive(false);
-    }
-
-    private static GameObject Panel(string name, Transform parent, Vector2 min, Vector2 max)
-    {
-        GameObject panel = new GameObject(name, typeof(RectTransform), typeof(Image));
-        Place(panel.GetComponent<RectTransform>(), parent, min, max);
-        Image image = panel.GetComponent<Image>(); image.color = new Color(0.055f, 0.08f, 0.12f, 0.88f); image.raycastTarget = false;
-        return panel;
-    }
-
-    private static Text Label(string name, Transform parent, Vector2 min, Vector2 max, int size, TextAnchor alignment)
-    {
-        GameObject label = new GameObject(name, typeof(RectTransform), typeof(Text), typeof(Outline));
-        Place(label.GetComponent<RectTransform>(), parent, min, max);
-        Text text = label.GetComponent<Text>(); text.font = GameFont.Bold; text.fontSize = size;
-        text.resizeTextForBestFit = true; text.resizeTextMinSize = 16; text.resizeTextMaxSize = size;
-        text.alignment = alignment; text.color = Color.white; text.raycastTarget = false;
-        return text;
-    }
-
-    private static void Place(RectTransform rect, Transform parent, Vector2 min, Vector2 max)
-    {
-        rect.SetParent(parent, false); rect.anchorMin = min; rect.anchorMax = max;
-        rect.offsetMin = rect.offsetMax = Vector2.zero;
+        dialogueBox = Instantiate(Resources.Load<TutorialSpeechBubble>("UI/TutorialSpeechBubble"), canvasObject.transform, false);
+        dialogueBox.Bind(dialoguePanel, dudu, haru.transform);
     }
 
     private void OnDestroy()

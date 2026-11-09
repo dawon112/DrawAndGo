@@ -387,11 +387,13 @@ public sealed partial class TutorialSequenceController
         if (!windWarningShown && x <= SketchBoxX + 0.6f)
         {
             windWarningShown = true;
+            instruction.QuietNextHide();
             ShowDialogue(new[] { "두두" }, new[] { WindWarningLine });
         }
         else if (!dangerWarningShown && x >= SketchDangerLeft)
         {
             dangerWarningShown = true;
+            instruction.QuietNextHide();
             ShowDialogue(new[] { "두두" }, new[] { DangerWarningLine });
         }
     }
@@ -544,6 +546,7 @@ public sealed partial class TutorialSequenceController
     {
         CurrentStep = TutorialStep.Tutorial_05_Star;
         lateDialoguePhase = 1;
+        tutorialRoom.ShowStarCounter(true);
         ShowDialogue(new[] { "두두", "하루" }, new[] { "하루! 저기 반짝이는 게 있어!", "한번 가져가 볼래?" });
     }
 
@@ -571,7 +574,6 @@ public sealed partial class TutorialSequenceController
     private void OnTutorialStarCollected(int count)
     {
         tutorialRoom.ShowStarCounter(true);
-        tutorialRoom.PulseStarCounter();
         if (!IsAuthority) return;
         if (count == 1 && CurrentStep == TutorialStep.Tutorial_05_Star)
         {
@@ -610,7 +612,9 @@ public sealed partial class TutorialSequenceController
     private IEnumerator HideDoorHint()
     {
         yield return new WaitForSeconds(2.5f);
-        if (CurrentStep == TutorialStep.Tutorial_07_Door) instructionPanel.SetActive(false);
+        if (CurrentStep != TutorialStep.Tutorial_07_Door) yield break;
+        instruction.QuietNextHide();
+        instructionPanel.SetActive(false);
     }
 
     private void SetLateInstruction(string text)

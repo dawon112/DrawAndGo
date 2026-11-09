@@ -25,6 +25,8 @@ public sealed class GameViewManager : MonoBehaviour
     public CameraState CurrentCameraState { get; private set; }
     public bool IsHaruGameplayView => CurrentCameraState == CameraState.Gameplay && !duduMode;
     public bool IsDuduMode => duduMode;
+    public Camera HaruCamera => haruCamera;
+    public Camera DuduCamera => duduCamera;
 
     private void Awake()
     {

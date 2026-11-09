@@ -4,8 +4,9 @@ using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-// The mic and quick-chat buttons on the left of every stage. V or a click turns the
-// microphone on and off (an X marks it off); C or a click opens the quick chat.
+// The mic and quick-chat buttons at the bottom left of every stage, icons only: their labels
+// show while the cursor is over them. V or a click turns the microphone on and off (an X marks
+// it off); C or a click opens the quick chat.
 // The layout lives in Resources/UI/CoopCommsHud.prefab, so it can be edited in the editor.
 [DisallowMultipleComponent]
 public sealed class CoopCommsHud : MonoBehaviour
@@ -14,6 +15,7 @@ public sealed class CoopCommsHud : MonoBehaviour
     [SerializeField] private GameObject micOffMark;
     [SerializeField] private Button quickChatButton;
     [SerializeField] private GameObject quickChatLabel;
+    [SerializeField] private GameObject micLabel;
 
     private Canvas canvas;
     private GameViewManager view;
@@ -52,10 +54,9 @@ public sealed class CoopCommsHud : MonoBehaviour
     private void Update()
     {
         if (view == null) view = FindAnyObjectByType<GameViewManager>();
-        // Quick chat exists only in online play.
         if (quickChat == null) quickChat = FindAnyObjectByType<CoopQuickChat>();
-        SetActiveIfChanged(quickChatButton.gameObject, quickChat != null);
-        SetActiveIfChanged(quickChatLabel, quickChat != null);
+        SetActiveIfChanged(quickChatLabel, IsHovered(quickChatButton));
+        SetActiveIfChanged(micLabel, IsHovered(micButton));
 
         // Out of the way during intro, clear and door cinematics.
         bool inPlay = view == null || view.CurrentCameraState == GameViewManager.CameraState.Gameplay;
@@ -65,6 +66,13 @@ public sealed class CoopCommsHud : MonoBehaviour
         if (inPlay && keyboard != null && keyboard.vKey.wasPressedThisFrame && !SettingsPopupController.IsAnyOpen)
             ToggleMicrophone();
         SetActiveIfChanged(micOffMark, !CoopAudioSettings.MicEnabled);
+    }
+
+    private static bool IsHovered(Button button)
+    {
+        Mouse mouse = Mouse.current;
+        return mouse != null && Cursor.lockState != CursorLockMode.Locked &&
+            RectTransformUtility.RectangleContainsScreenPoint((RectTransform)button.transform, mouse.position.ReadValue(), null);
     }
 
     private static void ToggleMicrophone()

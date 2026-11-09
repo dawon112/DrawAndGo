@@ -62,6 +62,25 @@ public sealed class DuduCameraController : MonoBehaviour
     private DuduSurfaceMovement duduMovement;
     private Image debuffOverlay;
 
+    // A world point as this camera sees it: walls laid end to end. UI that follows something
+    // in this view projects the result with this camera.
+    public Vector3 MapToView(Vector3 world, DuduSurface surface = null)
+    {
+        if (surfaces == null) return world;
+        if (surface == null) surface = FindSurface(world);
+        int index = surface != null ? System.Array.IndexOf(surfaces, surface) : -1;
+        if (index < 0) return world;
+        Vector2 local = surface.WorldToSurface(world);
+        return new Vector3(surfaceCenters[index] + local.x, local.y, 0f);
+    }
+
+    public bool TryGetHaruCursorView(out Vector3 position)
+    {
+        bool shown = haruCursorRoot != null && haruCursorRoot.gameObject.activeSelf;
+        position = shown ? haruCursorRoot.position : Vector3.zero;
+        return shown;
+    }
+
     public void SetSurface(DuduSurface surface) => targetSurface = surface;
     public void SetTarget(Transform target) => targetDudu = target;
 

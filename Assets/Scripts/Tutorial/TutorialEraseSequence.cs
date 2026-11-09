@@ -116,7 +116,7 @@ public sealed partial class TutorialSequenceController
             {
                 HasWalkedOnReplacement = false;
                 SetEraseInstruction(candidate != null
-                    ? "길이 이어졌어요! 두두를 움직여 건너가세요.\n<size=21>선의 시작점이 높으면 Space로 올라가세요.</size>"
+                    ? "길이 이어졌어요! 두두를 움직여 건너가세요.\n<size=21>선의 시작점이 높으면 [ Space ]로 올라가세요.</size>"
                     : "새로운 길을 그려 두두가 지나갈 수 있게 해보세요!");
             }
             replacementLine = candidate;
