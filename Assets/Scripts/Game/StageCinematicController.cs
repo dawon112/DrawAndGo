@@ -160,6 +160,16 @@ public sealed class StageCinematicController : MonoBehaviour
         return true;
     }
 
+    // The ranking screens come after the clear message and need the screen to themselves.
+    public void ClearCenterMessage()
+    {
+        if (fadeGroup == null) return;
+        foreach (Transform child in fadeGroup.transform.parent)
+            if (child.name == "Center Message") Destroy(child.gameObject);
+        fadeGroup.alpha = 0f;
+        fadeGroup.blocksRaycasts = false;
+    }
+
     private IEnumerator IntroRoutine(CornerRoomLevel level)
     {
         introPlayed = true;

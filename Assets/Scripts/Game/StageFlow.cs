@@ -16,8 +16,7 @@ public sealed class StageFlow : MonoBehaviour
 
     private const string LoadMessage = "FlowLoadV1";
     private const string VoteMessage = "FlowVoteV1";
-    private const string FinishMessage = "FlowFinishV1";
-    private const float ResultDuration = 6f;
+    private const string FinishMessage = "FlowFinishV2";
     private const float VoteTimeout = 20f;
     private const Key SkipTutorialKey = Key.K;
     private const Key RestartStageKey = Key.R;
@@ -34,7 +33,6 @@ public sealed class StageFlow : MonoBehaviour
     private float runStartTime = -1f;
     private float runEndTime = -1f;
     private GameObject panel;
-    private GameObject resultPanel;
     private Text panelText;
     private GameViewManager view;
 
@@ -65,6 +63,7 @@ public sealed class StageFlow : MonoBehaviour
         GameObject holder = new GameObject("Stage Flow", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler));
         DontDestroyOnLoad(holder);
         holder.AddComponent<StageFlow>();
+        holder.AddComponent<ExhibitionRankingFlow>();
     }
 
     private void Awake()
@@ -89,7 +88,6 @@ public sealed class StageFlow : MonoBehaviour
     {
         loading = false;
         ClearVotes();
-        if (resultPanel != null) Destroy(resultPanel);
         // Play time runs from the first stage until the players are back at the title.
         if (!sequence.IsStage(scene.name)) runStartTime = runEndTime = -1f;
         else if (runStartTime < 0f) runStartTime = Time.unscaledTime;
@@ -115,68 +113,45 @@ public sealed class StageFlow : MonoBehaviour
         action();
     }
 
-    // Host or offline: show the result on both screens, then close the room.
+    // Host or offline: the run is over. Both screens show the shared time, then the
+    // exhibition ranking takes over; the room stays open until the players leave it.
     private void FinishGame()
     {
+        runEndTime = Time.unscaledTime;
+        double seconds = PlaySeconds;
         if (IsNetworked)
         {
-            using var writer = new FastBufferWriter(1, Allocator.Temp);
-            writer.WriteValueSafe((byte)1);
+            using var writer = new FastBufferWriter(sizeof(double), Allocator.Temp);
+            writer.WriteValueSafe(seconds);
             foreach (ulong clientId in manager.ConnectedClientsIds)
                 if (clientId != manager.LocalClientId)
                     manager.CustomMessagingManager.SendNamedMessage(
                         FinishMessage, clientId, writer, NetworkDelivery.ReliableSequenced);
         }
-        StartCoroutine(ShowResultThenLeave(true));
+        ShowClearAndRank(seconds);
     }
 
     private void OnFinish(ulong sender, FastBufferReader reader)
     {
-        if (manager.IsHost || sender != NetworkManager.ServerClientId || loading) return;
-        StartCoroutine(ShowResultThenLeave(false));
+        if (manager.IsHost || sender != NetworkManager.ServerClientId || loading ||
+            !reader.TryBeginRead(sizeof(double))) return;
+        // The host's time: what the record is filed with, so both screens agree.
+        reader.ReadValueSafe(out double seconds);
+        runEndTime = Time.unscaledTime;
+        ShowClearAndRank(seconds);
     }
 
-    private IEnumerator ShowResultThenLeave(bool closesRoom)
+    // The party screen (play time, ranking button, the dance) takes over from the paper the
+    // clear faded to; ExhibitionRankingFlow runs it from here.
+    private void ShowClearAndRank(double seconds)
     {
         loading = true;
         ClearVotes();
-        if (GameSession.Current != null) GameSession.Current.ExpectEnd();
-        runEndTime = Time.unscaledTime;
-        int total = Mathf.FloorToInt(PlaySeconds);
-        string message = "모든 스테이지 클리어!\n\n" +
-            $"<size=40>함께한 시간  {total / 60:00}:{total % 60:00}</size>\n" +
-            "<size=30>잠시 후 처음 화면으로 돌아갑니다</size>";
         StageCinematicController cinematic = FindAnyObjectByType<StageCinematicController>();
-        if (cinematic == null || !cinematic.ShowCenterMessage(message)) ShowOwnResult(message);
-        yield return new WaitForSecondsRealtime(ResultDuration);
-        // The client normally leaves when the host closes the room; this is a fallback.
-        if (!closesRoom) yield return new WaitForSecondsRealtime(ResultDuration);
-        if (GameSession.Current != null) GameSession.Current.ReturnToTitle();
-        else SceneManager.LoadSceneAsync(sequence.titleScene);
-    }
-
-    private void ShowOwnResult(string message)
-    {
-        GameObject panelObject = new GameObject("Result", typeof(RectTransform), typeof(Image));
-        RectTransform rect = panelObject.GetComponent<RectTransform>();
-        rect.SetParent(transform, false);
-        rect.anchorMin = Vector2.zero;
-        rect.anchorMax = Vector2.one;
-        rect.offsetMin = rect.offsetMax = Vector2.zero;
-        panelObject.GetComponent<Image>().color = Color.white;
-        GameObject label = new GameObject("Text", typeof(RectTransform), typeof(Text));
-        RectTransform labelRect = label.GetComponent<RectTransform>();
-        labelRect.SetParent(rect, false);
-        labelRect.anchorMin = Vector2.zero;
-        labelRect.anchorMax = Vector2.one;
-        labelRect.offsetMin = labelRect.offsetMax = Vector2.zero;
-        Text text = label.GetComponent<Text>();
-        text.font = GameFont.Bold;
-        text.fontSize = 64;
-        text.alignment = TextAnchor.MiddleCenter;
-        text.color = new Color(0.12f, 0.16f, 0.22f);
-        text.text = message;
-        resultPanel = panelObject;
+        GetComponent<ExhibitionRankingFlow>().Begin(seconds, () =>
+        {
+            if (cinematic != null) cinematic.ClearCenterMessage();
+        });
     }
 
     private void LoadStage(string sceneName)

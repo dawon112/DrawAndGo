@@ -29,7 +29,7 @@ MonoBehaviour:
   lampInnerAngle: 60
   lampShadows: 2
   lampFixtureColor: {r: 2.2, g: 1.85, b: 1.35, a: 1}
-  hallwayLevel: 0.62
+  hallwayLevel: 0.5
   alternateLampLevel: 0.72
   startRoomRadius: 15
   goalLevel: 1.25

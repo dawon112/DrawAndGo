@@ -72,7 +72,7 @@ public sealed class CoopQuickChat : MonoBehaviour
         if (messageText.gameObject.activeSelf && Time.unscaledTime >= hideMessageAt)
             messageText.gameObject.SetActive(false);
 
-        if (SettingsPopupController.IsAnyOpen)
+        if (SettingsPopupController.IsAnyOpen || ExhibitionRankingFlow.IsTyping)
         {
             menu.SetActive(false);
             return;

@@ -65,7 +65,7 @@ public sealed class InGameSettingsMenu : MonoBehaviour
     {
         Keyboard keyboard = Keyboard.current;
         if (popup == null || popup.gameObject.activeSelf || keyboard == null ||
-            !keyboard.escapeKey.wasPressedThisFrame ||
+            !keyboard.escapeKey.wasPressedThisFrame || ExhibitionRankingFlow.IsShowing ||
             SettingsPopupController.LastClosedFrame == Time.frameCount) return;
 
         popup.Open();

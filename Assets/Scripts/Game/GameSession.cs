@@ -22,6 +22,11 @@ public sealed class GameSession : MonoBehaviour
     private bool endExpected;
     private bool leaving;
 
+    // After the ranking: when the friend leaves, stay on the result screen (the player
+    // leaves with its button) instead of jumping to the title.
+    public bool StayOnEnd { get; set; }
+    public bool PeerLeft { get; private set; }
+
     public static void Keep(ISession activeSession)
     {
         GameObject holder = new GameObject("Game Session");
@@ -72,14 +77,22 @@ public sealed class GameSession : MonoBehaviour
         session.Deleted -= OnSessionEnded;
         session.RemovedFromSession -= OnSessionEnded;
         session = null;
-        if (endExpected) ReturnToTitle();
+        if (endExpected && StayOnEnd) PeerLeft = true;
+        else if (endExpected) ReturnToTitle();
         else LoseConnection();
     }
 
     private void LoseConnection()
     {
-        if (endExpected || leaving) return;
+        if (leaving) return;
+        if (endExpected)
+        {
+            PeerLeft = true;
+            return;
+        }
         leaving = true;
+        // Mid-ranking the ranking screen says it itself and waits for the player.
+        if (ExhibitionRankingFlow.TakeOverLostConnection()) return;
         ShowNotice("친구와 연결이 끊겼어요.\n잠시 후 처음 화면으로 돌아갑니다.");
         StartCoroutine(ReturnAfterNotice());
     }
