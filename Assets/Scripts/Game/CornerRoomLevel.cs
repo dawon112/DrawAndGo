@@ -35,6 +35,9 @@ public sealed class CornerRoomLevel : MonoBehaviour
     {
         if (door == null || surfaces == null || surfaces.Length < 5 || surfaces[4] == null)
             return;
+        // Only the old five-wall room keeps its door on wall 5; newer stages place their own.
+        if (transform.Find("3D Doorway Wall - Permanent Opening") == null)
+            return;
 
         DuduSurface surface = surfaces[4];
         door.transform.SetPositionAndRotation(
@@ -253,9 +256,40 @@ public sealed class CornerRoomLevel : MonoBehaviour
         FindAnyObjectByType<GameViewManager>()?.HideExitInstruction();
     }
 
+    // The wall the door is set into: the one whose face is nearest the door.
+    public DuduSurface DoorWall
+    {
+        get
+        {
+            if (surfaces == null || surfaces.Length == 0) return null;
+            if (door == null) return surfaces[surfaces.Length - 1];
+            DuduSurface best = null;
+            float bestDistance = float.PositiveInfinity;
+            foreach (DuduSurface surface in surfaces)
+            {
+                if (surface == null) continue;
+                Vector2 local = surface.WorldToSurface(door.transform.position);
+                float depth = Mathf.Abs(Vector3.Dot(door.transform.position - surface.transform.position, surface.Normal.normalized));
+                float outside = Mathf.Max(0f, Mathf.Abs(local.x) - surface.Width * 0.5f) +
+                    Mathf.Max(0f, Mathf.Abs(local.y) - surface.Height * 0.5f);
+                float distance = depth + outside;
+                if (distance < bestDistance) { bestDistance = distance; best = surface; }
+            }
+            return best;
+        }
+    }
+
     public void TryCompleteThreeDimensionalGoal(Player3DMovement candidate)
     {
         if (GameSession.Current != null && !GameSession.Current.IsHost) return;
+        // A stage with no coins placed yet opens its door when Haru reaches it.
+        if (!IsOpen && (coins == null || coins.Length == 0) && candidate != null && candidate == player3D)
+        {
+            IsOpen = true;
+            GameViewManager viewManager = FindAnyObjectByType<GameViewManager>();
+            if (viewManager != null) viewManager.PlayAllCoinsCollectedSequence();
+            return;
+        }
         if (!IsClear && IsOpen && candidate != null && candidate == player3D)
         {
             IsClear = true;

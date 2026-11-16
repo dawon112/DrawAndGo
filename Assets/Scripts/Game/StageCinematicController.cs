@@ -70,8 +70,9 @@ public sealed class StageCinematicController : MonoBehaviour
     public void PlayClear(CornerRoomLevel level)
     {
         if (level == null) return;
-        Vector3 facing = level.surfaces != null && level.surfaces.Length > 4 && level.surfaces[4] != null
-            ? level.surfaces[4].Normal : (level.door != null ? level.door.transform.forward : Vector3.forward);
+        DuduSurface doorWall = level.DoorWall;
+        Vector3 facing = doorWall != null
+            ? doorWall.Normal : (level.door != null ? level.door.transform.forward : Vector3.forward);
         clearSequence.Play(level.door, facing, level.OpenDoorForCinematic, () =>
         {
             level.TryCompleteThreeDimensionalGoal(haruMovement);
@@ -283,7 +284,7 @@ public sealed class StageCinematicController : MonoBehaviour
     {
         Vector3 center = DoorCenter(level);
         Vector3 roomSide = Vector3.ProjectOnPlane(haruMovement.transform.position - center, Vector3.up).normalized;
-        if (roomSide.sqrMagnitude < 0.1f) roomSide = -level.surfaces[4].Normal.normalized;
+        if (roomSide.sqrMagnitude < 0.1f && level.DoorWall != null) roomSide = -level.DoorWall.Normal.normalized;
         return center + roomSide * distance + Vector3.up * 1.2f;
     }
 }
