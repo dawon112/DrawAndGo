@@ -408,12 +408,13 @@ public static class WallPlacerCore
         line.GetComponent<CrayonRouteLine>().Rebuild();
     }
 
-    // Movers go from their placed position to the right or up, and back.
+    // Movers go from their placed position to the end point, either way along one axis, and back.
     public static void GetPath(GameObject mover, WallView view, out Vector2 start, out Vector2 end)
     {
         SerializedObject data = new SerializedObject(mover.GetComponent<DuduMovingObstacle>());
         bool horizontal = data.FindProperty("movementAxis").enumValueIndex == (int)DuduMovingObstacle.MovementAxis.Horizontal;
         float travel = data.FindProperty("travelDistance").floatValue;
+        if (data.FindProperty("reverseDirection").boolValue) travel = -travel;
         start = view.FromWorld(mover.transform.position);
         end = start + (horizontal ? new Vector2(travel, 0f) : new Vector2(0f, travel));
     }
@@ -422,16 +423,17 @@ public static class WallPlacerCore
     {
         Vector2 delta = to - from;
         bool horizontal = Mathf.Abs(delta.x) >= Mathf.Abs(delta.y);
-        // Movers start at the low end. On a wall facing out of the room this is still the
-        // viewer's left: in play they run on the room-side surface, whose x matches the view.
-        bool swap = horizontal ? delta.x < 0f : delta.y < 0f;
-        Vector2 start = swap ? (horizontal ? new Vector2(to.x, from.y) : new Vector2(from.x, to.y)) : from;
+        // The mover stays where it was placed and the end goes where it was dragged, left and
+        // down included. On a wall facing out of the room the view's x still matches the
+        // room-side surface the mover runs on in play.
+        bool reverse = horizontal ? delta.x < 0f : delta.y < 0f;
         Transform t = mover.transform;
-        t.position = view.ToWorld(start, view.DepthOf(t.position));
+        t.position = view.ToWorld(from, view.DepthOf(t.position));
         SerializedObject data = new SerializedObject(mover.GetComponent<DuduMovingObstacle>());
         data.FindProperty("movementAxis").enumValueIndex =
             (int)(horizontal ? DuduMovingObstacle.MovementAxis.Horizontal : DuduMovingObstacle.MovementAxis.Vertical);
         data.FindProperty("travelDistance").floatValue = horizontal ? Mathf.Abs(delta.x) : Mathf.Abs(delta.y);
+        data.FindProperty("reverseDirection").boolValue = reverse;
         data.ApplyModifiedProperties();
         Bind(mover, view);
     }
@@ -493,8 +495,9 @@ public static class WallPlacerCore
             if (script is DuduMovingObstacle)
             {
                 bool horizontal = data.FindProperty("movementAxis").enumValueIndex == (int)DuduMovingObstacle.MovementAxis.Horizontal;
+                float sign = data.FindProperty("reverseDirection").boolValue ? -1f : 1f;
                 SetVector(data, "centerPosition", onSurface +
-                    (horizontal ? Vector2.right : Vector2.up) * data.FindProperty("travelDistance").floatValue * 0.5f);
+                    (horizontal ? Vector2.right : Vector2.up) * sign * data.FindProperty("travelDistance").floatValue * 0.5f);
             }
             data.ApplyModifiedProperties();
         }

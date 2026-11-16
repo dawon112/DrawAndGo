@@ -35,7 +35,10 @@ public sealed class DuduSurface : MonoBehaviour
     {
         Vector2 position = WorldToSurface(worldPosition);
         float bottom = position.y - Mathf.Max(0f, lowerExtent);
-        return bottom <= -height * 0.5f;
+        // The room's floor meets the wall's bottom edge, and Dudu landing on it rests a
+        // physics contact gap above that edge: without some slack he would stand there alive.
+        const float FloorSlack = 0.1f;
+        return bottom <= -height * 0.5f + FloorSlack;
     }
 
     public Vector2 ClampPosition(Vector2 position, Vector2 characterHalfSize)

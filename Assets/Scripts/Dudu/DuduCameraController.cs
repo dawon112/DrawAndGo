@@ -53,7 +53,11 @@ public sealed class DuduCameraController : MonoBehaviour
     private Transform proxyRoot;
     private DuduSurface[] surfaces;
     private float[] surfaceCenters;
+    // How far each wall's middle sits above the first wall's: walls are laid out by real
+    // height too, so a wall reaching up two floors meets the floors on either side of it.
+    private float[] surfaceLifts;
     private float totalWidth;
+    private float verticalVelocity;
     private readonly List<Vector3> clippedLinePoints = new List<Vector3>();
     private float horizontalVelocity;
     private float nextProxyRefresh;
@@ -73,9 +77,11 @@ public sealed class DuduCameraController : MonoBehaviour
         if (surface == null) surface = FindSurface(world);
         int index = surface != null ? System.Array.IndexOf(surfaces, surface) : -1;
         if (index < 0) return world;
-        Vector2 local = surface.WorldToSurface(world);
-        return new Vector3(surfaceCenters[index] + local.x, local.y, 0f);
+        return ToView(index, surface.WorldToSurface(world), 0f);
     }
+
+    private Vector3 ToView(int index, Vector2 local, float depth) =>
+        new Vector3(surfaceCenters[index] + local.x, local.y + surfaceLifts[index], depth);
 
     // Where to put things that only this view shows (they use its layer and view coordinates).
     public Transform ViewRoot => proxyRoot;
@@ -156,6 +162,9 @@ public sealed class DuduCameraController : MonoBehaviour
         }
         for (int i = 0; i < surfaceCenters.Length; i++)
             surfaceCenters[i] -= totalWidth * 0.5f;
+        surfaceLifts = new float[surfaces.Length];
+        for (int i = 0; i < surfaces.Length; i++)
+            surfaceLifts[i] = surfaces[i].transform.position.y - surfaces[0].transform.position.y;
 
         proxyRoot = new GameObject("Dudu Unwrapped View").transform;
         proxyRoot.gameObject.layer = UnwrappedLayer;
@@ -206,7 +215,21 @@ public sealed class DuduCameraController : MonoBehaviour
             float t = 1f - (rollUntil - now) / Mathf.Max(0.01f, rollLength);
             roll = Quaternion.Euler(0f, 0f, rollAmount * Mathf.Sin(t * Mathf.PI * 2.5f) * (1f - t));
         }
-        transform.SetPositionAndRotation(new Vector3(x, 0f, -cameraDistance) + shakeApplied, roll);
+        float y = Mathf.SmoothDamp(transform.position.y - shakeApplied.y, TargetViewY(), ref verticalVelocity, followSmoothTime);
+        transform.SetPositionAndRotation(new Vector3(x, y, -cameraDistance) + shakeApplied, roll);
+    }
+
+    // A one-floor wall stays framed as before, centred; on a taller wall (one climbing to the
+    // next floor) the view follows Dudu up and down within it.
+    private float TargetViewY()
+    {
+        int index = targetSurface != null ? System.Array.IndexOf(surfaces, targetSurface) : -1;
+        if (index < 0) return 0f;
+        float lift = surfaceLifts[index];
+        float band = targetSurface.Height * 0.5f - orthographicSize;
+        if (band <= 0f) return lift;
+        float dudu = targetSurface.WorldToSurface(targetDudu.position).y + lift;
+        return Mathf.Clamp(dudu, lift - band, lift + band);
     }
 
     private void CreateDebuffOverlay()
@@ -351,8 +374,7 @@ public sealed class DuduCameraController : MonoBehaviour
             return;
         }
 
-        Vector2 local = surface.WorldToSurface(point);
-        Vector3 target = new Vector3(surfaceCenters[surfaceIndex] + local.x, local.y, -0.3f);
+        Vector3 target = ToView(surfaceIndex, surface.WorldToSurface(point), -0.3f);
         // The host sends the aim 20 times a second; ease between those so it doesn't step.
         haruCursorRoot.position = haruCursorShown && remote
             ? Vector3.Lerp(haruCursorRoot.position, target, 1f - Mathf.Exp(-25f * Time.unscaledDeltaTime))
@@ -376,8 +398,9 @@ public sealed class DuduCameraController : MonoBehaviour
             targetSurface = movement.CurrentSurface;
         if (targetSurface == null) return;
         transform.SetPositionAndRotation(new Vector3(
-            GetUnwrappedX(targetDudu.position, targetSurface) + horizontalOffset, 0f, -cameraDistance), Quaternion.identity);
+            GetUnwrappedX(targetDudu.position, targetSurface) + horizontalOffset, TargetViewY(), -cameraDistance), Quaternion.identity);
         horizontalVelocity = 0f;
+        verticalVelocity = 0f;
     }
 
     private float GetUnwrappedX(Vector3 worldPosition, DuduSurface surface)
@@ -539,7 +562,7 @@ public sealed class DuduCameraController : MonoBehaviour
             Vector2 local = item.surface.WorldToSurface(item.source.transform.position);
             // Keep magnets in front of wall proxies, but behind Dudu's sprite.
             float displayDepth = magnet != null ? -0.1f : item.proxy is SpriteRenderer ? -0.2f : 0f;
-            item.proxy.transform.position = new Vector3(surfaceCenters[surfaceIndex] + local.x, local.y, displayDepth);
+            item.proxy.transform.position = ToView(surfaceIndex, local, displayDepth);
             item.proxy.transform.rotation = MapRotation(item.source.transform, item.surface);
             item.proxy.transform.localScale = item.source.transform.lossyScale;
             item.proxy.enabled = item.source.enabled && item.source.gameObject.activeInHierarchy;
@@ -566,7 +589,7 @@ public sealed class DuduCameraController : MonoBehaviour
                     Vector3 worldPoint = sourceLine.useWorldSpace ? sourceLine.GetPosition(point) :
                         sourceLine.transform.TransformPoint(sourceLine.GetPosition(point));
                     Vector2 pointLocal = item.surface.WorldToSurface(worldPoint);
-                    Vector3 current = new Vector3(surfaceCenters[surfaceIndex] + pointLocal.x, pointLocal.y, -0.1f);
+                    Vector3 current = ToView(surfaceIndex, pointLocal, -0.1f);
                     if (point > 0) AddClippedSegment(previous, current, minX, maxX);
                     else if (current.x >= minX && current.x <= maxX) clippedLinePoints.Add(current);
                     previous = current;

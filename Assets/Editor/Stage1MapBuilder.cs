@@ -54,8 +54,12 @@ public static class Stage1MapBuilder
         new[] { P(558, 315), P(558, 60) },
         new[] { P(558, 60), P(745, 60) },
         new[] { P(745, 60), P(745, 530) },
-        new[] { P(745, 530), P(132, 530) },
+        new[] { P(745, 530), P(370, 530) },
     };
+
+    // Beside the staircase one wall runs from 1F's floor to 2F's ceiling, so Dudu can climb
+    // along the stairs from the last 1F wall to the first 2F wall.
+    private static readonly Vector2[] StairWall = { P(370, 530), P(45, 530) };
 
     private static readonly Vector2[][] FirstFloorPlain =
     {
@@ -89,7 +93,7 @@ public static class Stage1MapBuilder
     private static readonly Vector2[][] SecondFloorPlain =
     {
         new[] { P(415, 610), P(415, 530) },
-        new[] { P(415, 530), P(45, 530) },
+        new[] { P(415, 530), P(370, 530) },
     };
 
     private const float DoorPixelX = 478f;   // on the last 2F wall
@@ -159,6 +163,9 @@ public static class Stage1MapBuilder
 
         List<DuduSurface> route = new List<DuduSurface>();
         route.AddRange(BuildWalls(FirstFloorRoute, 0f, "1F Wall", Child(first, "Walls"), strokeRoot, art, true));
+        DuduSurface stairWall = BuildWalls(new[] { StairWall }, 0f, "Stair Wall 1F-2F", Child(root.transform, "Stairs 1F-2F"),
+            strokeRoot, art, true, FloorTwo + WallHeight)[0];
+        route.Add(stairWall);
         route.AddRange(BuildWalls(SecondFloorRoute, FloorTwo, "2F Wall", Child(second, "Walls"), strokeRoot, art, true));
         BuildWalls(FirstFloorPlain, 0f, "1F Stair Wall", Child(first, "Walls"), strokeRoot, art, false);
         BuildWalls(SecondFloorPlain, FloorTwo, "2F Stair Wall", Child(second, "Walls"), strokeRoot, art, false);
@@ -168,8 +175,19 @@ public static class Stage1MapBuilder
             route[i].nextSurface = i < route.Count - 1 ? route[i + 1] : null;
         }
         Transform lines = Child(root.transform, "Dudu Route Lines");
+        DuduSurface lastFirstFloor = route[FirstFloorRoute.Length - 1];
         foreach (DuduSurface surface in route)
-            CreateGround(surface.name + " Line", surface, lines, art.Ink);
+            if (surface != stairWall && surface != lastFirstFloor) CreateGround(surface.name + " Line", surface, lines, art.Ink);
+        // The last 1F wall's floor line stops short of the stairs: the climb starts on it.
+        float climbStart = lastFirstFloor.Width * 0.5f - ClimbLead;
+        CreateGroundSpan(lastFirstFloor.name + " Line", lastFirstFloor, -lastFirstFloor.Width * 0.5f, climbStart, lines, art.Ink);
+        // Up along the stairs, then level on 2F to the corner.
+        const float LineHeight = 0.6f;
+        Vector3 top = World(P(StairTopX, StairSouthY), FloorTwo + LineHeight);
+        Vector3 end = World(StairWall[1], FloorTwo + LineHeight);
+        Vector3 climbFrom = World(P(StairFootX + ClimbLead / Scale, StairSouthY), LineHeight);
+        StairClimbLine("Stair Wall 1F-2F Line Up", stairWall, climbFrom, top, lines, art.Ink);
+        CreateLine("Stair Wall 1F-2F Line 2F", stairWall, top, end, lines, art.Ink);
 
         BuildPartitions(FirstFloorPartitions, 0f, Child(first, "Partitions"), art);
         BuildPartitions(SecondFloorPartitions, FloorTwo, Child(second, "Partitions"), art);
@@ -217,7 +235,7 @@ public static class Stage1MapBuilder
     // ---- Walls --------------------------------------------------------------------------------
 
     private static List<DuduSurface> BuildWalls(Vector2[][] segments, float baseY, string prefix,
-        Transform parent, Transform strokeRoot, Materials art, bool route)
+        Transform parent, Transform strokeRoot, Materials art, bool route, float height = WallHeight)
     {
         List<DuduSurface> result = new List<DuduSurface>();
         int drawingLayer = LayerMask.NameToLayer("DrawingSurface");
@@ -229,20 +247,69 @@ public static class Stage1MapBuilder
             float length = Vector3.Distance(a, b);
             // Each wall stands on the room side of its sketched line, so two walls drawn back to back
             // on one line (the pillar's) never share a face.
-            Vector3 center = (a + b) * 0.5f + Vector3.up * (WallHeight * 0.5f) + normal * (WallThickness * 0.5f);
-            GameObject wall = Cube($"{prefix} {i + 1}", center, Quaternion.LookRotation(-normal, Vector3.up),
-                new Vector3(length + WallThickness * 2f, WallHeight, WallThickness), art.Paper, parent);
+            Vector3 center = (a + b) * 0.5f + Vector3.up * (height * 0.5f) + normal * (WallThickness * 0.5f);
+            string name = segments.Length == 1 ? prefix : $"{prefix} {i + 1}";
+            GameObject wall = Cube(name, center, Quaternion.LookRotation(-normal, Vector3.up),
+                new Vector3(length + WallThickness * 2f, height, WallThickness), art.Paper, parent);
             wall.layer = drawingLayer;
             wall.AddComponent<DrawingSurface>().SetStrokeRoot(strokeRoot);
             if (!route) continue;
             DuduSurface surface = wall.AddComponent<DuduSurface>();
             SerializedObject data = new SerializedObject(surface);
             data.FindProperty("width").floatValue = length;
-            data.FindProperty("height").floatValue = WallHeight;
+            data.FindProperty("height").floatValue = height;
             data.ApplyModifiedPropertiesWithoutUndo();
             result.Add(surface);
         }
         return result;
+    }
+
+    // Dudu's feet are a box and he steps up only a few centimetres, so a line that turns
+    // sharply upward is a wall to him, and above about 30 degrees he barely crawls. The climb
+    // starts ClimbLead metres before the stairs, bends up a little at a time (10, 20, 27
+    // degrees), then runs straight to 2F at about 26 degrees; each piece tucks under its
+    // neighbours so the joins are smooth.
+    private const float ClimbLead = 3f;
+
+
+    public static void StairClimbLine(string name, DuduSurface wall, Vector3 floorEnd, Vector3 top, Transform parent, Material ink)
+    {
+        float[] easeIn = { 10f, 20f, 27f };
+        const float EaseRun = 1f, Tuck = 0.15f;
+        Vector2 start = wall.WorldToSurface(floorEnd), end = wall.WorldToSurface(top);
+        float forward = Mathf.Sign(end.x - start.x);
+        List<Vector2> points = new List<Vector2> { start };
+        foreach (float angle in easeIn)
+            points.Add(points[points.Count - 1] + new Vector2(forward * EaseRun, EaseRun * Mathf.Tan(angle * Mathf.Deg2Rad)));
+        points.Add(end);
+        for (int i = 0; i + 1 < points.Count; i++)
+        {
+            Vector2 a = points[i], b = points[i + 1];
+            Vector2 along = (b - a).normalized;
+            // Back under the piece before (twice as far under the flat floor line), and forward
+            // under the next one; the last piece stops where the 2F line starts.
+            a -= along * (i == 0 ? Tuck * 2f : Tuck);
+            if (i + 2 < points.Count) b += along * Tuck;
+            CreateLine($"{name} {i + 1}", wall, wall.SurfaceToWorld(a), wall.SurfaceToWorld(b), parent, ink);
+        }
+    }
+
+    // A crayon line on a wall between two world points (a slope when their heights differ).
+    private static void CreateLine(string name, DuduSurface surface, Vector3 from, Vector3 to, Transform parent, Material ink)
+    {
+        Vector2 a = surface.WorldToSurface(from), b = surface.WorldToSurface(to);
+        Vector2 along = b - a;
+        Quaternion rotation = surface.transform.rotation * Quaternion.Euler(0f, 0f, Mathf.Atan2(along.y, along.x) * Mathf.Rad2Deg);
+        GameObject line = Cube(name, surface.SurfaceToWorld((a + b) * 0.5f), rotation,
+            new Vector3(along.magnitude, 0.14f, 0.18f), ink, parent);
+        CrayonRouteLineTool.Convert(line);
+    }
+
+    private static void CreateGroundSpan(string name, DuduSurface surface, float fromX, float toX, Transform parent, Material ink)
+    {
+        GameObject line = Cube(name, surface.SurfaceToWorld(new Vector2((fromX + toX) * 0.5f, -2.4f)), surface.transform.rotation,
+            new Vector3(toX - fromX, 0.14f, 0.18f), ink, parent);
+        CrayonRouteLineTool.Convert(line);
     }
 
     private static void CreateGround(string name, DuduSurface surface, Transform parent, Material ink)
@@ -420,8 +487,10 @@ public static class Stage1MapBuilder
         float width = north - south;
         float run = foot.x - top.x;
 
-        // What Haru walks on: one smooth solid ramp, foot to landing.
-        Mesh ramp = SaveMesh(Wedge(top.x, foot.x, south, north, FloorTwo, 0f), "StairRamp");
+        // What Haru walks on: one smooth solid ramp, foot to landing. It keeps clear of the
+        // stair wall's face, where Dudu walks: touching it, the ramp would be a wall in his way.
+        const float DuduClearance = 0.25f;
+        Mesh ramp = SaveMesh(Wedge(top.x, foot.x, south + DuduClearance, north, FloorTwo, 0f), "StairRamp");
         GameObject walk = new GameObject("Stair Ramp (Collider)");
         walk.transform.SetParent(stairs, false);
         MeshCollider collider = walk.AddComponent<MeshCollider>();
@@ -434,6 +503,8 @@ public static class Stage1MapBuilder
         under.transform.SetParent(stairs, false);
         under.AddComponent<MeshFilter>().sharedMesh = support;
         under.AddComponent<MeshRenderer>().sharedMaterial = art.WoodFloor;
+        // The stairs are Haru's: Dudu's page shows the wall beside them, not the steps.
+        under.AddComponent<RoomOnlyDecor>();
 
         GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(StepsPrefab);
         float unitRun = run / StairUnits, unitRise = FloorTwo / StairUnits;
@@ -448,10 +519,12 @@ public static class Stage1MapBuilder
                 Quaternion.Euler(0f, 90f, 0f));
             unit.transform.localScale = new Vector3(width / 1.05f, unitRise, unitRun / 1.01f);
             foreach (Collider part in unit.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(part);
+            unit.AddComponent<RoomOnlyDecor>();
         }
 
         // A railing on 2F around the opening, open at the top step where Haru walks off.
         Transform rails = Child(stairs, "2F Railing");
+        rails.gameObject.AddComponent<RoomOnlyDecor>();
         Vector3 railNorthA = World(P(StairTopX + 35f, StairNorthY), FloorTwo);
         Vector3 railNorthB = World(P(StairFootX, StairNorthY), FloorTwo);
         Vector3 railEastB = World(P(StairFootX, StairSouthY), FloorTwo);

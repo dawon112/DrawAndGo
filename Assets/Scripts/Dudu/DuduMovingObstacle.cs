@@ -21,6 +21,8 @@ public sealed class DuduMovingObstacle : MonoBehaviour
     [SerializeField] private Vector2 centerPosition;
     [Tooltip("Total distance between the two ends of the movement path.")]
     [SerializeField, Min(0f)] private float travelDistance = 4f;
+    [Tooltip("Runs from where it was placed toward the left (or down) instead of the right (or up).")]
+    [SerializeField] private bool reverseDirection;
     [Tooltip("Seconds required to travel to the other end and return. Lower values move faster.")]
     [SerializeField, Min(0.1f)] private float roundTripDuration = 3f;
     [Tooltip("Delay before the obstacle starts moving.")]
@@ -39,6 +41,8 @@ public sealed class DuduMovingObstacle : MonoBehaviour
     private float elapsedTime;
 
     public DuduSurface Surface => surface;
+    // +1 when the path runs right/up from the placed position, -1 when it runs left/down.
+    private float DirectionSign => reverseDirection ? -1f : 1f;
 
     public void Configure(
         DuduSurface targetSurface,
@@ -52,6 +56,7 @@ public sealed class DuduMovingObstacle : MonoBehaviour
         movementAxis = axis;
         centerPosition = movementCenter;
         travelDistance = Mathf.Max(0f, distance);
+        reverseDirection = false;
         roundTripDuration = Mathf.Max(0.1f, duration);
         startDelay = Mathf.Max(0f, delay);
         ApplyPosition(GetPositionAtProgress(0f));
@@ -90,7 +95,7 @@ public sealed class DuduMovingObstacle : MonoBehaviour
             if (surface != null)
             {
                 Vector2 axis = movementAxis == MovementAxis.Horizontal ? Vector2.right : Vector2.up;
-                centerPosition = surface.WorldToSurface(placedPosition) + axis * (travelDistance * .5f);
+                centerPosition = surface.WorldToSurface(placedPosition) + axis * (DirectionSign * travelDistance * .5f);
             }
         }
     }
@@ -135,7 +140,8 @@ public sealed class DuduMovingObstacle : MonoBehaviour
 
     private Vector2 GetPositionAtProgress(float progress)
     {
-        float offset = Mathf.Lerp(-travelDistance * 0.5f, travelDistance * 0.5f, progress);
+        // Progress 0 is always the placed end, whichever way the path runs from it.
+        float offset = Mathf.Lerp(-travelDistance * 0.5f, travelDistance * 0.5f, progress) * DirectionSign;
         Vector2 direction = movementAxis == MovementAxis.Horizontal ? Vector2.right : Vector2.up;
         return centerPosition + direction * offset;
     }

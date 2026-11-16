@@ -571,12 +571,26 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         if (overshoot < 0f)
             return false;
         float verticalSpeed = Vector3.Dot(body.linearVelocity, currentSurface.Up);
+        DuduSurface previous = currentSurface;
+        // A wall that carries straight on in the same plane (like the one climbing beside the
+        // stairs) is not a corner: Dudu keeps his exact place and keeps following the line
+        // he is on, slope included, instead of being set down afresh.
+        if (Vector3.Dot(previous.Normal.normalized, next.Normal.normalized) > 0.999f &&
+            Mathf.Abs(Vector3.Dot(next.transform.position - previous.transform.position, next.Normal.normalized)) < 0.05f)
+        {
+            currentSurface = next;
+            InitializeSurfacePhysics();
+            return true;
+        }
         currentSurface = next;
         surfaceDepth = next.SurfaceOffset;
         float entryX = direction > 0
             ? -next.Width * 0.5f + CornerEntryInset
             : next.Width * 0.5f - CornerEntryInset;
-        body.position = next.SurfaceToWorld(new Vector2(entryX, position.y));
+        // Same height in the world, not on the wall: a wall climbing to the next floor has its
+        // middle higher than the one-floor wall beside it.
+        float entryY = next.WorldToSurface(previous.SurfaceToWorld(position)).y;
+        body.position = next.SurfaceToWorld(new Vector2(entryX, entryY));
         body.rotation = next.transform.rotation;
         body.linearVelocity = next.Right * speed + next.Up * verticalSpeed;
         wasFollowingDrawnLine = false;

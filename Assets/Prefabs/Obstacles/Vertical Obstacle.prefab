@@ -85,7 +85,7 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_MaskInteraction: 0
-  m_Sprite: {fileID: -1233384133, guid: a93ab2d1c672e7246aaeb4e7faf132e3, type: 3}
+  m_Sprite: {fileID: 252702286, guid: cc8d8e71737689440b8f2b0abb6aee5e, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -115,8 +115,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 9.1879225, y: 8.58809, z: 1}
-  m_Center: {x: 0.05410699, y: -0.16114414, z: 0}
+  m_Size: {x: 6.03, y: 5.66, z: 1}
+  m_Center: {x: -0.27, y: 0.53, z: 0}
 --- !u!95 &184948606
 Animator:
   serializedVersion: 7
@@ -184,6 +184,7 @@ MonoBehaviour:
   travelDistance: 1.6
   roundTripDuration: 4.5
   startDelay: 0
+  surfaceNormalOffset: 0
   horizontalBounceSpeed: 6
   upwardBounceSpeed: 5
   bounceControlDuration: 0.35
