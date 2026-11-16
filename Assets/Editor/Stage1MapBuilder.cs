@@ -321,6 +321,8 @@ public static class Stage1MapBuilder
 
     private static void BuildPartitions(Vector2[][] segments, float baseY, Transform parent, Materials art)
     {
+        // Partitions are in Haru's way only: Dudu's page neither shows them nor bumps into them.
+        if (parent.GetComponent<RoomOnlyDecor>() == null) parent.gameObject.AddComponent<RoomOnlyDecor>();
         GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(WallPrefab);
         for (int i = 0; i < segments.Length; i++)
         {

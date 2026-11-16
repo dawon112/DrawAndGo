@@ -30111,6 +30111,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1037052651}
+  - component: {fileID: 1037052652}
   m_Layer: 0
   m_Name: Partitions
   m_TagString: Untagged
@@ -30135,6 +30136,19 @@ Transform:
   - {fileID: 1756883302}
   m_Father: {fileID: 1661017723}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1037052652
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1037052650}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 19c37b8efe6b6d242918ee9c1f27b1ec, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RoomOnlyDecor
+  letsSunIn: 0
 --- !u!1 &1043610077
 GameObject:
   m_ObjectHideFlags: 0
@@ -35438,6 +35452,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1321288543}
+  - component: {fileID: 1321288544}
   m_Layer: 0
   m_Name: Partitions
   m_TagString: Untagged
@@ -35464,6 +35479,19 @@ Transform:
   - {fileID: 1987802098}
   m_Father: {fileID: 1522724810}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1321288544
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1321288542}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 19c37b8efe6b6d242918ee9c1f27b1ec, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RoomOnlyDecor
+  letsSunIn: 0
 --- !u!1 &1321437835
 GameObject:
   m_ObjectHideFlags: 0

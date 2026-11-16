@@ -1,8 +1,9 @@
 using UnityEngine;
 
 // Marks room decor that belongs to Haru's 3D room only (windows cut into a wall,
-// ceiling lamps). Dudu's 2D view skips everything under it, so none of it lands on
-// Dudu's paper. Built by the Tools > Draw And Go menu (WallWindowTool).
+// ceiling lamps, partition walls, stairs). Dudu's 2D view skips everything under it, so
+// none of it lands on Dudu's paper, and Dudu passes through its colliders. Built by the
+// Tools > Draw And Go menu (WallWindowTool, Stage1MapBuilder).
 [DisallowMultipleComponent]
 public sealed class RoomOnlyDecor : MonoBehaviour
 {

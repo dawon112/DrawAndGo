@@ -458,7 +458,8 @@ public sealed class DrawingStroke : MonoBehaviour
         Transform parent = transform.parent;
         foreach (List<Vector3> section in sections)
         {
-            if (section.Count < 2)
+            // A crumb left at the eraser's edge would still be a bump Dudu trips on; it goes too.
+            if (section.Count < 2 || SectionLength(section) < MinimumPieceLength)
                 continue;
 
             splitNumber++;
@@ -488,6 +489,16 @@ public sealed class DrawingStroke : MonoBehaviour
         isErased = true;
         Destroy(gameObject);
         return true;
+    }
+
+    // Shorter leftovers than this are rubbed away with the rest instead of staying as dots.
+    private const float MinimumPieceLength = 0.3f;
+
+    private static float SectionLength(List<Vector3> points)
+    {
+        float length = 0f;
+        for (int i = 1; i < points.Count; i++) length += Vector3.Distance(points[i - 1], points[i]);
+        return length;
     }
 
     private List<List<Vector3>> BuildOutsideSections(Vector3 center, float radius)

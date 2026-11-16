@@ -283,6 +283,16 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
         }
     }
 
+    // Things that belong to Haru's 3D room only (partition walls, stairs, room decor) stand
+    // against the walls too, but are not part of Dudu's page: he passes through them.
+    private void IgnoreRoomOnlyColliders()
+    {
+        if (duduCollider == null) return;
+        foreach (RoomOnlyDecor decor in FindObjectsByType<RoomOnlyDecor>(FindObjectsInactive.Include))
+            foreach (Collider other in decor.GetComponentsInChildren<Collider>(true))
+                Physics.IgnoreCollision(duduCollider, other);
+    }
+
     private void Awake()
     {
         body = GetComponent<Rigidbody>();
@@ -300,6 +310,8 @@ public sealed class DuduSurfaceMovement : MonoBehaviour
                 ? currentSurface.SurfaceToWorld(startSurfacePosition)
                 : transform.position;
         }
+
+        IgnoreRoomOnlyColliders();
 
         body.useGravity = false;
         body.isKinematic = false;
