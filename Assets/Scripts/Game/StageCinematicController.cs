@@ -11,6 +11,8 @@ public sealed class StageCinematicController : MonoBehaviour
     [SerializeField, Min(0.1f)] private float waypointMoveSpeed = 7f;
     [SerializeField, Min(0f)] private float waypointWaitTime = 0.7f;
     [SerializeField, Min(0f)] private float introBlendDuration = 0.8f;
+    [Tooltip("Metres per second along a stage's own intro path.")]
+    [SerializeField, Min(0.5f)] private float introPathSpeed = 6f;
 
     private GameViewManager manager;
     private Camera haruCamera, duduCamera, cinematicCamera;
@@ -177,24 +179,91 @@ public sealed class StageCinematicController : MonoBehaviour
         BeginSkippableCinematic();
         manager.EnterCinematic(GameViewManager.CameraState.IntroCinematic);
         ActivateCinematic();
-        List<Transform> points = BuildIntroPoints(level);
-        cinematicCamera.transform.SetPositionAndRotation(points[0].position, points[0].rotation);
-        yield return WaitOrSkip(1f);
-        if (skipRequested) { FinishIntroImmediately(); yield break; }
-        for (int i = 1; i < points.Count; i++)
+        if (level.introPath != null && level.introPath.childCount >= 2)
         {
-            float duration = Mathf.Max(0.15f,
-                Vector3.Distance(cinematicCamera.transform.position, points[i].position) / waypointMoveSpeed);
-            yield return MoveCamera(points[i].position, points[i].rotation, 60f, duration);
+            // The stage's own tour, laid out inside its rooms.
+            yield return FlyIntroPath(level.introPath);
             if (skipRequested) { FinishIntroImmediately(); yield break; }
-            yield return WaitOrSkip(i == points.Count - 1 ? 1f : waypointWaitTime);
+        }
+        else
+        {
+            List<Transform> points = BuildIntroPoints(level);
+            cinematicCamera.transform.SetPositionAndRotation(points[0].position, points[0].rotation);
+            yield return WaitOrSkip(1f);
             if (skipRequested) { FinishIntroImmediately(); yield break; }
+            for (int i = 1; i < points.Count; i++)
+            {
+                float duration = Mathf.Max(0.15f,
+                    Vector3.Distance(cinematicCamera.transform.position, points[i].position) / waypointMoveSpeed);
+                yield return MoveCamera(points[i].position, points[i].rotation, 60f, duration);
+                if (skipRequested) { FinishIntroImmediately(); yield break; }
+                yield return WaitOrSkip(i == points.Count - 1 ? 1f : waypointWaitTime);
+                if (skipRequested) { FinishIntroImmediately(); yield break; }
+            }
         }
         yield return MoveCamera(haruCamera.transform.position, haruCamera.transform.rotation,
             haruCamera.fieldOfView, introBlendDuration);
         cinematicCamera.gameObject.SetActive(false);
         EndSkippableCinematic();
         manager.FinishIntro();
+    }
+
+    // Flies through the path's waypoints, in order, along one smooth curve. A waypoint with a
+    // hold is a stop: the camera eases into it, waits, and eases out; the others it sweeps
+    // through. Facing turns from one waypoint's rotation to the next.
+    private IEnumerator FlyIntroPath(Transform path)
+    {
+        List<Transform> points = new List<Transform>();
+        foreach (Transform child in path) points.Add(child);
+        cinematicCamera.transform.SetPositionAndRotation(points[0].position, points[0].rotation);
+        cinematicCamera.fieldOfView = 60f;
+        yield return WaitOrSkip(IntroWaypoint.HoldOf(points[0]));
+        if (skipRequested) yield break;
+        int legStart = 0;
+        for (int i = 1; i < points.Count; i++)
+        {
+            if (i < points.Count - 1 && IntroWaypoint.HoldOf(points[i]) <= 0f) continue;
+            yield return FlyLeg(points, legStart, i);
+            if (skipRequested) yield break;
+            yield return WaitOrSkip(IntroWaypoint.HoldOf(points[i]));
+            if (skipRequested) yield break;
+            legStart = i;
+        }
+    }
+
+    private IEnumerator FlyLeg(List<Transform> points, int from, int to)
+    {
+        const int Steps = 24;
+        List<Vector3> positions = new List<Vector3>();
+        List<Quaternion> rotations = new List<Quaternion>();
+        List<float> distances = new List<float>();
+        for (int k = from; k < to; k++)
+        {
+            for (int step = k == from ? 0 : 1; step <= Steps; step++)
+            {
+                float u = step / (float)Steps;
+                Vector3 position = IntroWaypoint.PathPoint(points, k, u);
+                distances.Add(positions.Count == 0 ? 0f : distances[distances.Count - 1] + Vector3.Distance(positions[positions.Count - 1], position));
+                positions.Add(position);
+                rotations.Add(Quaternion.Slerp(points[k].rotation, points[k + 1].rotation, Mathf.SmoothStep(0f, 1f, u)));
+            }
+        }
+        float total = distances[distances.Count - 1];
+        float duration = Mathf.Max(0.3f, total / introPathSpeed);
+        int index = 0;
+        for (float elapsed = 0f; elapsed < duration; elapsed += Time.unscaledDeltaTime)
+        {
+            if (skipRequested) yield break;
+            float along = Mathf.SmoothStep(0f, 1f, elapsed / duration) * total;
+            while (index < distances.Count - 2 && distances[index + 1] < along) index++;
+            float span = Mathf.Max(0.0001f, distances[index + 1] - distances[index]);
+            float t = Mathf.Clamp01((along - distances[index]) / span);
+            cinematicCamera.transform.SetPositionAndRotation(
+                Vector3.Lerp(positions[index], positions[index + 1], t),
+                Quaternion.Slerp(rotations[index], rotations[index + 1], t));
+            yield return null;
+        }
+        cinematicCamera.transform.SetPositionAndRotation(positions[positions.Count - 1], rotations[rotations.Count - 1]);
     }
 
     private List<Transform> BuildIntroPoints(CornerRoomLevel level)

@@ -15,6 +15,7 @@ public sealed class WindZoneFx : MonoBehaviour
     private WindZone zone;
     private BoxCollider box;
     private AudioSource loop;
+    private DuduSurfaceMovement dudu;
     private float nextStreak, nextBit, nextArrow, nextStrokeCheck;
 
     private void Awake()
@@ -35,7 +36,11 @@ public sealed class WindZoneFx : MonoBehaviour
         Vector3 direction = FxWall.Direction(surface, flow);
         float now = Time.time;
 
-        FxSound.SetLoop(loop, Mathf.Clamp(0.09f + force * 0.05f, 0f, 0.28f) * FxView.Attenuation(FxWall.Point(surface, rect.center)));
+        // The air is only heard while it is pushing Dudu: a stage full of wind zones would
+        // otherwise roar all the time, wherever the players are.
+        if (dudu == null) dudu = FindAnyObjectByType<DuduSurfaceMovement>();
+        float gust = zone.IsPushing(dudu) ? Mathf.Clamp(0.09f + force * 0.05f, 0f, 0.28f) : 0f;
+        FxSound.SetLoop(loop, gust * FxView.Attenuation(FxWall.Point(surface, rect.center)));
 
         // More air the stronger it blows and the bigger the zone. Everything stays inside the
         // zone: the air outside it is still.

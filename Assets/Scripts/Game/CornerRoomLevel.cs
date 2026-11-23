@@ -15,6 +15,8 @@ public sealed class CornerRoomLevel : MonoBehaviour
     public Player3DMovement player3D;
     public ThreeDimensionalGoal goal3D;
     public TextMesh goalLabel;
+    [Tooltip("Optional: the opening camera tour, its waypoints as children in order (IntroWaypoint for stops).")]
+    public Transform introPath;
     public bool IsOpen { get; private set; }
     public bool IsDoorVisuallyOpen { get; private set; }
     public bool IsClear { get; private set; }

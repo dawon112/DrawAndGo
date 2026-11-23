@@ -118,7 +118,8 @@ public static class Stage1MapBuilder
     {
         R(245, 295, 305, 355),
         R(315, 240, 380, 295),
-        R(665, 350, 800, 405),
+        // Sketched out to x 800, but 1F ends at 745: past it the hole would drop into nothing.
+        R(665, 350, 745, 405),
     };
 
     // The staircase climbs west, from its foot on 1F to 2F.
@@ -212,6 +213,7 @@ public static class Stage1MapBuilder
         level.player = dudu;
         level.player3D = haru;
         level.goal3D = BuildGoal(root.transform, doorWall, doorX, level);
+        level.introPath = BuildIntroPath(root.transform);
 
         PlacePlayers(haru, dudu, duduCamera, route[0], scene);
         EditorSceneManager.MarkSceneDirty(scene);
@@ -711,6 +713,52 @@ public static class Stage1MapBuilder
         ThreeDimensionalGoal component = goal.AddComponent<ThreeDimensionalGoal>();
         component.Configure(level);
         return component;
+    }
+
+    // ---- Opening camera tour ------------------------------------------------------------------
+
+    // 2F first, then down along the stairs, around 1F, and on to Haru. Each point stays at
+    // least a metre or so from every wall, floor and ceiling, and the straight line to the next
+    // one crosses no wall, so the camera never looks through one.
+    private struct TourPoint
+    {
+        public Vector2 at, look;
+        public float height, lookHeight, hold;
+        public TourPoint(float x, float y, float h, float lx, float ly, float lh, float hold)
+        {
+            at = P(x, y); height = h; look = P(lx, ly); lookHeight = lh; this.hold = hold;
+        }
+    }
+
+    private static readonly TourPoint[] Tour =
+    {
+        new TourPoint(560, 480, 8.6f, 330, 300, 6.2f, 1.2f),   // 2F: over the hall toward the two holes
+        new TourPoint(440, 330, 8.8f, 700, 330, 6.6f, 0.8f),   // 2F: turning east, the third hole and the rooms
+        new TourPoint(330, 415, 8.6f, 150, 450, 7.0f, 0f),     // past the corner of the west room's wall
+        new TourPoint(150, 420, 8.4f, 260, 489, 4.0f, 0f),     // round to the top of the stairs, clear of the railing
+        new TourPoint(175, 489, 7.6f, 370, 489, 1.2f, 0f),     // down the stairs
+        new TourPoint(270, 489, 5.0f, 420, 489, 1.5f, 0f),
+        new TourPoint(395, 489, 2.5f, 395, 380, 2.0f, 0f),     // the foot of the stairs, turning into 1F
+        new TourPoint(390, 390, 3.4f, 250, 200, 1.2f, 0.8f),   // 1F: one look over the west room and its crate
+        new TourPoint(300, 412, 2.2f, 210, 410, 1.6f, 0f),     // and on to Haru
+    };
+
+    public static Transform BuildIntroPath(Transform root)
+    {
+        Transform existing = root.Find("Intro Camera Path");
+        if (existing != null) Object.DestroyImmediate(existing.gameObject);
+        Transform path = Child(root, "Intro Camera Path");
+        for (int i = 0; i < Tour.Length; i++)
+        {
+            TourPoint point = Tour[i];
+            GameObject waypoint = new GameObject($"Waypoint {i + 1:00}");
+            waypoint.transform.SetParent(path, false);
+            Vector3 position = World(point.at, point.height);
+            waypoint.transform.SetPositionAndRotation(position,
+                Quaternion.LookRotation(World(point.look, point.lookHeight) - position, Vector3.up));
+            waypoint.AddComponent<IntroWaypoint>().hold = point.hold;
+        }
+        return path;
     }
 
     // ---- Players ------------------------------------------------------------------------------

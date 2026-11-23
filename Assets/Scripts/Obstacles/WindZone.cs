@@ -97,6 +97,10 @@ public sealed class WindZone : MonoBehaviour
         return result;
     }
 
+    // True while Dudu stands in this zone's air, on its wall: the wind is pushing him.
+    public bool IsPushing(DuduSurfaceMovement dudu) =>
+        dudu != null && surface != null && dudu.CurrentSurface == surface && Contains(dudu.transform.position);
+
     private bool Contains(Vector3 worldPoint)
     {
         if (zoneCollider == null) zoneCollider = GetComponent<BoxCollider>();

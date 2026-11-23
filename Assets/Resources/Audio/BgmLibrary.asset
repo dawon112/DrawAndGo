@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ad5061c6dcb475a4590f8042b3bda0e7, type: 3}
+  m_Name: BgmLibrary
+  m_EditorClassIdentifier: Assembly-CSharp::BgmLibrary
+  title: {fileID: 8300000, guid: 5575f583f74db1f41823f45c5cef6105, type: 3}
+  inGame: {fileID: 8300000, guid: 6df80e6c7b4e3194cafa552dea40e6b5, type: 3}
+  clear: {fileID: 8300000, guid: 97b467a536c72cb439ef5b8de6b029c3, type: 3}
+  volume: 0.55
+  fadeSeconds: 1.2

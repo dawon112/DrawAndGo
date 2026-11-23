@@ -111,6 +111,7 @@ public sealed class ExhibitionRankingFlow : MonoBehaviour
             hostState = new State { id = recordId };
         }
         phase = Phase.Celebrate;
+        BgmPlayer.Play(BgmTrack.Clear);
         EnsureUi();
         hideClearScreen?.Invoke();
         stage = CelebrationStage.Build(ui.CelebrationWidth);
