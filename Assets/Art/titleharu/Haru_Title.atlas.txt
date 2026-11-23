@@ -1,0 +1,21 @@
+Haru_Title.png
+size:1882,1531
+filter:Linear,Linear
+armL
+bounds:630,4,391,257
+armL copy
+bounds:4,4,243,197
+armR
+bounds:4,513,235,205
+armR copy
+bounds:1256,4,204,158
+body
+bounds:630,513,327,396
+foot
+bounds:1256,513,255,211
+head
+bounds:4,1022,622,505
+leg
+bounds:1256,1022,254,357
+leg copy
+bounds:630,1022,199,260

@@ -1,0 +1,7 @@
+Embedded copy of spine-unity (spine-runtimes branch 4.2, commit 2060c0cd5609, 4.2.121) patched to compile on Unity 6.5,
+where several instance-id APIs are compile errors. Changes (search "DrawAndGo" for the larger ones):
+- Object.GetInstanceID() -> GetHashCode() (Unity returns the same value).
+- AssetDatabase.GetAssetPath(obj.GetInstanceID()) -> AssetDatabase.GetAssetPath(obj).
+- EditorUtility.InstanceIDToObject(obj.GetInstanceID()) -> EditorUtility.EntityIdToObject(obj.GetEntityId()).
+- Hierarchy drag-and-drop handler and hierarchy icons are left out on Unity 6.5 (editor conveniences only).
+Replace this folder with a newer official spine-unity 4.2 once it supports Unity 6.5.
