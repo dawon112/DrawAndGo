@@ -39,6 +39,7 @@ public sealed class GameHud : MonoBehaviour
     private GameViewManager view;
     private TutorialRoomLevel room;
     private CornerRoomLevel corner;
+    private float nextLevelSearch;
     private HaruDrawingController drawing;
 
     private readonly List<GameObject> pickups = new List<GameObject>();
@@ -138,8 +139,14 @@ public sealed class GameHud : MonoBehaviour
 
     private void BindSource()
     {
-        if (room == null) room = FindAnyObjectByType<TutorialRoomLevel>();
-        if (room == null && corner == null) corner = FindAnyObjectByType<CornerRoomLevel>();
+        // Looked for twice a second, not every frame: a stage without a tutorial room
+        // searched the whole scene for one each frame.
+        if (room == null && Time.unscaledTime >= nextLevelSearch)
+        {
+            nextLevelSearch = Time.unscaledTime + 0.5f;
+            room = FindAnyObjectByType<TutorialRoomLevel>();
+            if (room == null && corner == null) corner = FindAnyObjectByType<CornerRoomLevel>();
+        }
         object source = room != null ? room.Stars : corner != null ? corner.coins : null;
         if (ReferenceEquals(source, boundSource)) return;
         boundSource = source;

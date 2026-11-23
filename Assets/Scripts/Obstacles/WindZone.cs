@@ -97,6 +97,52 @@ public sealed class WindZone : MonoBehaviour
         return result;
     }
 
+    // A whole line at once: the wind on its first point or segment midpoint that has any,
+    // as the point-by-point query above would give. Each zone is read once per call.
+    public static Vector3 GetStrokeVelocity(LineRenderer line, Vector3 surfaceNormal)
+    {
+        int count = line != null ? line.positionCount : 0;
+        if (count == 0) return Vector3.zero;
+        Vector3 strokeNormal = surfaceNormal.normalized;
+        ZoneShape.LineBox(line, count, out Vector3 boxCenter, out Vector3 boxExtents);
+        int zones = 0;
+        foreach (WindZone zone in ActiveZones)
+        {
+            if (zone == null || zone.surface == null) continue;
+            Vector3 normal = zone.surface.Normal.normalized;
+            if (Mathf.Abs(Vector3.Dot(strokeNormal, normal)) < 0.9f) continue;
+            if (zone.zoneCollider == null) zone.zoneCollider = zone.GetComponent<BoxCollider>();
+            Vector2 direction = zone.windDirection.sqrMagnitude > 0f ? zone.windDirection.normalized : Vector2.right;
+            Vector3 velocity = (zone.surface.Right.normalized * direction.x + zone.surface.Up.normalized * direction.y) * zone.windForce;
+            var shape = new ZoneShape(zone.surface.transform.position, normal, zone.transform.worldToLocalMatrix,
+                zone.zoneCollider.center, zone.zoneCollider.size * 0.5f, velocity: velocity);
+            if (!shape.MayContain(boxCenter, boxExtents, 0.35f)) continue;
+            if (zones == Scratch.Length) System.Array.Resize(ref Scratch, zones * 2);
+            Scratch[zones++] = shape;
+        }
+        if (zones == 0) return Vector3.zero;
+        for (int i = 0; i < count; i++)
+        {
+            Vector3 point = line.GetPosition(i);
+            Vector3 velocity = VelocityAt(point, zones);
+            if (velocity.sqrMagnitude > 0.000001f) return velocity;
+            if (i + 1 >= count) continue;
+            velocity = VelocityAt((point + line.GetPosition(i + 1)) * 0.5f, zones);
+            if (velocity.sqrMagnitude > 0.000001f) return velocity;
+        }
+        return Vector3.zero;
+    }
+
+    private static ZoneShape[] Scratch = new ZoneShape[16];
+
+    private static Vector3 VelocityAt(Vector3 point, int zones)
+    {
+        Vector3 result = Vector3.zero;
+        for (int z = 0; z < zones; z++)
+            if (Scratch[z].Contains(point, 0.35f)) result += Scratch[z].Velocity;
+        return result;
+    }
+
     // True while Dudu stands in this zone's air, on its wall: the wind is pushing him.
     public bool IsPushing(DuduSurfaceMovement dudu) =>
         dudu != null && surface != null && dudu.CurrentSurface == surface && Contains(dudu.transform.position);

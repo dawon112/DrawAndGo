@@ -68,6 +68,16 @@ public sealed class DuduCameraController : MonoBehaviour
     private MaterialPropertyBlock proxyPropertyBlock;
     private DuduSurfaceMovement duduMovement;
     private Image debuffOverlay;
+    // The walls stand still (their places in this view are laid out once, in Start), so
+    // their axes are read once too: finding a thing's wall is then plain arithmetic.
+    private Vector3[] surfacePositions, surfaceRights, surfaceUps, surfaceNormals, surfaceFacings;
+    // Renderers that can never get a proxy (by kind, name or place), so the periodic
+    // look for new renderers does not weigh them again and again.
+    private readonly HashSet<Renderer> neverProxied = new HashSet<Renderer>();
+    private readonly Dictionary<Renderer, VisualProxy> offTheWalls = new Dictionary<Renderer, VisualProxy>();
+    private readonly List<Renderer> goneRenderers = new List<Renderer>();
+    private int refreshCount;
+    private Vector3[] linePointBuffer = new Vector3[64];
 
     // A world point as this camera sees it: walls laid end to end. UI that follows something
     // in this view projects the result with this camera.
@@ -165,6 +175,20 @@ public sealed class DuduCameraController : MonoBehaviour
         surfaceLifts = new float[surfaces.Length];
         for (int i = 0; i < surfaces.Length; i++)
             surfaceLifts[i] = surfaces[i].transform.position.y - surfaces[0].transform.position.y;
+        surfacePositions = new Vector3[surfaces.Length];
+        surfaceRights = new Vector3[surfaces.Length];
+        surfaceUps = new Vector3[surfaces.Length];
+        surfaceNormals = new Vector3[surfaces.Length];
+        surfaceFacings = new Vector3[surfaces.Length];
+        for (int i = 0; i < surfaces.Length; i++)
+        {
+            if (surfaces[i] == null) continue;
+            surfacePositions[i] = surfaces[i].transform.position;
+            surfaceRights[i] = surfaces[i].Right.normalized;
+            surfaceUps[i] = surfaces[i].Up.normalized;
+            surfaceNormals[i] = surfaces[i].Normal;
+            surfaceFacings[i] = surfaces[i].Normal.normalized;
+        }
 
         proxyRoot = new GameObject("Dudu Unwrapped View").transform;
         proxyRoot.gameObject.layer = UnwrappedLayer;
@@ -414,33 +438,62 @@ public sealed class DuduCameraController : MonoBehaviour
         nextProxyRefresh = Time.unscaledTime + 0.25f;
         foreach (Renderer source in FindObjectsByType<Renderer>(FindObjectsInactive.Include))
         {
+            if (source == null || proxiedSources.Contains(source) || neverProxied.Contains(source)) continue;
             AddVisualProxy(source);
         }
+        // Every ten seconds or so, forget renderers that have been destroyed.
+        if (++refreshCount % 40 != 0) return;
+        neverProxied.RemoveWhere(source => source == null);
+        goneRenderers.Clear();
+        foreach (Renderer source in offTheWalls.Keys)
+            if (source == null) goneRenderers.Add(source);
+        foreach (Renderer source in goneRenderers) offTheWalls.Remove(source);
     }
 
     private void AddVisualProxy(Renderer source)
     {
-        if (source == null || proxyRoot == null)
+        if (source == null || proxyRoot == null || proxiedSources.Contains(source))
             return;
 
         string sourceName = source.gameObject.name;
         if (source is SkinnedMeshRenderer || source.transform.IsChildOf(proxyRoot) ||
-            proxiedSources.Contains(source) ||
             sourceName == "Room Wall 6 - Closure" || sourceName.StartsWith("START") ||
-            sourceName.StartsWith("SECTION") || source.GetComponentInParent<RoomOnlyDecor>() != null) return;
+            sourceName.StartsWith("SECTION") || source.GetComponentInParent<RoomOnlyDecor>() != null)
+        {
+            neverProxied.Add(source);
+            return;
+        }
         // Haru's aim cross on the wall: Dudu sees Haru's crayon/eraser cursor there instead.
         // (Strokes are drawn under the same root, so only its two cross lines are left out.)
         if ((sourceName == "Horizontal" || sourceName == "Vertical") && source.transform.parent != null &&
-            source.transform.parent.GetComponent<HaruSurfaceAimMarker>() != null) return;
+            source.transform.parent.GetComponent<HaruSurfaceAimMarker>() != null)
+        {
+            neverProxied.Add(source);
+            return;
+        }
 
-        LineMagnet magnet = source.GetComponentInParent<LineMagnet>();
-        DuduSurface sourceSurface = magnet != null && magnet.Surface != null
-            ? magnet.Surface
-            : FindSurface(source);
-        if (sourceSurface == null) return;
+        // Off every wall for now (room furniture, effects waiting in their pool): kept, so the
+        // next look only checks whether it has moved.
+        if (!offTheWalls.TryGetValue(source, out VisualProxy item))
+            item = new VisualProxy(source);
+        DuduSurface sourceSurface = item.magnet != null && item.magnet.Surface != null
+            ? item.magnet.Surface
+            : FindSurface(item);
+        if (sourceSurface == null)
+        {
+            offTheWalls[source] = item;
+            return;
+        }
+        offTheWalls.Remove(source);
         Renderer proxy = CreateProxy(source);
-        if (proxy == null) return;
-        visualProxies.Add(new VisualProxy(source, proxy, sourceSurface));
+        if (proxy == null)
+        {
+            neverProxied.Add(source);
+            return;
+        }
+        item.proxy = proxy;
+        item.surface = sourceSurface;
+        visualProxies.Add(item);
         proxiedSources.Add(source);
     }
 
@@ -449,15 +502,23 @@ public sealed class DuduCameraController : MonoBehaviour
     // Things on the walls face their wall too. Right at a corner a point is about as close to
     // the neighbouring wall, and drawing it there turns it edge-on to the camera (it vanishes).
     // Dudu himself is always on his current wall.
-    private DuduSurface FindSurface(Renderer source)
+    // The parents asked about here are found once per proxy (VisualProxy), and a thing that
+    // has not moved since the last look keeps the wall it had: this ran for every proxy every
+    // frame and was most of Dudu's frame time once the page filled up (2026-11-23).
+    private DuduSurface FindSurface(VisualProxy item)
     {
-        DuduSurfaceMovement walker = source.GetComponentInParent<DuduSurfaceMovement>();
+        DuduSurfaceMovement walker = item.walker;
         if (walker != null && walker.CurrentSurface != null && System.Array.IndexOf(surfaces, walker.CurrentSurface) >= 0)
             return walker.CurrentSurface;
-        DrawingStroke stroke = source.GetComponentInParent<DrawingStroke>();
-        Vector3 position = GetReferencePosition(source);
-        Vector3 facing = stroke != null ? stroke.SurfaceNormal : source.transform.forward;
-        return FindSurface(position, facing) ?? FindSurface(position, Vector3.zero);
+        Vector3 position = GetReferencePosition(item.source, item.routeLine);
+        Vector3 facing = item.stroke != null ? item.stroke.SurfaceNormal : item.source.transform.forward;
+        if (item.placeKnown && position == item.placePosition && facing == item.placeFacing)
+            return item.placeSurface;
+        item.placeKnown = true;
+        item.placePosition = position;
+        item.placeFacing = facing;
+        item.placeSurface = FindSurface(position, facing) ?? FindSurface(position, Vector3.zero);
+        return item.placeSurface;
     }
 
     private DuduSurface FindSurface(Vector3 position) => FindSurface(position, Vector3.zero);
@@ -466,18 +527,28 @@ public sealed class DuduCameraController : MonoBehaviour
     {
         DuduSurface best = null;
         float bestScore = float.PositiveInfinity;
-        foreach (DuduSurface surface in surfaces)
+        Vector3 facingDirection = facing.normalized;
+        for (int i = 0; i < surfaces.Length; i++)
         {
+            DuduSurface surface = surfaces[i];
             if (surface == null) continue;
-            if (facing != Vector3.zero && Mathf.Abs(Vector3.Dot(facing.normalized, surface.Normal.normalized)) < 0.9f) continue;
-            Vector2 local = surface.WorldToSurface(position);
-            float planeDistance = Mathf.Abs(Vector3.Dot(position - surface.transform.position, surface.Normal));
+            if (facing != Vector3.zero && Mathf.Abs(Vector3.Dot(facingDirection, surfaceFacings[i])) < 0.9f) continue;
+            Vector3 relative = position - surfacePositions[i];
+            Vector2 local = new Vector2(Vector3.Dot(relative, surfaceRights[i]), Vector3.Dot(relative, surfaceUps[i]));
+            float planeDistance = Mathf.Abs(Vector3.Dot(relative, surfaceNormals[i]));
             float outsideX = Mathf.Max(0f, Mathf.Abs(local.x) - surface.Width * 0.5f - 1f);
             float outsideY = Mathf.Max(0f, Mathf.Abs(local.y) - surface.Height * 0.5f - 1f);
             float score = planeDistance + outsideX + outsideY;
             if (score < bestScore && score < 1.5f) { best = surface; bestScore = score; }
         }
         return best;
+    }
+
+    // surface.WorldToSurface with the wall's axes read once.
+    private Vector2 ToSurface(int index, Vector3 world)
+    {
+        Vector3 relative = world - surfacePositions[index];
+        return new Vector2(Vector3.Dot(relative, surfaceRights[index]), Vector3.Dot(relative, surfaceUps[index]));
     }
 
     private Renderer CreateProxy(Renderer source)
@@ -552,14 +623,14 @@ public sealed class DuduCameraController : MonoBehaviour
                 item.proxy.enabled = false;
                 continue;
             }
-            LineMagnet magnet = item.source.GetComponentInParent<LineMagnet>();
+            LineMagnet magnet = item.magnet;
             DuduSurface liveSurface = magnet != null && magnet.Surface != null
                 ? magnet.Surface
-                : FindSurface(item.source);
+                : FindSurface(item);
             if (liveSurface != null) item.surface = liveSurface;
             int surfaceIndex = System.Array.IndexOf(surfaces, item.surface);
             if (surfaceIndex < 0) continue;
-            Vector2 local = item.surface.WorldToSurface(item.source.transform.position);
+            Vector2 local = ToSurface(surfaceIndex, item.source.transform.position);
             // Keep magnets in front of wall proxies, but behind Dudu's sprite.
             float displayDepth = magnet != null ? -0.1f : item.proxy is SpriteRenderer ? -0.2f : 0f;
             item.proxy.transform.position = ToView(surfaceIndex, local, displayDepth);
@@ -577,6 +648,8 @@ public sealed class DuduCameraController : MonoBehaviour
             {
                 line.startWidth = sourceLine.startWidth; line.endWidth = sourceLine.endWidth;
                 line.startColor = sourceLine.startColor; line.endColor = sourceLine.endColor;
+                // Re-laid only when the line or its wall changed: most drawn lines sit still.
+                if (!LineChanged(item, sourceLine, surfaceIndex)) continue;
                 // A line ends at its wall's edge: anything poking past a corner would lie over
                 // the neighbouring wall's own drawing here.
                 float half = item.surface.Width * 0.5f;
@@ -584,19 +657,22 @@ public sealed class DuduCameraController : MonoBehaviour
                 float maxX = surfaceCenters[surfaceIndex] + (surfaceIndex < surfaces.Length - 1 ? half : float.PositiveInfinity);
                 clippedLinePoints.Clear();
                 Vector3 previous = Vector3.zero;
-                for (int point = 0; point < sourceLine.positionCount; point++)
+                int pointCount = item.lineCount;
+                for (int point = 0; point < pointCount; point++)
                 {
-                    Vector3 worldPoint = sourceLine.useWorldSpace ? sourceLine.GetPosition(point) :
-                        sourceLine.transform.TransformPoint(sourceLine.GetPosition(point));
-                    Vector2 pointLocal = item.surface.WorldToSurface(worldPoint);
+                    Vector3 worldPoint = sourceLine.useWorldSpace ? item.linePoints[point] :
+                        sourceLine.transform.TransformPoint(item.linePoints[point]);
+                    Vector2 pointLocal = ToSurface(surfaceIndex, worldPoint);
                     Vector3 current = ToView(surfaceIndex, pointLocal, -0.1f);
                     if (point > 0) AddClippedSegment(previous, current, minX, maxX);
                     else if (current.x >= minX && current.x <= maxX) clippedLinePoints.Add(current);
                     previous = current;
                 }
+                if (linePointBuffer.Length < clippedLinePoints.Count)
+                    linePointBuffer = new Vector3[Mathf.NextPowerOfTwo(clippedLinePoints.Count)];
+                clippedLinePoints.CopyTo(linePointBuffer);
                 line.positionCount = clippedLinePoints.Count;
-                for (int point = 0; point < clippedLinePoints.Count; point++)
-                    line.SetPosition(point, clippedLinePoints[point]);
+                line.SetPositions(linePointBuffer);
             }
             else if (item.source.TryGetComponent(out TextMesh sourceText) && item.proxy.TryGetComponent(out TextMesh text))
             {
@@ -633,10 +709,9 @@ public sealed class DuduCameraController : MonoBehaviour
         clippedLinePoints.Add(Vector3.Lerp(a, b, exit));
     }
 
-    private static Vector3 GetReferencePosition(Renderer renderer)
+    private static Vector3 GetReferencePosition(Renderer renderer, CrayonRouteLine routeLine)
     {
         // A route line's stroke can end right at a room corner; its box centre is on its own wall.
-        CrayonRouteLine routeLine = renderer.GetComponentInParent<CrayonRouteLine>();
         if (routeLine != null)
             return routeLine.transform.position;
         if (renderer is LineRenderer line && line.positionCount > 0)
@@ -662,12 +737,55 @@ public sealed class DuduCameraController : MonoBehaviour
         if (proxyRoot != null) Destroy(proxyRoot.gameObject);
     }
 
+    // Reads the source line's points into the proxy's copy. True when they, the wall or (for
+    // a line in its own space) the line's transform differ from what was laid out last.
+    private static bool LineChanged(VisualProxy item, LineRenderer sourceLine, int surfaceIndex)
+    {
+        int count = sourceLine.positionCount;
+        if (item.scratchPoints == null || item.scratchPoints.Length < count)
+            item.scratchPoints = new Vector3[Mathf.NextPowerOfTwo(Mathf.Max(count, 16))];
+        if (count > 0) sourceLine.GetPositions(item.scratchPoints);
+        Matrix4x4 space = sourceLine.useWorldSpace ? Matrix4x4.identity : sourceLine.transform.localToWorldMatrix;
+        bool changed = item.linePoints == null || count != item.lineCount || surfaceIndex != item.lineSurfaceIndex ||
+            space != item.lineSpace;
+        for (int i = 0; !changed && i < count; i++)
+            changed = item.scratchPoints[i] != item.linePoints[i];
+        if (!changed) return false;
+        Vector3[] previous = item.linePoints;
+        item.linePoints = item.scratchPoints;
+        item.scratchPoints = previous;
+        item.lineCount = count;
+        item.lineSurfaceIndex = surfaceIndex;
+        item.lineSpace = space;
+        return true;
+    }
+
     private sealed class VisualProxy
     {
         public readonly Renderer source;
-        public readonly Renderer proxy;
+        public Renderer proxy;
         public DuduSurface surface;
-        public VisualProxy(Renderer source, Renderer proxy, DuduSurface surface)
-        { this.source = source; this.proxy = proxy; this.surface = surface; }
+        // Its parents, which do not change: asked once instead of every frame.
+        public readonly LineMagnet magnet;
+        public readonly DuduSurfaceMovement walker;
+        public readonly DrawingStroke stroke;
+        public readonly CrayonRouteLine routeLine;
+        // The wall last found for it, and from where.
+        public bool placeKnown;
+        public Vector3 placePosition, placeFacing;
+        public DuduSurface placeSurface;
+        // A line's points as last laid out in this view.
+        public Vector3[] linePoints, scratchPoints;
+        public int lineCount, lineSurfaceIndex = -1;
+        public Matrix4x4 lineSpace;
+
+        public VisualProxy(Renderer source)
+        {
+            this.source = source;
+            magnet = source.GetComponentInParent<LineMagnet>();
+            walker = source.GetComponentInParent<DuduSurfaceMovement>();
+            stroke = source.GetComponentInParent<DrawingStroke>();
+            routeLine = source.GetComponentInParent<CrayonRouteLine>();
+        }
     }
 }

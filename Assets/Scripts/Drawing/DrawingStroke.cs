@@ -48,6 +48,10 @@ public sealed class DrawingStroke : MonoBehaviour
     private const float FreshSettleSeconds = 1.4f;
     private float settleStartedAt = -1f;
     private float nextSettleStep;
+    private const float ZoneScanInterval = 0.1f;
+    private float nextHeatScan;
+    private float nextWindScan;
+    private Vector3[] translateBuffer;
     public float FadeProgress => isFading ? Mathf.Clamp01((Time.time - fadeStartedAt) / fadeDuration) : 0f;
     private void OnEnable() { if (!Live.Contains(this)) Live.Add(this); }
     private void OnDisable() => Live.Remove(this);
@@ -295,36 +299,27 @@ public sealed class DrawingStroke : MonoBehaviour
         if (lineRenderer == null || lineRenderer.positionCount == 0)
             return;
 
-        if (!isFading)
+        // Every point of every line against every zone each physics step grew with each
+        // line drawn until frames took longer than the steps they ran (2026-11-23). A line
+        // no zone touches is looked at again a few times a second: new points are checked
+        // as they are added, and a line only moves when the wind already has it.
+        float now = Time.time;
+        if (!isFading && now >= nextHeatScan)
         {
-            for (int i = 0; i < lineRenderer.positionCount; i++)
-            {
-                if (TryStartHotZoneFade(lineRenderer.GetPosition(i))) break;
-                if (i + 1 >= lineRenderer.positionCount) continue;
-                Vector3 midpoint = (lineRenderer.GetPosition(i) + lineRenderer.GetPosition(i + 1)) * 0.5f;
-                if (TryStartHotZoneFade(midpoint)) break;
-            }
+            nextHeatScan = now + ZoneScanInterval;
+            if (HotZone.TryGetFadeDuration(lineRenderer, surfaceNormal, out float duration))
+                StartHotZoneFade(duration);
         }
 
-        if (!isFinished || IsNetworkMirror)
+        if (!isFinished || IsNetworkMirror || now < nextWindScan)
             return;
 
-        Vector3 windVelocity = Vector3.zero;
-        for (int i = 0; i < lineRenderer.positionCount; i++)
-        {
-            windVelocity = WindZone.GetWorldVelocity(lineRenderer.GetPosition(i), surfaceNormal);
-            if (windVelocity.sqrMagnitude > 0.000001f) break;
-
-            if (i + 1 < lineRenderer.positionCount)
-            {
-                Vector3 midpoint = (lineRenderer.GetPosition(i) + lineRenderer.GetPosition(i + 1)) * 0.5f;
-                windVelocity = WindZone.GetWorldVelocity(midpoint, surfaceNormal);
-                if (windVelocity.sqrMagnitude > 0.000001f) break;
-            }
-        }
-
+        Vector3 windVelocity = WindZone.GetStrokeVelocity(lineRenderer, surfaceNormal);
         if (windVelocity.sqrMagnitude <= 0.000001f)
+        {
+            nextWindScan = now + ZoneScanInterval;
             return;
+        }
 
         // Translate the entire stroke rigidly. Moving only the points inside the
         // zone pins them at its boundary and destroys the shape of the drawing.
@@ -336,8 +331,13 @@ public sealed class DrawingStroke : MonoBehaviour
         if (lineRenderer == null || displacement.sqrMagnitude <= Mathf.Epsilon)
             return;
 
-        for (int i = 0; i < lineRenderer.positionCount; i++)
-            lineRenderer.SetPosition(i, lineRenderer.GetPosition(i) + displacement);
+        int count = lineRenderer.positionCount;
+        if (translateBuffer == null || translateBuffer.Length < count)
+            translateBuffer = new Vector3[Mathf.NextPowerOfTwo(Mathf.Max(count, 16))];
+        lineRenderer.GetPositions(translateBuffer);
+        for (int i = 0; i < count; i++)
+            translateBuffer[i] += displacement;
+        lineRenderer.SetPositions(translateBuffer);
         // Physics points are translation invariant, so the segments can move as-is.
         foreach (BoxCollider segment in colliderSegments)
             if (segment != null)
@@ -349,6 +349,12 @@ public sealed class DrawingStroke : MonoBehaviour
     {
         if (isFading || !HotZone.TryGetFadeDuration(firstPoint, surfaceNormal, out float duration))
             return false;
+        StartHotZoneFade(duration);
+        return true;
+    }
+
+    private void StartHotZoneFade(float duration)
+    {
         isFading = true;
         fadeStartedAt = Time.time;
         fadeDuration = duration;
@@ -361,7 +367,6 @@ public sealed class DrawingStroke : MonoBehaviour
             colorKeys = new[] { new GradientColorKey(fadeStartColor, 0f), new GradientColorKey(fadeStartColor, 1f) },
             alphaKeys = new[] { new GradientAlphaKey(fadeStartColor.a, 0f), new GradientAlphaKey(fadeStartColor.a, 1f) }
         };
-        return true;
     }
 
     private Vector3 GetPhysicsPoint(int index)

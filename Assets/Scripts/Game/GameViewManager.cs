@@ -80,6 +80,9 @@ public sealed class GameViewManager : MonoBehaviour
             PlayerPoseSync poseSync = gameObject.AddComponent<PlayerPoseSync>();
             poseSync.Configure(haruMovement != null ? haruMovement.transform : null,
                 duduMovement, multiplayerLevel != null ? multiplayerLevel.surfaces : null);
+            // The stage's opening tour plays on both PCs too (coming in from the tutorial it
+            // was skipped). FinishIntro hands each PC back its own view: Haru's or Dudu's.
+            if (multiplayerLevel != null) stageCinematic.PlayIntro(multiplayerLevel);
             return;
         }
 

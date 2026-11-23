@@ -309,17 +309,25 @@ public sealed class BlockFx : MonoBehaviour
         FxArt.Sync(flash, art, new Color(1f, 1f, 1f, flashAmount));
     }
 
-    // Blocks have no script of their own, so Dudu finds them.
+    // Blocks have no script of their own, so Dudu finds them. Looked for by their sprite:
+    // every drawn line is made of box colliders, so going through all boxes grew with each
+    // line until it hitched the frame (2026-11-23).
     public static void AttachToBlocks()
     {
-        foreach (BoxCollider box in Object.FindObjectsByType<BoxCollider>())
+        foreach (SpriteRenderer renderer in Object.FindObjectsByType<SpriteRenderer>())
         {
-            if (box.isTrigger || box.GetComponent<BlockFx>() != null || box.GetComponent<DuduMovingObstacle>() != null) continue;
-            if (!box.TryGetComponent(out SpriteRenderer renderer) || renderer.sprite == null) continue;
+            if (renderer.sprite == null || renderer.TryGetComponent(out BlockFx _) ||
+                renderer.TryGetComponent(out DuduMovingObstacle _)) continue;
+            renderer.GetComponents(Boxes);
+            bool solid = false;
+            foreach (BoxCollider box in Boxes) solid |= !box.isTrigger;
+            if (!solid || renderer.GetComponent<SpriteRenderer>() != renderer) continue;
             if (!renderer.sprite.name.StartsWith("block")) continue;
-            box.gameObject.AddComponent<BlockFx>().Bind(renderer);
+            renderer.gameObject.AddComponent<BlockFx>().Bind(renderer);
         }
     }
+
+    private static readonly List<BoxCollider> Boxes = new List<BoxCollider>();
 }
 
 // Magnet: a visible field, bits streaming in while it is on, a line tying it to Dudu while it
