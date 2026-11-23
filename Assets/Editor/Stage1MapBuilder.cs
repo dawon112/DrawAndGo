@@ -247,12 +247,16 @@ public static class Stage1MapBuilder
             Vector3 right = (b - a).normalized;
             Vector3 normal = Vector3.Cross(Vector3.up, right);
             float length = Vector3.Distance(a, b);
-            // Each wall stands on the room side of its sketched line, so two walls drawn back to back
-            // on one line (the pillar's) never share a face.
-            Vector3 center = (a + b) * 0.5f + Vector3.up * (height * 0.5f) + normal * (WallThickness * 0.5f);
+            // The face lies on the sketched line and the wall's body behind it, so at every corner
+            // the two faces meet exactly and no end of a wall hides inside the next one. A wall drawn
+            // back to back with another on one line (the pillar's) is a thin sheet on its own side.
+            bool backToBack = IsBackToBack(segments[i][0], segments[i][1]);
+            float thickness = backToBack ? TwinThickness : WallThickness;
+            Vector3 center = (a + b) * 0.5f + Vector3.up * (height * 0.5f) +
+                normal * (backToBack ? thickness * 0.5f : -thickness * 0.5f);
             string name = segments.Length == 1 ? prefix : $"{prefix} {i + 1}";
             GameObject wall = Cube(name, center, Quaternion.LookRotation(-normal, Vector3.up),
-                new Vector3(length + WallThickness * 2f, height, WallThickness), art.Paper, parent);
+                new Vector3(length, height, thickness), art.Paper, parent);
             wall.layer = drawingLayer;
             wall.AddComponent<DrawingSurface>().SetStrokeRoot(strokeRoot);
             if (!route) continue;
@@ -312,6 +316,27 @@ public static class Stage1MapBuilder
         GameObject line = Cube(name, surface.SurfaceToWorld(new Vector2((fromX + toX) * 0.5f, -2.4f)), surface.transform.rotation,
             new Vector3(toX - fromX, 0.14f, 0.18f), ink, parent);
         CrayonRouteLineTool.Convert(line);
+    }
+
+    private const float TwinThickness = 0.03f;
+
+    // True when another wall of the blueprint runs along the same line, facing the other way, over
+    // part of this one's length.
+    private static bool IsBackToBack(Vector2 a, Vector2 b)
+    {
+        IEnumerable<Vector2[]> all = FirstFloorRoute.Concat(FirstFloorPlain).Concat(SecondFloorRoute).Concat(SecondFloorPlain);
+        Vector2 dir = (b - a).normalized;
+        foreach (Vector2[] other in all)
+        {
+            Vector2 od = (other[1] - other[0]).normalized;
+            if (Vector2.Dot(dir, od) > -0.99f) continue;
+            Vector2 offset = other[0] - a;
+            if (Mathf.Abs(dir.x * offset.y - dir.y * offset.x) > 0.5f) continue;   // not on the same line
+            float lo = Mathf.Min(Vector2.Dot(other[0] - a, dir), Vector2.Dot(other[1] - a, dir));
+            float hi = Mathf.Max(Vector2.Dot(other[0] - a, dir), Vector2.Dot(other[1] - a, dir));
+            if (hi > 0.5f && lo < (b - a).magnitude - 0.5f) return true;
+        }
+        return false;
     }
 
     private static void CreateGround(string name, DuduSurface surface, Transform parent, Material ink)
@@ -662,7 +687,7 @@ public static class Stage1MapBuilder
     {
         Transform parent = Child(root, "Clear Door");
         const float DoorWidth = 1.8f, DoorHeight = 4f, DoorY = -0.3f;
-        float wallMin = -surface.Width * 0.5f - WallThickness, wallMax = surface.Width * 0.5f + WallThickness;
+        float wallMin = -surface.Width * 0.5f, wallMax = surface.Width * 0.5f;
         float doorMin = doorX - DoorWidth * 0.5f, doorMax = doorX + DoorWidth * 0.5f;
 
         // The full wall stays as Dudu's surface but stops drawing and blocking; pieces around the
@@ -685,7 +710,8 @@ public static class Stage1MapBuilder
 
         void Segment(string name, float x, float y, float width, float height, bool solid)
         {
-            GameObject piece = Cube(name, surface.SurfaceToWorld(new Vector2(x, y)), surface.transform.rotation,
+            // Flush with the wall itself: the surface point sits a little in front of its centre.
+            GameObject piece = Cube(name, surface.transform.position + surface.Right * x + surface.Up * y, surface.transform.rotation,
                 new Vector3(width, height, WallThickness), art.Paper, parent);
             piece.layer = surface.gameObject.layer;
             if (solid) piece.AddComponent<DrawingSurface>().SetStrokeRoot(strokeRoot);
