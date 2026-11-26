@@ -8,6 +8,12 @@ public sealed class DuduHomingShooter : MonoBehaviour
     private const float LightningVisualOffset = 0.12f;
     // How long the cloud visibly charges before a bolt leaves it.
     private const float ChargeDuration = 0.45f;
+    // With Dudu out of reach, the cloud looks again this often instead of waiting a whole
+    // fire interval, so he is shot soon after he steps into range.
+    private const float RecheckInterval = 0.1f;
+    // Once charging, Dudu may slip this far past the range and still be shot: a bolt the
+    // cloud has visibly charged is not called off for a step.
+    private const float ChargeGrace = 0.5f;
 
     [Header("References")]
     [SerializeField] private DuduSurface surface;
@@ -46,8 +52,10 @@ public sealed class DuduHomingShooter : MonoBehaviour
     private float nextShotTime;
     private AudioSource audioSource;
     private DuduHomingProjectile activeProjectile;
+    private BoxCollider targetBody;
     public Transform ActiveProjectile => activeProjectile != null ? activeProjectile.transform : null;
     private float chargeEndsAt = -1f;
+    private float nextRecheck;
 
     public DuduSurface Surface => surface;
     // 0 while idle, rising to 1 as the next bolt is about to leave.
@@ -61,6 +69,7 @@ public sealed class DuduHomingShooter : MonoBehaviour
             return lightningSpawnPoint != null ? lightningSpawnPoint.position : transform.position;
         }
     }
+    private const int CloudSortingOrder = -1;
     private static AudioClip defaultFireSound;
     private static Sprite projectileSprite;
 
@@ -69,6 +78,10 @@ public sealed class DuduHomingShooter : MonoBehaviour
         // Online sync matches hazards by hierarchy path, so "StormCloud 2" keeps its own name.
         if (!gameObject.name.StartsWith("StormCloud")) gameObject.name = "StormCloud";
         gameObject.AddComponent<StormCloudFx>();
+        // The cloud hangs a little in front of the wall, so with the same order a line drawn
+        // over it was drawn first and hidden under it. Lines go over the cloud.
+        foreach (SpriteRenderer art in GetComponentsInChildren<SpriteRenderer>(true))
+            art.sortingOrder = Mathf.Min(art.sortingOrder, CloudSortingOrder);
         EnsureLightningSpawnPoint();
     }
 
@@ -115,9 +128,9 @@ public sealed class DuduHomingShooter : MonoBehaviour
         if (chargeEndsAt < 0f)
         {
             ChargeProgress = 0f;
-            if (Time.time < nextShotTime - ChargeDuration) return;
-            if (CanRecognizeTarget()) chargeEndsAt = Mathf.Max(nextShotTime, Time.time + ChargeDuration);
-            else if (Time.time >= nextShotTime) nextShotTime = Time.time + fireInterval;
+            if (Time.time < nextShotTime - ChargeDuration || Time.time < nextRecheck) return;
+            if (CanRecognizeTarget(0f)) chargeEndsAt = Mathf.Max(nextShotTime, Time.time + ChargeDuration);
+            else nextRecheck = Time.time + RecheckInterval;
             return;
         }
 
@@ -127,9 +140,14 @@ public sealed class DuduHomingShooter : MonoBehaviour
 
         chargeEndsAt = -1f;
         ChargeProgress = 0f;
-        nextShotTime = Time.time + fireInterval;
-        if (CanRecognizeTarget())
+        if (CanRecognizeTarget(ChargeGrace))
+        {
+            nextShotTime = Time.time + fireInterval;
             FireProjectile();
+        }
+        // Dudu got away (or behind a line) just as it was ready: it charges again as soon as
+        // it sees him, not a whole interval later.
+        else nextRecheck = Time.time + RecheckInterval;
     }
 
     public void ApplyRemoteProjectile(bool active, Vector3 position, Quaternion rotation)
@@ -155,7 +173,7 @@ public sealed class DuduHomingShooter : MonoBehaviour
         activeProjectile.transform.SetPositionAndRotation(position, rotation);
     }
 
-    private bool CanRecognizeTarget()
+    private bool CanRecognizeTarget(float extraRange)
     {
         // Dudu on a neighbouring wall counts too: the bolt can follow him around the corner.
         if (surface == null || target == null ||
@@ -164,8 +182,31 @@ public sealed class DuduHomingShooter : MonoBehaviour
 
         EnsureLightningSpawnPoint();
         Vector2 emitterPosition = surface.WorldToSurface(lightningSpawnPoint.position);
-        return Vector2.Distance(emitterPosition, targetPosition) <= attackRange &&
+        // Any part of Dudu inside the range counts, not only his middle: the nearest point of
+        // his body to the cloud.
+        Vector2 nearest = NearestBodyPoint(emitterPosition, targetPosition);
+        return Vector2.Distance(emitterPosition, nearest) <= attackRange + extraRange &&
             HasClearLineOfSight(emitterPosition, targetPosition);
+    }
+
+    private Vector2 NearestBodyPoint(Vector2 from, Vector2 targetPosition)
+    {
+        if (targetBody == null && target != null) targetBody = target.GetComponent<BoxCollider>();
+        if (targetBody == null) return targetPosition;
+        Vector3 scale = targetBody.transform.lossyScale;
+        // Width along the wall is the body's local z (Dudu's side faces the wall), height its y.
+        Vector2 half = new Vector2(
+            Mathf.Max(Mathf.Abs(targetBody.size.x * scale.x), Mathf.Abs(targetBody.size.z * scale.z)),
+            Mathf.Abs(targetBody.size.y * scale.y)) * 0.5f;
+        if (target.CurrentSurface != null)
+        {
+            Vector2 center = target.CurrentSurface.WorldToSurface(targetBody.bounds.center);
+            Vector2 pivot = target.CurrentSurface.WorldToSurface(target.transform.position);
+            targetPosition += center - pivot;
+        }
+        return new Vector2(
+            Mathf.Clamp(from.x, targetPosition.x - half.x, targetPosition.x + half.x),
+            Mathf.Clamp(from.y, targetPosition.y - half.y, targetPosition.y + half.y));
     }
 
     private bool HasClearLineOfSight(Vector2 emitterPosition, Vector2 targetPosition)
@@ -240,7 +281,8 @@ public sealed class DuduHomingShooter : MonoBehaviour
             LightningVisualOffset);
         homingProjectile.SetMaxHorizontalReach(projectileMaxHorizontalReach);
         // A bolt leaving the cloud's attack range disappears instead of chasing Dudu on.
-        homingProjectile.SetMaxRange(attackRange);
+        // A little past it, so a bolt fired at Dudu on the edge of the range still reaches him.
+        homingProjectile.SetMaxRange(attackRange + 1f);
         PlayFireSound();
     }
 
@@ -386,11 +428,13 @@ public sealed class DuduHomingShooter : MonoBehaviour
         if (surface == null || attackRange <= 0f) return;
         Gizmos.color = new Color(1f, 0.35f, 0.1f, 0.8f);
         const int segments = 32;
-        Vector3 previous = surface.SurfaceToWorld(surfacePosition + Vector2.right * attackRange);
+        // Around the point the bolts leave from, which is what the range is measured from.
+        Vector2 middle = lightningSpawnPoint != null ? surface.WorldToSurface(lightningSpawnPoint.position) : surfacePosition;
+        Vector3 previous = surface.SurfaceToWorld(middle + Vector2.right * attackRange);
         for (int i = 1; i <= segments; i++)
         {
             float angle = i * Mathf.PI * 2f / segments;
-            Vector2 point = surfacePosition + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * attackRange;
+            Vector2 point = middle + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * attackRange;
             Vector3 current = surface.SurfaceToWorld(point);
             Gizmos.DrawLine(previous, current);
             previous = current;

@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e17e9636850d4b24494d90a36575ae4e, type: 3}
+  m_Name: ZoneIconArt
+  m_EditorClassIdentifier: Assembly-CSharp::ZoneIconArt
+  hot:
+  - {fileID: 1540906703, guid: 5286b24ad14c2ff4a8ec5a7acb98ce13, type: 3}
+  - {fileID: 676475037, guid: 5286b24ad14c2ff4a8ec5a7acb98ce13, type: 3}
+  - {fileID: -505961885, guid: 5286b24ad14c2ff4a8ec5a7acb98ce13, type: 3}
+  locked:
+  - {fileID: 460574742, guid: e6ffa2b3af03a9d40998fc23d7018523, type: 3}
+  - {fileID: 1288385437, guid: e6ffa2b3af03a9d40998fc23d7018523, type: 3}
+  - {fileID: 1478036529, guid: e6ffa2b3af03a9d40998fc23d7018523, type: 3}

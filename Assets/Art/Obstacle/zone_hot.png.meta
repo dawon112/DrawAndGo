@@ -48,7 +48,7 @@ TextureImporter:
   spriteMeshType: 1
   alignment: 0
   spritePivot: {x: 0.5, y: 0.5}
-  spritePixelsToUnits: 100
+  spritePixelsToUnits: 58.82353
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
   alphaUsage: 1
@@ -97,13 +97,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: zone_fire_0
+      name: zone_hot_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 1360
-        height: 1360
+        width: 800
+        height: 800
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -112,20 +112,20 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: b93b1f2777f900e4a853d712d85a6dbb
+      spriteID: 2352219a71f582f4fb4acc84fbbf7671
       internalID: -465365737
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: zone_fire_1
+      name: zone_hot_1
       rect:
         serializedVersion: 2
-        x: 1360
+        x: 800
         y: 0
-        width: 1360
-        height: 1360
+        width: 800
+        height: 800
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -134,20 +134,20 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 2c05b82e0764fad42aedd50e4105b8a6
+      spriteID: 0d8c8f2fee26d1a4a8bdff4d46867b8e
       internalID: -355112172
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: zone_fire_2
+      name: zone_hot_2
       rect:
         serializedVersion: 2
-        x: 2720
+        x: 1600
         y: 0
-        width: 1360
-        height: 1360
+        width: 800
+        height: 800
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -156,7 +156,7 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 074ad99ce1772534ebd32fb6319831df
+      spriteID: 434f55d38e6c4d649a17cf26abc03438
       internalID: 458217051
       vertices: []
       indices: 
@@ -176,11 +176,11 @@ TextureImporter:
     spriteCustomMetadata:
       entries:
       - key: SpriteEditor.SliceSettings
-        value: '{"sliceOnImport":false,"gridCellCount":{"x":3.0,"y":1.0},"gridSpriteSize":{"x":1360.0,"y":1360.0},"gridSpriteOffset":{"x":0.0,"y":0.0},"gridSpritePadding":{"x":0.0,"y":0.0},"pivot":{"x":0.5,"y":0.5},"pivotPixels":{"x":0.0,"y":0.0},"autoSlicingMethod":0,"spriteAlignment":0,"pivotUnitMode":0,"slicingType":2,"keepEmptyRects":false,"isAlternate":false}'
+        value: '{"sliceOnImport":false,"gridCellCount":{"x":3.0,"y":1.0},"gridSpriteSize":{"x":800.0,"y":800.0},"gridSpriteOffset":{"x":0.0,"y":0.0},"gridSpritePadding":{"x":0.0,"y":0.0},"pivot":{"x":0.5,"y":0.5},"pivotPixels":{"x":0.0,"y":0.0},"autoSlicingMethod":0,"spriteAlignment":0,"pivotUnitMode":0,"slicingType":2,"keepEmptyRects":false,"isAlternate":false}'
     nameFileIdTable:
-      zone_fire_0: -465365737
-      zone_fire_1: -355112172
-      zone_fire_2: 458217051
+      zone_hot_0: -465365737
+      zone_hot_1: -355112172
+      zone_hot_2: 458217051
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

@@ -116,11 +116,15 @@ public sealed class HotZoneFx : MonoBehaviour
     private static readonly Color Heat = new Color(1f, 0.5f, 0.12f, 0.55f);
     private static readonly Color Ember = new Color(1f, 0.42f, 0.1f, 0.95f);
 
+    private static readonly Color FlameIcon = new Color(1f, 0.95f, 0.88f, 0.85f);
+
     private HotZone zone;
     private BoxCollider box;
     private AudioSource sizzle;
     private float nextHeat, nextEmber, nextStrokeCheck;
     private float heatOnStrokes;
+    // Little flames drift up and out of the zone.
+    private readonly ZoneIconArt.Pulse flames = new ZoneIconArt.Pulse(1.1f, 2.6f);
 
     private void Awake()
     {
@@ -129,6 +133,10 @@ public sealed class HotZoneFx : MonoBehaviour
         sizzle = FxSound.AddLoop(gameObject, FxClip.SizzleLoop);
     }
 
+    private void OnDisable() => flames.Hide();
+
+    private void OnDestroy() => flames.Release();
+
     private void Update()
     {
         DuduSurface surface = zone.Surface;
@@ -136,6 +144,8 @@ public sealed class HotZoneFx : MonoBehaviour
         Rect rect = FxWall.ZoneRect(box, surface);
         float now = Time.time;
         Vector3 up = surface.Up.normalized;
+        ZoneIconArt art = ZoneIconArt.Load();
+        if (art != null) flames.Update(art.hot, surface, rect, FlameIcon, 0.22f, transform);
 
         if (now >= nextHeat)
         {
@@ -180,10 +190,14 @@ public sealed class NoDrawZoneFx : MonoBehaviour
 {
     private const float RestAlpha = 0.26f;
 
+    private static readonly Color LockIcon = new Color(1f, 1f, 1f, 0.8f);
+
     private NoDrawZone zone;
     private BoxCollider box;
     private SpriteRenderer hatch;
     private float flare;
+    // Padlocks spread slowly out over the zone.
+    private readonly ZoneIconArt.Pulse locks = new ZoneIconArt.Pulse(1.6f, 3.2f);
 
     private void Awake()
     {
@@ -209,6 +223,7 @@ public sealed class NoDrawZoneFx : MonoBehaviour
     private void OnDisable()
     {
         if (hatch != null) hatch.enabled = false;
+        locks.Hide();
     }
 
     private void OnEnable()
@@ -218,6 +233,7 @@ public sealed class NoDrawZoneFx : MonoBehaviour
 
     private void OnDestroy()
     {
+        locks.Release();
         if (hatch == null) return;
         if (hatch.sprite != null)
         {
@@ -243,6 +259,9 @@ public sealed class NoDrawZoneFx : MonoBehaviour
     private void Update()
     {
         if (hatch == null) return;
+        ZoneIconArt art = ZoneIconArt.Load();
+        if (art != null && box != null && zone.Surface != null)
+            locks.Update(art.locked, zone.Surface, FxWall.ZoneRect(box, zone.Surface), LockIcon, 0f, transform);
         flare = Mathf.MoveTowards(flare, 0f, Time.deltaTime * 3f);
         hatch.color = Color.Lerp(new Color(1f, 1f, 1f, RestAlpha), new Color(1f, 0.32f, 0.26f, 0.85f), flare);
     }

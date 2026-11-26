@@ -527,7 +527,10 @@ public static class Stage1MapBuilder
         collider.convex = true;
 
         // The steps people see; the solid wedge under them closes the side seen from the room.
-        Mesh support = SaveMesh(Wedge(top.x, foot.x, south, north, FloorTwo - 0.25f, -0.25f), "StairSupport");
+        // Both stop a few centimetres short of the walls either side: flush with a wall's face,
+        // the two would flicker through each other.
+        const float WallGap = 0.03f;
+        Mesh support = SaveMesh(Wedge(top.x, foot.x, south + WallGap, north - WallGap, FloorTwo - 0.25f, -0.25f), "StairSupport");
         GameObject under = new GameObject("Stair Support");
         under.transform.SetParent(stairs, false);
         under.AddComponent<MeshFilter>().sharedMesh = support;
@@ -546,10 +549,17 @@ public static class Stage1MapBuilder
             unit.transform.SetPositionAndRotation(
                 new Vector3(foot.x - unitRun * (i + 0.5f), unitRise * i, (north + south) * 0.5f),
                 Quaternion.Euler(0f, 90f, 0f));
-            unit.transform.localScale = new Vector3(width / 1.05f, unitRise, unitRun / 1.01f);
+            unit.transform.localScale = new Vector3((width - WallGap * 2f) / 1.05f, unitRise, unitRun / 1.01f);
             foreach (Collider part in unit.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(part);
             unit.AddComponent<RoomOnlyDecor>();
         }
+
+        // While Haru climbs, the hint at the top of his screen says he can jump.
+        StairJumpHint jumpHint = stairs.gameObject.AddComponent<StairJumpHint>();
+        Vector3 hintMin = World(P(StairTopX - 10f, StairSouthY), -0.5f), hintMax = World(P(StairFootX + 10f, StairNorthY), FloorTwo + 0.4f);
+        jumpHint.stairs = new Bounds((hintMin + hintMax) * 0.5f, new Vector3(
+            Mathf.Abs(hintMax.x - hintMin.x), Mathf.Abs(hintMax.y - hintMin.y), Mathf.Abs(hintMax.z - hintMin.z)));
+        jumpHint.topHeight = FloorTwo;
 
         // A railing on 2F around the opening, open at the top step where Haru walks off.
         Transform rails = Child(stairs, "2F Railing");
